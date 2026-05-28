@@ -28,13 +28,17 @@ class PhasePage(QWidget):
 
     * A reference to the shared :class:`AppState`.
     * A standard heading layout (title + subtitle).
-    * Two convenience signals -- :pyattr:`status_message` (logged in
-      the dock at the bottom of the main window) and :pyattr:`request_navigate`
-      (asks the main window to switch to a different phase index).
+    * Convenience signals -- :pyattr:`status_message`, :pyattr:`request_navigate`,
+      and :pyattr:`request_jump_to_row` for cross-phase navigation.
+    * A :pyattr:`is_busy` guard so subclasses can refuse double-clicks
+      from the user without each one re-implementing the same dance.
     """
 
     status_message = Signal(str)
     request_navigate = Signal(int)
+    request_jump_to_row = Signal(str)  # entry key
+    file_dropped = Signal(str)         # absolute path of a dropped file
+    busy_changed = Signal(bool)
 
     def __init__(
         self,
@@ -45,6 +49,7 @@ class PhasePage(QWidget):
     ) -> None:
         super().__init__(parent)
         self._state = state
+        self._busy = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 24, 24, 24)
@@ -84,8 +89,39 @@ class PhasePage(QWidget):
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
-        line.setStyleSheet("color: #e2e8f0;")
+        line.setProperty("role", "separator")
         self._content_layout.addWidget(line)
+
+    # ------------------------------------------------------------------ busy guard
+
+    @property
+    def is_busy(self) -> bool:
+        return self._busy
+
+    def set_busy(self, busy: bool) -> None:
+        """Toggle the busy state.
+
+        Subclasses that start work via :meth:`run_when_idle` get
+        protection from double-clicks for free; explicit callers can
+        also use this directly to gate UI elements.
+        """
+        if self._busy == busy:
+            return
+        self._busy = busy
+        self.busy_changed.emit(busy)
+
+    def run_when_idle(self, callable_, *args, **kwargs) -> bool:
+        """Invoke ``callable_`` only if the page isn't already running work.
+
+        Returns ``True`` if the call ran, ``False`` if it was suppressed.
+        Used by every ``_on_<action>`` slot so that a user mashing the
+        mouse can never trigger overlapping operations.
+        """
+        if self._busy:
+            self.status_message.emit("Operation already in progress -- ignoring duplicate click.")
+            return False
+        callable_(*args, **kwargs)
+        return True
 
     # ------------------------------------------------------------------ dialogs
 
@@ -98,7 +134,24 @@ class PhasePage(QWidget):
     def error(self, message: str, title: str = "Error") -> None:
         QMessageBox.critical(self, title, message)
 
-    def pick_open_file(self, caption: str, filter_str: str, start_dir: Optional[Path] = None) -> Optional[Path]:
+    def confirm(self, message: str, title: str = "Confirm") -> bool:
+        return (
+            QMessageBox.question(
+                self,
+                title,
+                message,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        )
+
+    def pick_open_file(
+        self,
+        caption: str,
+        filter_str: str,
+        start_dir: Optional[Path] = None,
+    ) -> Optional[Path]:
         path_str, _ = QFileDialog.getOpenFileName(
             self,
             caption,
@@ -107,11 +160,17 @@ class PhasePage(QWidget):
         )
         return Path(path_str) if path_str else None
 
-    def pick_save_file(self, caption: str, filter_str: str, default_name: str) -> Optional[Path]:
+    def pick_save_file(
+        self,
+        caption: str,
+        filter_str: str,
+        default_name: str,
+    ) -> Optional[Path]:
+        start = self._state.output_dir or Path.cwd()
         path_str, _ = QFileDialog.getSaveFileName(
             self,
             caption,
-            str(self._state.output_dir or Path.cwd() / default_name),
+            str(Path(start) / default_name),
             filter_str,
         )
         return Path(path_str) if path_str else None
@@ -127,10 +186,29 @@ class PhasePage(QWidget):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
-        """Called by :class:`MainWindow` when this page becomes active.
+        """Called by :class:`MainWindow` when this page becomes active."""
 
-        Subclasses override to refresh state-dependent widgets.
-        """
+    # ------------------------------------------------------------------ drag-and-drop
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802 -- Qt API
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
+
+    def dragMoveEvent(self, event) -> None:  # noqa: N802
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:  # noqa: N802
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    self.file_dropped.emit(url.toLocalFile())
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +216,7 @@ class PhasePage(QWidget):
 # ---------------------------------------------------------------------------
 
 def make_action_row(*buttons: QPushButton) -> QHBoxLayout:
-    """Lay out a row of action buttons, left-aligned with the layout pushing right."""
+    """Lay out a row of action buttons, left-aligned with spacer pushing right."""
     layout = QHBoxLayout()
     layout.setSpacing(8)
     for btn in buttons:
@@ -147,3 +225,15 @@ def make_action_row(*buttons: QPushButton) -> QHBoxLayout:
         layout.addWidget(btn)
     layout.addStretch(1)
     return layout
+
+
+def primary(button: QPushButton) -> QPushButton:
+    """Mark a button as primary (themed accent colour)."""
+    button.setProperty("primary", True)
+    return button
+
+
+def danger(button: QPushButton) -> QPushButton:
+    """Mark a button as destructive."""
+    button.setProperty("danger", True)
+    return button

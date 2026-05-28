@@ -125,6 +125,9 @@ class TranslationDone:
     statuses: list
     translated_count: int
     skipped_count: int
+    cached_count: int = 0
+    deduped_count: int = 0
+    elapsed_seconds: float = 0.0
 
 
 class TranslationWorker(QThread):
@@ -140,30 +143,70 @@ class TranslationWorker(QThread):
         original text -- the audit sheets still capture that detail).
     failed(str)
         On unexpected error.
+    row_translated(str source, str translation, str status)
+        Live "EN -> JA" feed for the GUI status panel.
+
+    Multi-click safety:
+        - ``start()`` is idempotent: a second call while running logs a
+          warning (Qt's own QThread.start() check) and is a no-op.
+        - ``cancel()`` is idempotent: setting ``_cancel`` to True repeatedly
+          has no extra effect.
+        - The worker itself is one-shot; pages must construct a fresh
+          worker per translation run (Qt requirement anyway).
     """
 
     progress = Signal(int, str)
     finished_ok = Signal(object)
     failed = Signal(str)
+    row_translated = Signal(str, str, str)  # source, translation, status
 
     def __init__(
         self,
         doc: Document,
         source_code: str,
         target_code: str,
+        *,
+        scope=None,
+        memory=None,
+        glossary=None,
+        workers: int = 4,
+        rate_limit_per_second=8.0,
+        prevent_system_sleep: bool = True,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._doc = doc
         self._source = to_google_code(source_code)
         self._target = to_google_code(target_code)
+        self._scope = scope
+        self._memory = memory
+        self._glossary = glossary
+        self._workers = workers
+        self._rate_limit = rate_limit_per_second
+        self._prevent_sleep = prevent_system_sleep
         self._cancel = False
+        self._cancel_lock = QObject()  # used only for sender identity
+        self._already_finished = False
 
     def cancel(self) -> None:
-        """Request a graceful early-stop after the current row."""
+        """Request a graceful early-stop after the current row.
+
+        Idempotent -- calling repeatedly has no extra effect.  The
+        running translation finishes its in-flight row and then the
+        runner gracefully fills remaining slots with ``Cancelled``.
+        """
         self._cancel = True
 
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancel
+
     def run(self) -> None:  # noqa: D401
+        if self._already_finished:
+            # Defensive: should never happen because Qt threads are one-shot,
+            # but avoids any chance of double-emit if someone re-invokes run().
+            return
+
         translator = GoogleFreeTranslator()
 
         def on_progress(event: TranslationProgress) -> None:
@@ -171,6 +214,12 @@ class TranslationWorker(QThread):
                 event.percent,
                 f"[{event.completed}/{event.total}] {event.sheet} :: {event.key} -> {event.status}",
             )
+            if event.status.startswith("Translated") or event.status.startswith("Skipped"):
+                self.row_translated.emit(
+                    event.source_text or "",
+                    event.translation_text or "",
+                    event.status,
+                )
 
         try:
             result = translate_document(
@@ -180,17 +229,28 @@ class TranslationWorker(QThread):
                 target_lang=self._target,
                 progress=on_progress,
                 cancel=lambda: self._cancel,
+                scope=self._scope,
+                memory=self._memory,
+                glossary=self._glossary,
+                workers=self._workers,
+                rate_limit_per_second=self._rate_limit,
+                prevent_system_sleep=self._prevent_sleep,
             )
         except Exception as exc:  # noqa: BLE001
+            self._already_finished = True
             self.failed.emit(f"{type(exc).__name__}: {exc}")
             return
 
+        self._already_finished = True
         self.finished_ok.emit(
             TranslationDone(
                 summaries=result.summaries,
                 statuses=result.statuses,
                 translated_count=result.translated_count,
                 skipped_count=result.skipped_count,
+                cached_count=result.cached_count,
+                deduped_count=result.deduped_count,
+                elapsed_seconds=result.elapsed_seconds,
             )
         )
 

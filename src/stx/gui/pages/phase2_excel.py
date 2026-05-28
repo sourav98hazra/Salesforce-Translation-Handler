@@ -75,7 +75,7 @@ class Phase2ExcelPage(PhasePage):
 
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
+        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
         self.add_layout(make_action_row(self._convert_btn, self._load_btn, self._next_btn))
 
@@ -131,6 +131,15 @@ class Phase2ExcelPage(PhasePage):
         self._state.organized_xlsx_path = result.path
         self._state.output_dir = result.path.parent
         self._populate_details(result)
+        try:
+            from .. import settings as gui_settings
+            from ..state import PhaseStatus
+
+            gui_settings.add_recent_file(result.path)
+            gui_settings.remember_output_dir(result.path.parent)
+            self._state.set_phase(2, PhaseStatus.DONE)
+        except Exception:  # noqa: BLE001
+            pass
         self.status_message.emit(
             f"Wrote {len(result.sheets_written)} sheets to {result.path}"
         )

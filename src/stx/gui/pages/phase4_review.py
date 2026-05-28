@@ -4,6 +4,14 @@ The review page presents every entry in a single table.  The
 ``Translation`` column is editable; everything else is read-only.  A
 filter row at the top lets the reviewer narrow by component type or
 translation status, which is essential at 36k+ rows.
+
+A side-by-side editor pane appears below the table when a row is
+selected, showing the source label and the translation in larger,
+multi-line fields with explicit "Save row" / "Reset" buttons -- much
+nicer than editing long HTML strings in a single cell.
+
+Phase 4 also exposes a public :meth:`focus_key` method that Phase 5
+calls to "jump to issue" when the reviewer clicks a validation error.
 """
 
 from __future__ import annotations
@@ -19,14 +27,17 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
+    QSplitter,
     QTableView,
+    QVBoxLayout,
 )
 
 from ...model import Document, Entry
-from ..state import AppState
+from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
-from .base import PhasePage, make_action_row
+from .base import PhasePage, make_action_row, primary
 
 _HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation"]
 _TRANSLATION_COL = 5
@@ -40,8 +51,6 @@ class _EntriesModel(QAbstractTableModel):
     def __init__(self, doc: Document, parent=None) -> None:
         super().__init__(parent)
         self._doc = doc
-
-    # ---- read
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: D401, N802
         return 0 if parent.isValid() else len(self._doc.entries)
@@ -84,8 +93,6 @@ class _EntriesModel(QAbstractTableModel):
             return base | Qt.ItemFlag.ItemIsEditable
         return base
 
-    # ---- write
-
     def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: D401, N802
         if role != Qt.ItemDataRole.EditRole or index.column() != _TRANSLATION_COL:
             return False
@@ -94,7 +101,6 @@ class _EntriesModel(QAbstractTableModel):
         text = "" if value is None else str(value)
         self._doc.entries[row] = Entry(key=old.key, label=old.label, translation=text)
         self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
-        # Also signal the Status column may have changed.
         status_idx = self.index(row, 3)
         self.dataChanged.emit(status_idx, status_idx, [Qt.ItemDataRole.DisplayRole])
         self.edited.emit(row)
@@ -102,7 +108,7 @@ class _EntriesModel(QAbstractTableModel):
 
 
 class _ComponentStatusFilter(QSortFilterProxyModel):
-    """Custom proxy that filters by component, status, and key/label search."""
+    """Custom proxy filter (component + status + key/label search)."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -148,18 +154,20 @@ class Phase4ReviewPage(PhasePage):
             state,
             title="Phase 4 \u2014 Review",
             subtitle=(
-                "Inspect every translation and edit any cells that need correction. "
-                "Filter by component type or status to focus your review. The "
-                "edited workbook can be saved at any time."
+                "Inspect every translation and edit any cells that need "
+                "correction.  Filter by component type or status to focus "
+                "your review.  Phase 5's validation can also jump you "
+                "directly to a problematic row."
             ),
             parent=parent,
         )
         self._model: Optional[_EntriesModel] = None
-        self._proxy: _ComponentStatusFilter = _ComponentStatusFilter(self)
+        self._proxy = _ComponentStatusFilter(self)
+        self._current_row: Optional[int] = None
         self._build()
 
     def _build(self) -> None:
-        # ---------- Filter row
+        # Filter row
         filter_box = QGroupBox("Filter")
         filter_layout = QHBoxLayout(filter_box)
         filter_layout.addWidget(QLabel("Component:"))
@@ -183,29 +191,74 @@ class Phase4ReviewPage(PhasePage):
         filter_layout.addWidget(self._search, stretch=1)
         self.add_widget(filter_box)
 
-        # ---------- Table
+        # Splitter: table on top, side-by-side editor below
+        splitter = QSplitter(Qt.Orientation.Vertical)
+
         self._table = QTableView()
         self._table.setModel(self._proxy)
         self._table.setAlternatingRowColors(True)
         self._table.setSortingEnabled(True)
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self._table.verticalHeader().setVisible(False)
-        self._table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.SelectedClicked)
-        self.add_widget(self._table, stretch=1)
+        self._table.setEditTriggers(
+            QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.SelectedClicked
+        )
+        self._table.selectionModel  # touch -- ensures it exists
+        splitter.addWidget(self._table)
 
-        # ---------- Counters
+        # Side-by-side editor pane
+        editor_box = QGroupBox("Selected row -- side-by-side editor")
+        editor_layout = QVBoxLayout(editor_box)
+
+        meta_row = QHBoxLayout()
+        self._key_field = QLineEdit()
+        self._key_field.setReadOnly(True)
+        self._key_field.setStyleSheet("font-family: 'JetBrains Mono', 'Consolas', 'Menlo', monospace;")
+        meta_row.addWidget(QLabel("Key:"))
+        meta_row.addWidget(self._key_field, stretch=1)
+        editor_layout.addLayout(meta_row)
+
+        side_by_side = QHBoxLayout()
+        src_box = QVBoxLayout()
+        src_box.addWidget(QLabel("Source label"))
+        self._source_field = QPlainTextEdit()
+        self._source_field.setReadOnly(True)
+        src_box.addWidget(self._source_field)
+        side_by_side.addLayout(src_box, stretch=1)
+
+        tgt_box = QVBoxLayout()
+        tgt_box.addWidget(QLabel("Translation (editable)"))
+        self._translation_field = QPlainTextEdit()
+        tgt_box.addWidget(self._translation_field)
+        side_by_side.addLayout(tgt_box, stretch=1)
+
+        editor_layout.addLayout(side_by_side)
+
+        editor_actions = QHBoxLayout()
+        self._save_row_btn = primary(QPushButton("Apply to row"))
+        self._save_row_btn.clicked.connect(self._apply_editor_to_row)
+        self._reset_row_btn = QPushButton("Reset row to source")
+        self._reset_row_btn.clicked.connect(self._reset_row)
+        editor_actions.addWidget(self._save_row_btn)
+        editor_actions.addWidget(self._reset_row_btn)
+        editor_actions.addStretch(1)
+        editor_layout.addLayout(editor_actions)
+
+        splitter.addWidget(editor_box)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        self.add_widget(splitter, stretch=1)
+
+        # Counters
         self._counters = QLabel("")
         self._counters.setStyleSheet("color: #4a5568;")
         self.add_widget(self._counters)
 
-        # ---------- Actions
-        self._save_btn = QPushButton("Save reviewed workbook (.xlsx)")
+        # Actions
+        self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
         self._save_btn.clicked.connect(self._on_save)
-        self._save_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
-
         self._next_btn = QPushButton("Continue to Phase 5 \u2192")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(4))
-
+        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(5))
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
@@ -221,13 +274,12 @@ class Phase4ReviewPage(PhasePage):
             self._model = _EntriesModel(self._state.document, self)
             self._model.edited.connect(lambda _row: self._update_counters())
             self._proxy.setSourceModel(self._model)
+            self._table.selectionModel().currentChanged.connect(self._on_selection_changed)
         else:
-            # Document may have been swapped underneath -- rebind.
             self._model.beginResetModel()
             self._model._doc = self._state.document  # noqa: SLF001 (intentional)
             self._model.endResetModel()
 
-        # Refresh component combo
         components = sorted({e.component_type for e in self._state.document.entries})
         self._component_combo.blockSignals(True)
         current = self._component_combo.currentText()
@@ -237,7 +289,6 @@ class Phase4ReviewPage(PhasePage):
             self._component_combo.setCurrentText(current)
         self._component_combo.blockSignals(False)
 
-        # Reasonable column widths
         self._table.setColumnWidth(0, 60)
         self._table.setColumnWidth(1, 320)
         self._table.setColumnWidth(2, 120)
@@ -246,35 +297,80 @@ class Phase4ReviewPage(PhasePage):
         self._table.setColumnWidth(5, 320)
         self._update_counters()
 
-    # ------------------------------------------------------------------ slots
-
     def _update_counters(self) -> None:
         if self._state.document is None:
             return
         stats = self._state.document.stats()
         self._counters.setText(
-            f"Total: {stats['total']:,}   "
-            f"Translated: {stats['translated']:,}   "
-            f"Untranslated: {stats['untranslated']:,}   "
-            f"Components: {stats['components']}"
+            f"Total: {stats['total']:,}   Translated: {stats['translated']:,}   "
+            f"Untranslated: {stats['untranslated']:,}   Components: {stats['components']}"
         )
 
-    def _on_save(self) -> None:
-        if self._state.document is None:
+    def _on_selection_changed(self, current: QModelIndex, _previous: QModelIndex) -> None:
+        if not current.isValid():
             return
-        suggested = (
-            self._state.translated_xlsx_path or self._state.organized_xlsx_path or Path.cwd() / "reviewed.xlsx"
-        )
-        path = self.pick_save_file(
-            "Save reviewed workbook as",
-            "Excel files (*.xlsx)",
-            "reviewed.xlsx",
-        )
+        source_row = self._proxy.mapToSource(current).row()
+        self._current_row = source_row
+        if self._model is None or self._state.document is None:
+            return
+        entry = self._state.document.entries[source_row]
+        self._key_field.setText(entry.key)
+        self._source_field.setPlainText(entry.label)
+        self._translation_field.setPlainText(entry.translation)
+
+    def _apply_editor_to_row(self) -> None:
+        if self._current_row is None or self._model is None:
+            return
+        new_text = self._translation_field.toPlainText()
+        idx = self._model.index(self._current_row, _TRANSLATION_COL)
+        self._model.setData(idx, new_text, Qt.ItemDataRole.EditRole)
+        self.status_message.emit(f"Updated translation for row {self._current_row + 1}.")
+
+    def _reset_row(self) -> None:
+        if self._current_row is None or self._model is None:
+            return
+        if not self.confirm("Reset this row's translation to the source label?"):
+            return
+        entry = self._state.document.entries[self._current_row]
+        idx = self._model.index(self._current_row, _TRANSLATION_COL)
+        self._model.setData(idx, entry.label, Qt.ItemDataRole.EditRole)
+        self._translation_field.setPlainText(entry.label)
+
+    # ------------------------------------------------------------------ jump-to-issue
+
+    def focus_key(self, key: str) -> None:
+        """Find ``key`` in the table and select it.
+
+        Called by Phase 5 (validation report) to "jump to issue".  Clears
+        any active filters so the row is guaranteed visible.
+        """
+        if self._state.document is None or self._model is None:
+            return
+        for index, entry in enumerate(self._state.document.entries):
+            if entry.key == key:
+                self._component_combo.setCurrentText("All")
+                self._status_combo.setCurrentText("All")
+                self._search.clear()
+                src_index = self._model.index(index, 1)
+                proxy_index = self._proxy.mapFromSource(src_index)
+                if proxy_index.isValid():
+                    self._table.scrollTo(proxy_index, QTableView.ScrollHint.PositionAtCenter)
+                    self._table.setCurrentIndex(proxy_index)
+                self._on_selection_changed(proxy_index, QModelIndex())
+                return
+
+    # ------------------------------------------------------------------ save
+
+    def _on_save(self) -> None:
+        if self._state.document is None or self.is_busy:
+            return
+        path = self.pick_save_file("Save reviewed workbook as", "Excel files (*.xlsx)", "reviewed.xlsx")
         if not path:
             return
         if path.suffix.lower() != ".xlsx":
             path = path.with_suffix(".xlsx")
 
+        self.set_busy(True)
         self.status_message.emit(f"Saving reviewed workbook -> {path}")
         worker = ExportExcelWorker(self._state.document, path, self)
 
@@ -287,16 +383,23 @@ class Phase4ReviewPage(PhasePage):
                     parent=self,
                 )
                 audit.finished_ok.connect(lambda _: self._on_saved(path))
-                audit.failed.connect(lambda msg: self.error(msg, "Save failed"))
+                audit.failed.connect(lambda msg: self._on_save_failed(msg))
                 audit.start()
             else:
                 self._on_saved(path)
 
         worker.finished_ok.connect(_then_audit)
-        worker.failed.connect(lambda msg: self.error(msg, "Save failed"))
+        worker.failed.connect(lambda msg: self._on_save_failed(msg))
         worker.start()
 
     def _on_saved(self, path: Path) -> None:
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
+        self._state.set_phase(4, PhaseStatus.DONE)
+        self.set_busy(False)
         self.status_message.emit(f"Reviewed workbook saved: {path}")
+
+    def _on_save_failed(self, message: str) -> None:
+        self.set_busy(False)
+        self._state.set_phase(4, PhaseStatus.ERROR)
+        self.error(message, "Save failed")

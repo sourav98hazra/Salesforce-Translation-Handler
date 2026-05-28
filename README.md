@@ -342,3 +342,207 @@ scripts can still consume, and vice versa.
 ## License
 
 MIT
+
+
+
+---
+
+# v1.1 -- Improvements
+
+The `feat/v1.1-improvements` branch adds the following on top of the v1.0 MVP. None of v1.0 is broken; every existing CLI command and GUI page continues to work.
+
+## New core features
+
+### 1. Component selection + persistent key list (Phase 3)
+
+In Phase 3 (Translate), a "Components to translate" panel lists every component type in the loaded document with checkboxes (default: all selected). Below it, "Include" and "Exclude" text areas accept exact keys or glob patterns (`CustomLabel.*`, `*.HelpText`).
+
+The full filter set is saved to a JSON file (`.stxscope.json`) and can be auto-discovered next to the source STF. This implements both:
+
+- "select which components to ultimately translate, all selected by default"
+- "store a list of keys somewhere which should be translated"
+
+CLI:
+
+```bash
+# Build a scope file from a source document
+stx scope new input.stf my-scope.stxscope.json --components CustomLabel,ButtonOrLink --exclude '*.HelpText'
+
+# Use it during translation
+stx translate organized.xlsx translated.xlsx --target ja --scope-file my-scope.stxscope.json
+```
+
+### 2. Translation Memory (SQLite cache)
+
+Every successful `(source, source_lang, target_lang) -> translation` triple is cached. Subsequent runs skip the network entirely for known sources -- saves time, avoids rate limits, produces identical translations across reviews.
+
+Default location: `~/.cache/salesforce-translation-handler/tm.sqlite`. The Phase 3 panel shows live stats (entries, hits, file size) and exposes a "Clear cache" button.
+
+CLI:
+
+```bash
+stx translate organized.xlsx translated.xlsx --memory-db ./tm.sqlite
+```
+
+### 3. Glossary (CSV)
+
+Two rule kinds in one file:
+
+- **Do-not-translate (DNT)** -- term shielded by sentinel; round-trips exactly.
+- **Forced translation** -- source term always replaced with the specified translation.
+
+CSV format: `source,target,do_not_translate`.
+
+```csv
+source,target,do_not_translate
+Bayer,,true
+ATLS,,true
+case,ケース,
+record,レコード,
+```
+
+CLI:
+
+```bash
+stx translate organized.xlsx translated.xlsx --glossary glossary.csv
+```
+
+### 4. In-run deduplication + parallel workers
+
+Repeated source labels (e.g. "Name" / "Created Date" appear in every Salesforce object's field labels) are translated **once** and the result is reused for every duplicate row. Combined with a `ThreadPoolExecutor`, translation throughput improves dramatically.
+
+On the bundled 36245-row sample with `workers=4`, dedup eliminates ~50% of the work; with a warm TM, subsequent runs of the same file finish in seconds instead of minutes.
+
+### 5. Adaptive rate limiting
+
+Token-bucket pacer that grows on every successful call and shrinks on every failure. The free Google tier rate-limits aggressively; the limiter self-tunes to whatever rate the backend tolerates today.
+
+CLI:
+
+```bash
+stx translate ... --workers 8 --rate-limit 12.0
+```
+
+`--rate-limit 0` disables it (recommended for paid backends).
+
+### 6. Multi-language batch
+
+Translate to multiple target languages in a single command:
+
+```bash
+stx run input.stf ./out --target ja --targets fr,de,es
+```
+
+Outputs land in `./out/ja/`, `./out/fr/`, `./out/de/`, `./out/es/`.
+
+### 7. Multiple translator backends
+
+Available via `--backend`:
+
+| Key      | Backend                       | API key needed | Env var                  |
+|----------|-------------------------------|----------------|--------------------------|
+| `google` | Google Translate (free)       | no             | -                        |
+| `deepl`  | DeepL                         | yes            | `DEEPL_API_KEY`          |
+| `azure`  | Microsoft Azure Translator    | yes            | `AZURE_TRANSLATOR_KEY`   |
+| `openai` | OpenAI (GPT)                  | yes            | `OPENAI_API_KEY`         |
+
+```bash
+stx backends   # list them
+stx translate ... --backend deepl --api-key sk-...
+```
+
+### 8. Wake-lock (prevent system sleep during long runs)
+
+Cross-platform: `caffeinate` on macOS, `SetThreadExecutionState` on Windows, `systemd-inhibit` on Linux. The Phase 3 page has a "Prevent system sleep" checkbox (on by default).
+
+Note: this prevents *idle* sleep. Closing a laptop lid still suspends every process -- there is no way around that. Keep the lid open.
+
+### 9. Project files (`.stxproject`)
+
+Save the entire pipeline state -- file paths, target language, backend, scope, glossary, TM -- to a single JSON file you can reopen later or share with a teammate.
+
+```bash
+stx project show my-project.stxproject
+```
+
+## GUI improvements
+
+### Welcome screen (Phase 0)
+
+Recent files list, quick actions ("Open STF", "Load project", "Load Excel"), and the project description. Drag-and-drop files anywhere in the window.
+
+### Sidebar status badges
+
+Each phase now shows its status as an icon (`▶` running, `✓` done, `⚠` error) next to the label, so the entire pipeline state is visible at a glance.
+
+### Drag-and-drop
+
+Drop an `.stf`, `.xlsx`, or `.stxproject` file anywhere in the window. The app routes you to the appropriate phase automatically.
+
+### Keyboard shortcuts
+
+| Shortcut    | Action                          |
+|-------------|---------------------------------|
+| `Ctrl+0..5` | Switch to phase N               |
+| `Ctrl+O`    | Open file...                    |
+| `Ctrl+S`    | Save current phase artifact     |
+| `Ctrl+Q`    | Quit                            |
+
+### Theme toggle (View menu)
+
+Light, Dark, and Auto themes. The choice is remembered across sessions.
+
+### Phase 3 enhancements
+
+- **Component scope panel** with Select all / Select none / Invert and per-component count
+- **Include / Exclude key list** with glob support, save / load / auto-discover
+- **Glossary picker** (CSV)
+- **Translation Memory** path + live cache stats + Clear cache
+- **Backend picker** (Google / DeepL / Azure / OpenAI) with API-key field
+- **Workers** spinner (1-32) and **Rate limit** (req/s)
+- **Prevent system sleep** checkbox
+- **Live feed** showing the actual EN -> JA pair for each row as it translates
+- **ETA + rows/second** in the progress panel
+- **Multi-click protection** -- "Start" cannot be triggered twice; "Cancel" is idempotent
+
+### Phase 4 enhancements
+
+- **Side-by-side editor** below the table: when a row is selected, the source label and translation appear in larger multi-line fields with explicit "Apply to row" / "Reset row to source" buttons -- much nicer than editing long HTML strings in a single cell.
+- **Jump-to-issue** -- when Phase 5 reports a validation error, double-click it and you land on the offending row in Phase 4 with all filters cleared so the row is guaranteed visible.
+
+### Settings persistence
+
+Window geometry, theme, last target language, last output directory, last-used backend, and recent files are remembered across sessions via QSettings.
+
+## CLI parity
+
+Everything the GUI can do is now mirrored on the CLI:
+
+```bash
+# Existing commands gain the new flags
+stx translate organized.xlsx translated.xlsx \
+    --target ja \
+    --backend google \
+    --scope-file scope.stxscope.json \
+    --glossary glossary.csv \
+    --memory-db ./tm.sqlite \
+    --workers 8 \
+    --rate-limit 12
+
+# Multi-language batch in one run
+stx run input.stf ./out --target ja --targets fr,de,es --memory-db ./tm.sqlite
+
+# New subcommands
+stx scope new input.stf scope.stxscope.json --components CustomLabel,ButtonOrLink
+stx scope show scope.stxscope.json
+stx project show my-project.stxproject
+stx backends   # list available translator backends
+```
+
+## Robustness
+
+- **Single-shot runner guard** -- the runner refuses to be invoked twice on the same instance.
+- **Multi-click protection** in the GUI -- "Start" / "Cancel" / "Save" buttons can be clicked rapidly without stacking work.
+- **Gap-prevention sweep** -- after every translation run, the runner walks the entries array and ensures every slot has both a final entry and a status entry. The audit log is guaranteed to have one row per source row.
+- **Verified on the 36245-row sample**: round-trip preserves every row, scope filter correctly accounts for in-scope vs out-of-scope rows, no rows are ever lost.
+

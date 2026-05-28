@@ -150,6 +150,17 @@ class Phase1ImportPage(PhasePage):
         self._save_stf_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
 
+        # Persist this file in the recent files list and mark phase 1 done.
+        try:
+            from .. import settings as gui_settings
+            from ..state import PhaseStatus
+
+            if self._state.source_stf_path:
+                gui_settings.add_recent_file(self._state.source_stf_path)
+            self._state.set_phase(1, PhaseStatus.DONE)
+        except Exception:  # noqa: BLE001
+            pass
+
         self.status_message.emit(
             f"Parsed {stats['total']:,} rows ({stats['untranslated']:,} untranslated) "
             f"across {stats['components']} component types."
@@ -197,4 +208,4 @@ class Phase1ImportPage(PhasePage):
             self._state.target_language_name = self._language_field.text().strip()
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
-        self.request_navigate.emit(1)
+        self.request_navigate.emit(2)
