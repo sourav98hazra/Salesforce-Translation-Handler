@@ -125,6 +125,43 @@ After install, two commands appear on your `PATH`:
 
 ## Running the desktop GUI
 
+There are three ways to launch the app — pick whichever fits your situation:
+
+### Option 1: Double-click launcher (easiest, after `pip install`)
+
+After running `pip install -e ".[gui]"` once, just **double-click** the launcher for your OS in the project folder:
+
+| OS | File to double-click | Notes |
+|---|---|---|
+| **Windows** | `launch.bat` | Auto-creates the venv on first run if needed |
+| **macOS**   | `launch.command` | Right-click → Open the first time (Gatekeeper) |
+| **Linux**   | `launch.sh` | Run `chmod +x launch.sh` once, then double-click in your file manager |
+
+These launchers detect the virtual environment, set it up automatically on first run if it doesn't exist, then start the GUI. They're safe to commit / share with non-technical users — they handle the install for them.
+
+For Linux desktop integration, the included `SalesforceTranslationHandler.desktop` file can be copied to `~/.local/share/applications/` after editing the `Exec=` path, giving you a Start Menu / launcher entry.
+
+### Option 2: Standalone executable (no Python needed on target machine)
+
+For distributing to non-technical users who don't have Python at all, build a single self-contained binary:
+
+```bash
+pip install -e ".[gui]" pyinstaller
+python build_exe.py
+```
+
+This produces:
+
+| OS | Output |
+|---|---|
+| Windows | `dist\SalesforceTranslationHandler.exe` |
+| macOS   | `dist/SalesforceTranslationHandler.app` |
+| Linux   | `dist/SalesforceTranslationHandler` (ELF binary) |
+
+The artifact is fully self-contained (~65MB on Linux): it bundles Python, all dependencies, and the application. End users just **double-click and go** — no installation, no Python, no terminal. PyInstaller does not cross-compile, so build on the OS you intend to ship to.
+
+### Option 3: Terminal command
+
 ```bash
 stx-app
 ```
@@ -231,6 +268,12 @@ Salesforce-Translation-Handler/
 ├── tests/                            # Pytest test suite
 ├── pyproject.toml
 ├── README.md
+├── launcher.py                       # PyInstaller / OS launcher entry-point
+├── launch.bat                        # Windows double-click launcher
+├── launch.command                    # macOS double-click launcher
+├── launch.sh                         # Linux double-click launcher
+├── SalesforceTranslationHandler.desktop  # Linux desktop entry
+├── build_exe.py                      # PyInstaller standalone-binary builder
 └── (legacy scripts kept for reference)
     ├── stftoexcel_v2.ps1
     ├── translate_excel_fixed.py

@@ -53,9 +53,12 @@ Super_STF_*.stf
 TranslatedOnly_STF_*.stf
 UntranslatedOnly_STF_*.stf
 
-# PyInstaller
+# PyInstaller output
+build/
+dist/
+SalesforceTranslationHandler.spec
 *.spec
-!build_exe.spec
+!build_exe.py
 
 # Logs
 *.log
