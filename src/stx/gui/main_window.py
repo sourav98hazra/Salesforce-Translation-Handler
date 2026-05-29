@@ -1,17 +1,28 @@
 """Top-level window: sidebar phase navigation + stacked phase pages.
 
-v1.1 additions over the MVP:
+The window hosts the six-phase pipeline (Import STF / STF -> Excel /
+Translate / Browse & Review / Validate & Fix / Export STF) with:
 
-* **Welcome page** as Phase 0, with recent files and quick actions.
-* **Status badges** in the sidebar (idle / running / done / error).
-* **Drag-and-drop** anywhere in the window opens a dropped file in the
-  appropriate phase.
-* **Keyboard shortcuts**: ``Ctrl+1..6`` (phase), ``Ctrl+O`` (open),
-  ``Ctrl+S`` (save current phase), ``Ctrl+Q`` (quit), ``Ctrl+Shift+L`` /
-  ``Ctrl+Shift+D`` (light / dark theme).
-* **File menu** with recent files submenu (auto-routes by extension).
-* **View menu** with theme toggle.
-* **Settings persistence** for window geometry, theme, last language.
+* **Status badges** in the sidebar (idle / running / done / error)
+  for every phase, so the entire pipeline state is visible at a glance.
+* **Drag-and-drop** anywhere in the window auto-routes by extension
+  (.stf -> Phase 1, .xlsx -> Phase 4 / 2 / 5 based on filename).
+* **Keyboard shortcuts**: ``Ctrl+0..5`` jump straight to a phase,
+  ``Ctrl+O`` opens a file, ``Ctrl+S`` saves the current phase artifact,
+  ``Ctrl+L`` toggles the status log, ``Ctrl+,`` opens Settings,
+  ``F1`` opens the user guide, ``Ctrl+Q`` quits.
+* **File menu** with a Recent files submenu (auto-routes on click).
+* **Edit menu** with a single Settings entry -- everything advanced
+  (backend / API key / workers / rate limit / glossary / TM / batch
+  targets / wake-lock) lives there.
+* **View menu** with the five theme presets (light / dark / ocean /
+  forest / sunset) plus auto, persisted across sessions.
+* **Settings persistence** for window geometry, theme, last target
+  language, recent files, and last-used backend.
+* **Resizable sidebar** (220-280 px) and a sensible
+  ``setMinimumSize(900, 600)`` floor; the initial window size is
+  clamped to the available screen geometry so the app never opens
+  wider than the user's display.
 """
 
 from __future__ import annotations

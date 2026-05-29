@@ -1,16 +1,17 @@
 """Command line interface for the Salesforce Translation Manager.
 
 The CLI mirrors every GUI phase plus a ``run`` convenience command that
-performs the full pipeline.  v1.1 adds:
+performs the full pipeline.  Translation-related options (these are the
+default surface for ``translate`` / ``run``):
 
-* ``--backend`` (google / deepl / azure / openai) for the ``translate`` /
-  ``run`` commands.
+* ``--backend`` (google / deepl / azure / openai).
 * ``--scope-file`` to apply a saved component / key scope.
 * ``--glossary`` to apply a glossary CSV.
 * ``--memory-db`` to enable the persistent translation memory.
 * ``--workers`` and ``--rate-limit`` for performance tuning.
 * ``--targets`` for multi-language batch runs.
 * ``stx scope`` subcommand to inspect / build scope files.
+* ``stx backends`` to list available translator backends.
 
 Examples
 --------
@@ -19,7 +20,7 @@ Examples
     # Phase 1+2: STF -> organised Excel
     stx stf2xlsx input.stf organized.xlsx
 
-    # Phase 3 with all v1.1 features
+    # Phase 3 with all features
     stx translate organized.xlsx translated.xlsx \\
         --target ja \\
         --backend google \\

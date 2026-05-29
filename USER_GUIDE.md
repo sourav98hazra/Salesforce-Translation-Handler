@@ -38,6 +38,8 @@ The sidebar on the left shows:
 
 The **Status log** at the bottom of the window can be hidden or shown via `View -> Show Status Log` (`Ctrl+L`).
 
+The sidebar is **resizable** (drag its right edge to taste, between roughly 220 and 280 pixels) and the whole window has a sensible minimum (900×600) -- the app starts within your screen size, never wider, even on small laptops or secondary monitors.
+
 ---
 
 ## 2. Two ways to use the app
@@ -140,7 +142,7 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 * **Translation memory** SQLite path (caches translations across runs).
 * **Batch targets** for multi-language runs.
 
-### Phase 4 — Review
+### Phase 4 — Browse & Review
 
 **What it does:** browse and (optionally) edit the translations, with auto-validation on entry so issues stand out immediately.
 
@@ -149,7 +151,7 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 1. The **status pill** at the top tells you whether the document is clean (green), has warnings (amber), or has errors (red).
 2. The **counters** show translated / untranslated / issue counts.
 3. **Filter** the table by component, status, or substring search — see [Filters (Phase 4)](#filters-phase-4--browse--review) below for details.
-4. Click any row to populate the **side-by-side editor** at the bottom (source on the left, translation on the right).  Edit the translation and click **Apply** to save the change.  Click **Reset to source** to revert.
+4. Click any row to populate the **side-by-side editor** at the bottom (source on the left, translation on the right).  Edit the translation and click **Apply** to save the change.  Click **Reset to source** to revert.  Drag the slim handle between the table and the editor to resize them; the text areas grow vertically with the editor pane.
 5. **"Save reviewed workbook (.xlsx)"** writes the current state to disk.
 6. Click **"Continue to Phase 5 (Validate & Fix) →"**.
 

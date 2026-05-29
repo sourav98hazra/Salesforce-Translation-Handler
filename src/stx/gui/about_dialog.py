@@ -6,7 +6,7 @@ Layout::
     | About -- Salesforce Translation Manager         [X]   |
     +-------------------------------------------------------+
     |  [LOGO 64]   Salesforce Translation Manager           |
-    |              Version 1.3.0                            |
+    |              Version <stx.__version__>                |
     |              Professional desktop app for ...         |
     |  -----------------------------------------------      |
     |  [ Overview | Features | System | Credits ]           |
@@ -277,7 +277,14 @@ class AboutDialog(QDialog):
             "\u2022 Deterministic auto-fix means the same input always yields "
             "the same output -- great for diffs and code review.\n"
             "\u2022 Each phase works on its own input or as part of the "
-            "end-to-end flow -- both modes are first-class."
+            "end-to-end flow -- both modes are first-class.\n"
+            "\u2022 Five themes (light, dark, ocean, forest, sunset) plus "
+            "auto, with soft borders and rounded panels for a calm, modern "
+            "look.\n"
+            "\u2022 Screen-aware window sizing -- the app never opens wider "
+            "than your display, the sidebar is resizable, and the editor "
+            "splitter in Phase 4 / 5 drags freely so the text areas grow "
+            "to whatever height you want."
         ))
 
         layout.addStretch(1)
@@ -323,6 +330,17 @@ class AboutDialog(QDialog):
             "Drag-and-drop file loading anywhere in the window",
             "Recent files menu and persistent settings",
             "Multi-language batch translation",
+        ]))
+
+        layout.addWidget(_heading("Look & feel"))
+        layout.addWidget(_bullets([
+            "Five themes -- light, dark, ocean, forest, sunset -- plus auto",
+            "Soft borders and rounded panels for a calm, professional look",
+            "Screen-aware window sizing -- never opens wider than your "
+            "display",
+            "Resizable sidebar (220-280 px) with status badges per phase",
+            "Draggable splitter between table and editor in Phase 4 / 5 "
+            "so the Source / Translation text areas grow to any height",
         ]))
 
         layout.addWidget(_heading("Performance"))

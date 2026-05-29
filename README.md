@@ -4,7 +4,7 @@ A professional cross-platform desktop application for the Salesforce
 Translation Workbench (STF) workflow:
 
 ```
-  Salesforce STF  ─►  Organized Excel  ─►  Auto-Translate  ─►  Review  ─►  STF
+  Salesforce STF  ─►  Organized Excel  ─►  Auto-Translate  ─►  Browse & Review  ─►  Validate & Fix  ─►  STF
 ```
 
 Every phase produces a downloadable artifact (`.xlsx` or `.stf`) so you
@@ -684,15 +684,59 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
 
 ---
 
-# Latest (v1.4)
+# v1.5 -- UI polish, screen-aware sizing, draggable editor splitter
 
-Summary of the most recent improvements shipped in this release:
+A small but impactful release focused on the look-and-feel of the GUI based on direct user feedback.  No backend / runner / CLI behaviour changes.
 
-- **Minimalist hexagonal logo** in the sidebar, rendered from an inline SVG beside the full "Salesforce Translation Manager" title.
-- **Sidebar footer** showing document stats (total/translated/untranslated rows), target language, and a mini progress bar visible during translation.
-- **Enhanced Filter Components dialog** in Phase 3 with a search field, status filter (all / untranslated only / translated for retranslation / both), and a live summary of selection count and estimated rows.
-- **Filter button separated from estimate label** for a cleaner Phase 3 layout.
-- **Pop-out capability** for Preview (Phase 1) and Live feed (Phase 3) panels, allowing them to be detached into independent windows.
-- **Status log toggle** via `View -> Show Status Log` (`Ctrl+L`) so the bottom log panel can be hidden when not needed.
-- **Compact fields/buttons/margins globally** -- reduced padding, 2-column metadata grids, smaller font sizes where appropriate, and tighter spacing throughout.
+## Editor splitter -- now actually draggable
+
+The vertical splitter between the table and the side-by-side editor in **Phase 4 (Browse & Review)** and **Phase 5 (Validate & Fix)** could not be dragged on Windows.  Root cause was a global QSS rule (`QSplitter::handle:vertical { height: 1px; }`) overriding `setHandleWidth()` and forcing every handle in the app to 1 pixel.  Fixed at the source: the global rule is now the single source of truth, with 4-pixel slim soft handles that highlight on hover (accent colour).  Also added `stretch=1` on the inner side-by-side splitter so dragging actually grows the **Source** / **Translation** text areas instead of just adding padding.
+
+## Borders softened across every theme
+
+The previous palettes used a visible-but-heavy `border` colour for every group box, card, input, table, frame, menu, dock, and tab.  Stacked nested borders read as bold double-frames.  Each palette now uses a softer one-tone-lighter border:
+
+| Palette | `border` (was → now) |
+|---|---|
+| Light | slate-400 `#94a3b8` → slate-200 `#e2e8f0` |
+| Dark | slate-600 `#475569` → slate-700 `#334155` |
+| Ocean | sky-300 `#7dd3fc` → sky-200 `#bae6fd` |
+| Forest | green-300 `#86efac` → green-200 `#bbf7d0` |
+| Sunset | amber-300 `#fcd34d` → amber-200 `#fde68a` |
+
+The `border_strong` tier (kept at the previous tone) is still used for splitter handle hover, scrollbars, focus rings, and checkbox outlines so those remain visible.
+
+## More rounded corners and roomier internal padding
+
+Major UI containers now have softer shapes and more breathing room:
+
+| Element | radius | padding |
+|---|---|---|
+| `QGroupBox` (every panel) | 6 → **10 px** | 8/8/4/8 → **12/12/8/12** |
+| `QFrame[role="card"]` | 8 → **10 px** | (unchanged) |
+| `QPushButton` | 6 → **8 px** | 5/12 → **6/14** |
+| `QLineEdit` / `QPlainTextEdit` / `QComboBox` / spinboxes | 6 → **8 px** | 3/6 → **5/8** |
+| `QTableView` / `QTabWidget::pane` | 6 → **8 px** | (unchanged) |
+
+## Source / Translation editor -- proper column padding
+
+The "Source label (read-only)" and "Translation (editable)" columns in Phase 4 / Phase 5 had labels and text areas running flush against the splitter handle.  Each column now has `setContentsMargins(10, 6, 10, 6)` so the entire column (label + text area) is inset with consistent breathing room from the handle and the outer panel border, with the labels rendered in a muted slate-600 colour and lined up with the text inside the input.
+
+## Screen-aware window sizing
+
+`MainWindow.__init__` and every pop-out / preview / about / user-guide dialog were calling `resize(...)` with hard-coded sizes (1400×900, 1100×700, etc.) regardless of the user's screen.  On smaller laptops this caused the window to open wider than the display.  A new `clamp_to_screen(widget, w, h)` helper in `pages/base.py` caps every requested size to `screen.availableGeometry()` minus margins and is now applied universally.
+
+## Resizable sidebar + sensible window minimum
+
+The sidebar was `setFixedWidth(260)`, which combined with content minimums prevented users from shrinking the window.  Now `setMinimumWidth(220)` / `setMaximumWidth(280)` so it can squeeze, and `MainWindow.setMinimumSize(900, 600)` is the floor.
+
+## Tighter overall spacing
+
+`PhasePage` outer margins `16/12/16/12 → 14/10/14/10`, outer spacing `16 → 10`.  The verbose multi-line subtitles on Phase 5 and Phase 6 are now single sentences each.  Also replaced the beveled native `QFrame.VLine` separator between sidebar and content (Windows-specific bold rendering) with a 1-pixel soft semi-transparent line.
+
+---
+
+# Latest (v1.5)
+
+See the v1.5 section above for the full list.  In short: editor splitter now draggable, softer borders + rounder corners across all themes, screen-aware window sizing, resizable sidebar, tighter spacing, proper column padding around the Source / Translation editor.
 
