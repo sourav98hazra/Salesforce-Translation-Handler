@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QStackedWidget,
     QStatusBar,
     QVBoxLayout,
@@ -150,9 +151,13 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(16, 24, 16, 16)
         v.setSpacing(12)
 
-        title = QLabel("Salesforce\nTranslation\nHandler")
-        title.setFont(QFont("Inter, Arial", 16, QFont.Weight.Bold))
-        title.setStyleSheet("color:#f8fafc;")
+        title = QLabel()
+        title.setTextFormat(Qt.TextFormat.RichText)
+        title.setText(
+            "<span style='font-family: monospace; font-size: 14px; font-weight: 900; "
+            "color: #c7d2fe; background: #312e81; padding: 3px 8px; border-radius: 4px;'>"
+            "STF</span> <span style='font-size: 13px; font-weight: 600; color: #f1f5f9;'>Handler</span>"
+        )
         v.addWidget(title)
 
         version = QLabel(f"v{__version__}")
@@ -171,6 +176,27 @@ class MainWindow(QMainWindow):
         self._phase_list.currentRowChanged.connect(self._goto)
         v.addWidget(self._phase_list)
         v.addStretch(1)
+
+        # ---- sidebar footer: stats + progress
+        self._footer_stats = QLabel("No file loaded")
+        self._footer_stats.setStyleSheet("color: #64748b; font-size: 10px;")
+        self._footer_stats.setWordWrap(True)
+        v.addWidget(self._footer_stats)
+
+        self._footer_lang = QLabel("")
+        self._footer_lang.setStyleSheet("color: #64748b; font-size: 10px;")
+        v.addWidget(self._footer_lang)
+
+        self._footer_progress = QProgressBar()
+        self._footer_progress.setFixedHeight(4)
+        self._footer_progress.setTextVisible(False)
+        self._footer_progress.setStyleSheet(
+            "QProgressBar { background: #334155; border: none; border-radius: 2px; }"
+            "QProgressBar::chunk { background: #4338ca; border-radius: 2px; }"
+        )
+        self._footer_progress.setVisible(False)
+        v.addWidget(self._footer_progress)
+
         return sidebar
 
     def _format_phase_label(self, label: str, hint: str, status: PhaseStatus) -> str:
@@ -183,6 +209,43 @@ class MainWindow(QMainWindow):
             status = self._state.phase_status[index] if index < len(self._state.phase_status) else PhaseStatus.IDLE
             item = self._phase_list.item(index)
             item.setText(self._format_phase_label(label, hint, status))
+
+    def _update_sidebar_footer(self) -> None:
+        """Refresh the sidebar footer stats and progress bar."""
+        doc = self._state.document
+        if doc is None:
+            self._footer_stats.setText("No file loaded")
+            self._footer_lang.setText("")
+            self._footer_progress.setVisible(False)
+            return
+
+        # Count rows and unique components
+        row_count = len(doc.entries)
+        components = {e.component_type for e in doc.entries}
+        self._footer_stats.setText(
+            f"{row_count:,} rows \u00b7 {len(components)} components"
+        )
+
+        # Target language
+        lang_name = self._state.target_language_name or ""
+        lang_code = self._state.target_language_code or ""
+        if lang_name and lang_code:
+            self._footer_lang.setText(f"{lang_name} ({lang_code})")
+        elif lang_name:
+            self._footer_lang.setText(lang_name)
+        else:
+            self._footer_lang.setText("")
+
+        # Progress bar: only visible during Phase 3 (Translate) running
+        phase3_running = (
+            len(self._state.phase_status) > 2
+            and self._state.phase_status[2] == PhaseStatus.RUNNING
+        )
+        self._footer_progress.setVisible(phase3_running)
+        if phase3_running and row_count > 0:
+            translated_count = len(doc.translated())
+            self._footer_progress.setMaximum(row_count)
+            self._footer_progress.setValue(translated_count)
 
     def _build_separator(self) -> QFrame:
         line = QFrame()
@@ -276,6 +339,7 @@ class MainWindow(QMainWindow):
         self._phase_list.blockSignals(False)
         self._pages[index].on_enter()
         self._refresh_phase_badges()
+        self._update_sidebar_footer()
 
     def _jump_to_row(self, key: str) -> None:
         # Phase 4 (Review) is now at index 3 in the simplified flow.
