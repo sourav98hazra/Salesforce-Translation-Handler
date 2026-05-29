@@ -3,7 +3,11 @@ Type=Application
 Name=Salesforce Translation Manager
 Comment=STF -> Excel -> Translate -> Review -> STF workflow
 Exec=bash -c 'cd "$(dirname %k)" && exec ./launch.sh'
-Icon=text-x-generic
+# Icon path: update this to the absolute path where logo.png is installed.
+# For example, if the repo lives at /home/you/Salesforce-Translation-Handler,
+# set Icon=/home/you/Salesforce-Translation-Handler/src/stx/gui/assets/logo.png
+# After copying this file to ~/.local/share/applications/, update Exec= and Icon= paths.
+Icon=logo.png
 Terminal=false
 Categories=Utility;Development;
 StartupNotify=true

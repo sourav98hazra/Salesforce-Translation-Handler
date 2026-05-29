@@ -39,12 +39,15 @@ BUILD = ROOT / "build"
 SPEC = ROOT / f"{NAME}.spec"
 
 # ``--windowed`` hides the console on Windows / produces a Mac .app bundle.
-# Add ``--icon path/to/icon.{ico,icns}`` if you have one.
 EXTRA_FLAGS: list[str] = [
     "--onefile",
     "--windowed",
     "--noconfirm",
     "--clean",
+    "--icon",
+    "src/stx/gui/assets/logo.ico",
+    "--add-data",
+    "src/stx/gui/assets" + (";" if sys.platform == "win32" else ":") + "stx/gui/assets",
 ]
 
 # Hidden imports openpyxl / deep_translator / bs4 sometimes need explicitly.
