@@ -22,31 +22,31 @@ from PySide6.QtWidgets import QApplication
 # ---------------------------------------------------------------------------
 
 LIGHT_PALETTE = {
-    # Soft cool-grey base -- not pure white, so cards lift visibly.
-    "bg":                "#eef2f7",
-    "surface":           "#ffffff",
-    "surface_alt":       "#f1f5f9",
-    "surface_raised":    "#f8fafc",
-    "border":            "#cbd5e1",
-    "border_strong":     "#94a3b8",
-    "text":              "#0f172a",
-    "text_muted":        "#475569",
-    "text_subtle":       "#64748b",
-    "accent":            "#4f46e5",  # indigo-600
-    "accent_hover":      "#4338ca",
-    "accent_soft":       "#eef2ff",
-    "sidebar_bg":        "#0f172a",
-    "sidebar_text":      "#cbd5e1",
+    # Professional cool-grey.  Clearly not white -- visible tint everywhere.
+    "bg":                "#e2e8f0",       # slate-200 -- main canvas
+    "surface":           "#f8fafc",       # slate-50 -- cards / group boxes
+    "surface_alt":       "#eef2f7",       # between bg and surface
+    "surface_raised":    "#ffffff",       # inputs / tooltips only
+    "border":            "#94a3b8",       # slate-400 -- visible, not faint
+    "border_strong":     "#64748b",       # slate-500
+    "text":              "#1e293b",       # slate-800
+    "text_muted":        "#475569",       # slate-600
+    "text_subtle":       "#64748b",       # slate-500
+    "accent":            "#4338ca",       # indigo-700 -- deep, professional
+    "accent_hover":      "#3730a3",       # indigo-800
+    "accent_soft":       "#e0e7ff",       # indigo-100
+    "sidebar_bg":        "#1e293b",       # slate-800
+    "sidebar_text":      "#94a3b8",       # slate-400
     "sidebar_text_active": "#ffffff",
-    "sidebar_item_hover":  "#1e293b",
-    "sidebar_item_active": "#3730a3",
-    "danger":            "#dc2626",
+    "sidebar_item_hover":  "#334155",     # slate-700
+    "sidebar_item_active": "#4338ca",     # indigo-700
+    "danger":            "#b91c1c",       # red-700
     "danger_soft":       "#fef2f2",
-    "warning":           "#d97706",
+    "warning":           "#b45309",       # amber-700
     "warning_soft":      "#fffbeb",
-    "success":           "#16a34a",
+    "success":           "#15803d",       # green-700
     "success_soft":      "#f0fdf4",
-    "info":              "#0284c7",
+    "info":              "#0369a1",       # sky-700
 }
 
 DARK_PALETTE = {
