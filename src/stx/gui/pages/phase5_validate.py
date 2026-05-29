@@ -158,10 +158,16 @@ class Phase5ValidatePage(PhasePage):
 
         src_widget = QWidget()
         src_col = QVBoxLayout(src_widget)
-        src_col.setContentsMargins(0, 0, 0, 0)
-        src_col.setSpacing(2)
+        # Inset the whole column (label + text area) so it sits with
+        # breathing room from the outer group-box border on the left
+        # and from the splitter handle on the right.
+        src_col.setContentsMargins(10, 6, 10, 6)
+        src_col.setSpacing(3)
         src_label = QLabel("Source label (read-only)")
-        src_label.setStyleSheet("padding-left: 6px; padding-bottom: 2px; color: #475569; font-weight: 500;")
+        src_label.setStyleSheet(
+            "padding-left: 4px; padding-bottom: 2px; "
+            "color: #475569; font-weight: 500;"
+        )
         src_col.addWidget(src_label)
         self._src_field = QPlainTextEdit()
         self._src_field.setReadOnly(True)
@@ -172,10 +178,13 @@ class Phase5ValidatePage(PhasePage):
 
         tgt_widget = QWidget()
         tgt_col = QVBoxLayout(tgt_widget)
-        tgt_col.setContentsMargins(0, 0, 0, 0)
-        tgt_col.setSpacing(2)
+        tgt_col.setContentsMargins(10, 6, 10, 6)
+        tgt_col.setSpacing(3)
         tgt_label = QLabel("Translation (editable)")
-        tgt_label.setStyleSheet("padding-left: 6px; padding-bottom: 2px; color: #475569; font-weight: 500;")
+        tgt_label.setStyleSheet(
+            "padding-left: 4px; padding-bottom: 2px; "
+            "color: #475569; font-weight: 500;"
+        )
         tgt_col.addWidget(tgt_label)
         self._tgt_field = QPlainTextEdit()
         self._tgt_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
