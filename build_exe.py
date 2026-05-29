@@ -31,26 +31,46 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+# All paths are resolved to absolutes from the location of THIS script, so
+# `python build_exe.py` works no matter which directory you run it from.
+# (Previously the relative "src" / "src/stx/gui/assets/logo.ico" paths only
+# resolved when invoked from the repo root; running it from anywhere else
+# made PyInstaller miss the `stx` package -> "No module named stx.gui.app"
+# at runtime.)
+ROOT = Path(__file__).resolve().parent
+SRC = ROOT / "src"
 ENTRY = ROOT / "launcher.py"
+ICON = ROOT / "src" / "stx" / "gui" / "assets" / "logo.ico"
+ASSETS = ROOT / "src" / "stx" / "gui" / "assets"
 NAME = "SalesforceTranslationHandler"
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 SPEC = ROOT / f"{NAME}.spec"
 
+# PyInstaller's --add-data separator differs by OS (";" on Windows, ":" else).
+_DATA_SEP = ";" if sys.platform == "win32" else ":"
+
 # ``--windowed`` hides the console on Windows / produces a Mac .app bundle.
+# Built dynamically so we can use absolute paths and only add --icon when the
+# icon actually exists on disk.
 EXTRA_FLAGS: list[str] = [
     "--onefile",
     "--windowed",
     "--noconfirm",
     "--clean",
     "--paths",
-    "src",
-    "--icon",
-    "src/stx/gui/assets/logo.ico",
+    str(SRC),
+    "--distpath",
+    str(DIST),
+    "--workpath",
+    str(BUILD),
+    "--specpath",
+    str(ROOT),
     "--add-data",
-    "src/stx/gui/assets" + (";" if sys.platform == "win32" else ":") + "stx/gui/assets",
+    f"{ASSETS}{_DATA_SEP}stx/gui/assets",
 ]
+if ICON.is_file():
+    EXTRA_FLAGS += ["--icon", str(ICON)]
 
 # Hidden imports openpyxl / deep_translator / bs4 sometimes need explicitly.
 HIDDEN_IMPORTS: list[str] = [
@@ -151,16 +171,26 @@ def main() -> int:
         cmd.extend(["--hidden-import", module])
     cmd.append(str(ENTRY))
 
+    print("Building from project root:", ROOT)
     print("Running:", " ".join(cmd))
-    result = subprocess.run(cmd, check=False)
+    # cwd=ROOT guarantees PyInstaller resolves everything from the repo root
+    # regardless of the directory the user launched this script from.
+    result = subprocess.run(cmd, check=False, cwd=str(ROOT))
     if result.returncode != 0:
         return result.returncode
 
     print()
     print("Build complete.  Artifacts in:", DIST.resolve())
-    if DIST.exists():
-        for entry in DIST.iterdir():
-            print("  -", entry.name)
+    produced = sorted(DIST.iterdir()) if DIST.exists() else []
+    for entry in produced:
+        print("  -", entry.name)
+
+    exe_suffix = ".exe" if sys.platform == "win32" else ""
+    exe_path = DIST / f"{NAME}{exe_suffix}"
+    if exe_path.exists():
+        print()
+        print("Double-click this file to launch the app:")
+        print("   ", exe_path.resolve())
     return 0
 
 

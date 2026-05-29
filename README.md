@@ -125,7 +125,22 @@ After install, two commands appear on your `PATH`:
 
 ## Running the desktop GUI
 
-There are three ways to launch the app — pick whichever fits your situation:
+### Easiest (Windows): one-click setup → desktop icon
+
+If you're on Windows and just want the app running with the fewest steps:
+
+1. **Double-click `setup_desktop_app.bat`** in the project folder.
+2. Wait for it to finish (first run installs dependencies and builds the app — a few minutes).
+3. A **"Salesforce Translation Manager"** shortcut with the app logo appears on your Desktop.
+4. **Double-click that shortcut** to launch the app — from now on, that's the only step.
+
+`setup_desktop_app.bat` does everything for you: creates the virtual environment, installs the GUI dependencies + PyInstaller, builds the standalone `.exe`, and drops the Desktop shortcut. You only need Python 3.9+ installed (from [python.org](https://www.python.org/downloads/), with "Add Python to PATH" ticked). No terminal commands required.
+
+The manual options below are for macOS / Linux, or if you prefer to run the steps yourself.
+
+---
+
+There are also three manual ways to launch the app — pick whichever fits your situation:
 
 ### Option 1: Double-click launcher (easiest, after `pip install`)
 
