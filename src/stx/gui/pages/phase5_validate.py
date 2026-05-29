@@ -25,6 +25,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -43,7 +44,7 @@ from ...model import Entry
 from ...validate import ValidationIssue, ValidationReport, validate_document
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
-from .base import PhasePage, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 
 class Phase5ValidatePage(PhasePage):
@@ -102,7 +103,17 @@ class Phase5ValidatePage(PhasePage):
         self.add_layout(actions)
 
         # ---------- Splitter: issues table (top) + inline editor (bottom)
+        # Wrapped in a single QGroupBox so the pop-out icon lives on the
+        # group box border (Q1 + Q2: one consolidated pop-out for Phase 5).
+        issues_box = QGroupBox("Validation issues")
+        self._issues_box = issues_box
+        issues_layout = QVBoxLayout(issues_box)
+        issues_layout.setContentsMargins(4, 4, 4, 4)
+        issues_layout.setSpacing(2)
+        self._issues_layout = issues_layout
+
         splitter = QSplitter(Qt.Orientation.Vertical)
+        self._splitter = splitter
 
         # Issues table
         self._table = QTableWidget(0, 6)
@@ -165,7 +176,13 @@ class Phase5ValidatePage(PhasePage):
         splitter.addWidget(editor_box)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        self.add_widget(splitter, stretch=1)
+
+        issues_layout.addWidget(splitter)
+        self.add_widget(issues_box, stretch=1)
+
+        # ONE pop-out icon glued to the group box border, popping the
+        # whole splitter (issues table + editor) into a modeless QDialog.
+        add_popout_to_groupbox(issues_box, self._on_popout_issues)
 
         # ---------- Bottom: next phase
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
@@ -534,3 +551,27 @@ class Phase5ValidatePage(PhasePage):
         self.set_busy(False)
         self._state.set_phase(4, PhaseStatus.ERROR)
         self.error(message, "Save failed")
+
+    # ------------------------------------------------------------------ pop-out (entire splitter: issues table + editor)
+
+    def _on_popout_issues(self) -> None:
+        if hasattr(self, '_issues_dialog') and self._issues_dialog is not None:
+            self._issues_dialog.raise_()
+            self._issues_dialog.activateWindow()
+            return
+        self._issues_dialog = QDialog(self)
+        self._issues_dialog.setWindowTitle("Phase 5 \u2014 Validate & Fix")
+        self._issues_dialog.resize(1100, 700)
+        self._issues_dialog.setWindowFlags(
+            self._issues_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._issues_dialog)
+        self._splitter.setParent(self._issues_dialog)
+        layout.addWidget(self._splitter)
+        self._issues_dialog.finished.connect(self._on_issues_dialog_closed)
+        self._issues_dialog.show()
+
+    def _on_issues_dialog_closed(self) -> None:
+        self._splitter.setParent(self._issues_box)
+        self._issues_layout.addWidget(self._splitter)
+        self._issues_dialog = None

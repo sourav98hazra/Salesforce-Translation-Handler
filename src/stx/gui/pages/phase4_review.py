@@ -49,7 +49,7 @@ from ...model import Document, Entry
 from ...validate import validate_document
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
-from .base import PhasePage, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 _HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation"]
 _TRANSLATION_COL = 5
@@ -241,7 +241,17 @@ class Phase4ReviewPage(PhasePage):
         self.add_widget(filter_row)
 
         # ---------- Splitter: table on top, slim inline editor below
+        # Wrapped in a single QGroupBox so the pop-out icon lives on the
+        # group box border (Q1 + Q2: one consolidated pop-out for Phase 4).
+        review_box = QGroupBox("Translations")
+        self._review_box = review_box
+        review_layout = QVBoxLayout(review_box)
+        review_layout.setContentsMargins(4, 4, 4, 4)
+        review_layout.setSpacing(2)
+        self._review_layout = review_layout
+
         splitter = QSplitter(Qt.Orientation.Vertical)
+        self._splitter = splitter
 
         self._table = QTableView()
         self._table.setModel(self._proxy)
@@ -274,16 +284,6 @@ class Phase4ReviewPage(PhasePage):
         self._reset_btn.clicked.connect(self._reset_row)
         meta.addWidget(self._apply_btn)
         meta.addWidget(self._reset_btn)
-
-        # Pop-out button inline at far right of key row
-        self._popout_editor_btn = QPushButton("\u2197")
-        self._popout_editor_btn.setFixedSize(20, 20)
-        self._popout_editor_btn.setToolTip("Pop out into a separate window")
-        self._popout_editor_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_editor_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_editor_btn.clicked.connect(self._on_popout_editor)
-        meta.addWidget(self._popout_editor_btn)
-
         self._editor_layout.addLayout(meta)
 
         side_by_side = QHBoxLayout()
@@ -307,10 +307,15 @@ class Phase4ReviewPage(PhasePage):
 
         splitter.addWidget(editor)
         self._editor_widget = editor
-        self._splitter = splitter
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
-        self.add_widget(splitter, stretch=1)
+
+        review_layout.addWidget(splitter)
+        self.add_widget(review_box, stretch=1)
+
+        # ONE pop-out icon glued to the group box border, popping the
+        # whole splitter (table + editor) into a modeless QDialog.
+        add_popout_to_groupbox(review_box, self._on_popout_review)
 
         # ---------- Bottom action buttons
         self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
@@ -581,39 +586,26 @@ class Phase4ReviewPage(PhasePage):
             )
         self.request_navigate.emit(4)
 
-    # ------------------------------------------------------------------ pop-out editor
+    # ------------------------------------------------------------------ pop-out (entire splitter: table + editor)
 
-    def _on_popout_editor(self) -> None:
-        if hasattr(self, '_editor_dialog') and self._editor_dialog is not None:
-            self._editor_dialog.raise_()
+    def _on_popout_review(self) -> None:
+        if hasattr(self, '_review_dialog') and self._review_dialog is not None:
+            self._review_dialog.raise_()
+            self._review_dialog.activateWindow()
             return
-        self._editor_dialog = QDialog(self)
-        self._editor_dialog.setWindowTitle("Editor - Key / Source / Translation")
-        self._editor_dialog.resize(800, 400)
-        self._editor_dialog.setWindowFlags(
-            self._editor_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        self._review_dialog = QDialog(self)
+        self._review_dialog.setWindowTitle("Phase 4 \u2014 Browse & Review")
+        self._review_dialog.resize(1100, 700)
+        self._review_dialog.setWindowFlags(
+            self._review_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )
-        layout = QVBoxLayout(self._editor_dialog)
-        self._editor_widget.setParent(self._editor_dialog)
-        layout.addWidget(self._editor_widget)
-        self._editor_dialog.finished.connect(self._on_editor_dialog_closed)
-        self._editor_dialog.show()
-        self._popout_editor_btn.setText("\u2199")
-        self._popout_editor_btn.setToolTip("Dock back into the page")
-        self._popout_editor_btn.clicked.disconnect()
-        self._popout_editor_btn.clicked.connect(self._on_dock_editor_back)
+        layout = QVBoxLayout(self._review_dialog)
+        self._splitter.setParent(self._review_dialog)
+        layout.addWidget(self._splitter)
+        self._review_dialog.finished.connect(self._on_review_dialog_closed)
+        self._review_dialog.show()
 
-    def _on_dock_editor_back(self) -> None:
-        if hasattr(self, '_editor_dialog') and self._editor_dialog is not None:
-            self._editor_dialog.close()
-
-    def _on_editor_dialog_closed(self) -> None:
-        self._editor_widget.setParent(self)
-        self._splitter.addWidget(self._editor_widget)
-        self._splitter.setStretchFactor(0, 4)
-        self._splitter.setStretchFactor(1, 1)
-        self._editor_dialog = None
-        self._popout_editor_btn.setText("\u2197")
-        self._popout_editor_btn.setToolTip("Pop out into a separate window")
-        self._popout_editor_btn.clicked.disconnect()
-        self._popout_editor_btn.clicked.connect(self._on_popout_editor)
+    def _on_review_dialog_closed(self) -> None:
+        self._splitter.setParent(self._review_box)
+        self._review_layout.addWidget(self._splitter)
+        self._review_dialog = None

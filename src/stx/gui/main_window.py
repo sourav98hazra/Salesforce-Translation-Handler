@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
         header_row.setSpacing(8)
         header_row.setContentsMargins(0, 0, 0, 0)
 
-        # Render the SVG logo as a 28x28 pixmap
+        # Render the SVG logo as a 32x32 pixmap (Q3: bumped from 28x28)
         logo_label = QLabel()
         try:
             from PySide6.QtSvg import QSvgRenderer
@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
             svg_path = _Path(__file__).parent / "assets" / "logo.svg"
             if svg_path.exists():
                 renderer = QSvgRenderer(str(svg_path))
-                pixmap = QPixmap(QSize(28, 28))
+                pixmap = QPixmap(QSize(32, 32))
                 pixmap.fill(Qt.GlobalColor.transparent)
                 painter = QPainter(pixmap)
                 renderer.render(painter)
@@ -176,20 +176,20 @@ class MainWindow(QMainWindow):
             else:
                 # Fallback: text-based hex indicator
                 logo_label.setText("\u2b22")
-                logo_label.setStyleSheet("font-size: 22px; color: #818cf8;")
+                logo_label.setStyleSheet("font-size: 24px; color: #818cf8;")
         except ImportError:
             # PySide6-Svg not installed -- use unicode hex as fallback
             logo_label.setText("\u2b22")
-            logo_label.setStyleSheet("font-size: 22px; color: #818cf8;")
+            logo_label.setStyleSheet("font-size: 24px; color: #818cf8;")
         header_row.addWidget(logo_label)
 
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
-            "<div style='line-height: 1.3;'>"
-            "<span style='font-size: 13px; font-weight: 700; color: #f1f5f9;'>Salesforce</span><br/>"
-            "<span style='font-size: 13px; font-weight: 700; color: #f1f5f9;'>Translation Handler</span>"
-            "</div>"
+            '<div style="line-height: 1.2;">'
+            '<div style="font-size: 13px; font-weight: 600; color: #f8fafc; letter-spacing: 0.2px;">Salesforce</div>'
+            '<div style="font-size: 12px; font-weight: 400; color: #94a3b8; letter-spacing: 0.2px;">Translation Handler</div>'
+            '</div>'
         )
         header_row.addWidget(title)
         header_row.addStretch(1)

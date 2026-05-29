@@ -36,7 +36,7 @@ from ...languages import LANGUAGE_NAME_TO_CODE, code_for_language, supported_lan
 from ...validate import validate_document
 from ..state import AppState, PhaseStatus
 from ..workers import ImportExcelWorker, WriteStfWorker
-from .base import PhasePage, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 
 class Phase6ExportPage(PhasePage):
@@ -111,25 +111,23 @@ class Phase6ExportPage(PhasePage):
         self._export_btn.clicked.connect(self._on_export)
         self.add_layout(make_action_row(self._export_btn))
 
-        # ---------- Result table (no group box wrapper, pop-out inline)
-        result_header_row = QHBoxLayout()
-        result_header_row.addWidget(QLabel("Export results"))
-        result_header_row.addStretch(1)
-
-        self._popout_results_btn = QPushButton("\u2197")
-        self._popout_results_btn.setFixedSize(20, 20)
-        self._popout_results_btn.setToolTip("Pop out into a separate window")
-        self._popout_results_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_results_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_results_btn.clicked.connect(self._on_popout_results)
-        result_header_row.addWidget(self._popout_results_btn)
-        self.add_layout(result_header_row)
+        # ---------- Result table wrapped in a QGroupBox so the pop-out
+        # icon lives on the group box border (Q1 + Q2: one consolidated
+        # pop-out for Phase 6 results area).
+        results_box = QGroupBox("Export results")
+        self._results_box = results_box
+        self._results_layout = QVBoxLayout(results_box)
+        self._results_layout.setContentsMargins(4, 4, 4, 4)
+        self._results_layout.setSpacing(2)
 
         self._result_table = QTableWidget(0, 2)
         self._result_table.setHorizontalHeaderLabels(["File", "Size"])
         self._result_table.horizontalHeader().setStretchLastSection(True)
         self._result_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.add_widget(self._result_table)
+        self._results_layout.addWidget(self._result_table)
+        self.add_widget(results_box)
+
+        add_popout_to_groupbox(results_box, self._on_popout_results)
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -283,6 +281,7 @@ class Phase6ExportPage(PhasePage):
     def _on_popout_results(self) -> None:
         if hasattr(self, '_results_dialog') and self._results_dialog is not None:
             self._results_dialog.raise_()
+            self._results_dialog.activateWindow()
             return
         self._results_dialog = QDialog(self)
         self._results_dialog.setWindowTitle("Export Results")
@@ -295,21 +294,8 @@ class Phase6ExportPage(PhasePage):
         layout.addWidget(self._result_table)
         self._results_dialog.finished.connect(self._on_results_dialog_closed)
         self._results_dialog.show()
-        self._popout_results_btn.setText("\u2199")
-        self._popout_results_btn.setToolTip("Dock back into the page")
-        self._popout_results_btn.clicked.disconnect()
-        self._popout_results_btn.clicked.connect(self._on_dock_results_back)
-
-    def _on_dock_results_back(self) -> None:
-        if hasattr(self, '_results_dialog') and self._results_dialog is not None:
-            self._results_dialog.close()
 
     def _on_results_dialog_closed(self) -> None:
-        self._result_table.setParent(self)
-        # Re-add to main layout (after the header row)
-        self.layout().addWidget(self._result_table)
+        self._result_table.setParent(self._results_box)
+        self._results_layout.addWidget(self._result_table)
         self._results_dialog = None
-        self._popout_results_btn.setText("\u2197")
-        self._popout_results_btn.setToolTip("Pop out into a separate window")
-        self._popout_results_btn.clicked.disconnect()
-        self._popout_results_btn.clicked.connect(self._on_popout_results)

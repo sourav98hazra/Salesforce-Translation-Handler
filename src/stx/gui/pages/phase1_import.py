@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from ...stf import write_stf_files
 from ..state import AppState
 from ..workers import ParseStfWorker, WriteStfWorker
-from .base import PhasePage, make_action_row
+from .base import PhasePage, add_popout_to_groupbox, make_action_row
 
 _PREVIEW_ROWS = 100
 
@@ -101,22 +101,10 @@ class Phase1ImportPage(PhasePage):
 
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
+        self._preview_box = preview_box
         self._preview_layout = QVBoxLayout(preview_box)
         self._preview_layout.setContentsMargins(4, 4, 4, 4)
         self._preview_layout.setSpacing(2)
-
-        self._popout_preview_btn = QPushButton("\u2197")
-        self._popout_preview_btn.setFixedSize(20, 20)
-        self._popout_preview_btn.setToolTip("Pop out preview into a separate window")
-        self._popout_preview_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_preview_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_preview_btn.clicked.connect(self._on_popout_preview)
-
-        # Inline header row: stretch pushes pop-out icon to far right
-        preview_header_row = QHBoxLayout()
-        preview_header_row.addStretch(1)
-        preview_header_row.addWidget(self._popout_preview_btn)
-        self._preview_layout.addLayout(preview_header_row)
 
         self._preview = QTableWidget(0, 3)
         self._preview.setHorizontalHeaderLabels(["Key", "Label", "Translation"])
@@ -125,6 +113,9 @@ class Phase1ImportPage(PhasePage):
         self._preview.setAlternatingRowColors(True)
         self._preview_layout.addWidget(self._preview)
         self.add_widget(preview_box, stretch=1)
+
+        # Pop-out icon glued to the top-right of the group box border
+        add_popout_to_groupbox(preview_box, self._on_popout_preview)
 
         # ---------- Actions
         self._save_stf_btn = self._make_button("Save copy as STF...", self._on_save_stf, enabled=False)
@@ -259,6 +250,7 @@ class Phase1ImportPage(PhasePage):
     def _on_popout_preview(self) -> None:
         if hasattr(self, '_preview_dialog') and self._preview_dialog is not None:
             self._preview_dialog.raise_()
+            self._preview_dialog.activateWindow()
             return
         self._preview_dialog = QDialog(self)
         self._preview_dialog.setWindowTitle("Preview (first 100 rows)")
@@ -271,20 +263,8 @@ class Phase1ImportPage(PhasePage):
         layout.addWidget(self._preview)
         self._preview_dialog.finished.connect(self._on_preview_dialog_closed)
         self._preview_dialog.show()
-        self._popout_preview_btn.setText("\u2199")
-        self._popout_preview_btn.setToolTip("Dock back into the page")
-        self._popout_preview_btn.clicked.disconnect()
-        self._popout_preview_btn.clicked.connect(self._on_dock_preview_back)
-
-    def _on_dock_preview_back(self) -> None:
-        if hasattr(self, '_preview_dialog') and self._preview_dialog is not None:
-            self._preview_dialog.close()
 
     def _on_preview_dialog_closed(self) -> None:
-        self._preview.setParent(self)
+        self._preview.setParent(self._preview_box)
         self._preview_layout.addWidget(self._preview)
         self._preview_dialog = None
-        self._popout_preview_btn.setText("\u2197")
-        self._popout_preview_btn.setToolTip("Pop out preview into a separate window")
-        self._popout_preview_btn.clicked.disconnect()
-        self._popout_preview_btn.clicked.connect(self._on_popout_preview)

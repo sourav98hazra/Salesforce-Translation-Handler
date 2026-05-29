@@ -41,7 +41,7 @@ from ...scope import Scope, StatusFilter
 from .. import settings as gui_settings
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
-from .base import PhasePage, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 
 # ---------------------------------------------------------------------------
@@ -286,15 +286,18 @@ class Phase3TranslatePage(PhasePage):
 
         # Target row: combo + filter button + estimate label
         target_row = QHBoxLayout()
+        target_row.setSpacing(12)  # Q4: explicit spacing between elements
         self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
         target_row.addWidget(self._target_combo)
-        target_row.addSpacing(12)
+        target_row.addSpacing(20)  # Q4: gap before the filter button
         self._filter_btn = QPushButton("Filter Components...")
+        self._filter_btn.setStyleSheet("padding: 4px 14px;")  # Q4: padding inside button
         self._filter_btn.clicked.connect(self._on_filter_components)
         target_row.addWidget(self._filter_btn)
+        target_row.addSpacing(12)  # Q4: gap after filter button before estimate label
         self._estimate_label = QLabel("Rows to translate: --")
         self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
         target_row.addWidget(self._estimate_label)
@@ -350,22 +353,10 @@ class Phase3TranslatePage(PhasePage):
 
         # ----- Live feed log (takes all remaining space)
         feed_box = QGroupBox("Live feed")
+        self._feed_box = feed_box
         self._feed_layout = QVBoxLayout(feed_box)
         self._feed_layout.setContentsMargins(4, 4, 4, 4)
         self._feed_layout.setSpacing(2)
-
-        self._popout_feed_btn = QPushButton("\u2197")
-        self._popout_feed_btn.setFixedSize(20, 20)
-        self._popout_feed_btn.setToolTip("Pop out live feed into a separate window")
-        self._popout_feed_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_feed_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_feed_btn.clicked.connect(self._on_popout_feed)
-
-        # Inline header row: stretch pushes pop-out icon to far right
-        feed_header_row = QHBoxLayout()
-        feed_header_row.addStretch(1)
-        feed_header_row.addWidget(self._popout_feed_btn)
-        self._feed_layout.addLayout(feed_header_row)
 
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
@@ -373,6 +364,9 @@ class Phase3TranslatePage(PhasePage):
         self._log.setPlaceholderText("Live feed -- each translated row appears here with inline counters")
         self._feed_layout.addWidget(self._log)
         self.add_widget(feed_box, stretch=1)
+
+        # Pop-out icon glued to the top-right of the group box border
+        add_popout_to_groupbox(feed_box, self._on_popout_feed)
 
         # ----- Action buttons
         self._start_btn = primary(QPushButton("Start translation"))
@@ -782,6 +776,7 @@ class Phase3TranslatePage(PhasePage):
     def _on_popout_feed(self) -> None:
         if hasattr(self, '_feed_dialog') and self._feed_dialog is not None:
             self._feed_dialog.raise_()
+            self._feed_dialog.activateWindow()
             return
         self._feed_dialog = QDialog(self)
         self._feed_dialog.setWindowTitle("Live Translation Feed")
@@ -794,20 +789,8 @@ class Phase3TranslatePage(PhasePage):
         layout.addWidget(self._log)
         self._feed_dialog.finished.connect(self._on_feed_dialog_closed)
         self._feed_dialog.show()
-        self._popout_feed_btn.setText("\u2199")
-        self._popout_feed_btn.setToolTip("Dock back into the page")
-        self._popout_feed_btn.clicked.disconnect()
-        self._popout_feed_btn.clicked.connect(self._on_dock_feed_back)
-
-    def _on_dock_feed_back(self) -> None:
-        if hasattr(self, '_feed_dialog') and self._feed_dialog is not None:
-            self._feed_dialog.close()
 
     def _on_feed_dialog_closed(self) -> None:
-        self._log.setParent(self)
+        self._log.setParent(self._feed_box)
         self._feed_layout.addWidget(self._log)
         self._feed_dialog = None
-        self._popout_feed_btn.setText("\u2197")
-        self._popout_feed_btn.setToolTip("Pop out live feed into a separate window")
-        self._popout_feed_btn.clicked.disconnect()
-        self._popout_feed_btn.clicked.connect(self._on_popout_feed)

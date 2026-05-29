@@ -237,3 +237,59 @@ def danger(button: QPushButton) -> QPushButton:
     """Mark a button as destructive."""
     button.setProperty("danger", True)
     return button
+
+
+# ---------------------------------------------------------------------------
+# Pop-out icon helper
+# ---------------------------------------------------------------------------
+
+from PySide6.QtCore import QObject, QEvent
+from PySide6.QtGui import Qt
+from PySide6.QtWidgets import QGroupBox  # noqa: F401  (re-export for callers)
+
+
+def add_popout_to_groupbox(groupbox, callback):
+    """Add a tiny \u2197 pop-out icon to the top-right of a QGroupBox border.
+
+    Qt does not natively allow widgets in QGroupBox titles, so this
+    workaround positions a tiny QPushButton as a *child* of the
+    QGroupBox at absolute coordinates aligned to the top-right of the
+    group box border, overlapping the title bar area.
+
+    The button automatically repositions whenever the group box is
+    resized or shown so it stays glued to the corner.
+
+    Returns the QPushButton for further customization.
+    """
+    from PySide6.QtCore import QObject, QEvent
+    from PySide6.QtWidgets import QPushButton
+
+    btn = QPushButton("\u2197", groupbox)
+    btn.setFixedSize(18, 18)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setStyleSheet(
+        "QPushButton { font-size: 11px; padding: 0; border: none; "
+        "background: transparent; color: #94a3b8; } "
+        "QPushButton:hover { color: #4338ca; background: rgba(67,56,202,0.10); border-radius: 3px; }"
+    )
+    btn.setToolTip("Pop out into a separate window")
+    btn.clicked.connect(callback)
+
+    def reposition():
+        btn.move(groupbox.width() - btn.width() - 6, 2)
+
+    class Repositioner(QObject):
+        def eventFilter(self, obj, event):
+            if event.type() == QEvent.Type.Resize or event.type() == QEvent.Type.Show:
+                reposition()
+            return False
+
+    repositioner = Repositioner(groupbox)
+    groupbox.installEventFilter(repositioner)
+    btn.show()
+    btn.raise_()
+    reposition()
+
+    groupbox._popout_repositioner = repositioner
+    groupbox._popout_btn = btn
+    return btn

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..state import AppState
 from ..workers import ExportExcelWorker, ImportExcelWorker
-from .base import PhasePage, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 
 class Phase2ExcelPage(PhasePage):
@@ -45,22 +45,10 @@ class Phase2ExcelPage(PhasePage):
 
         # Content Details preview
         details_box = QGroupBox("Content Details (post-export preview)")
+        self._details_box = details_box
         self._details_layout = QVBoxLayout(details_box)
         self._details_layout.setContentsMargins(4, 4, 4, 4)
         self._details_layout.setSpacing(2)
-
-        self._popout_details_btn = QPushButton("\u2197")
-        self._popout_details_btn.setFixedSize(20, 20)
-        self._popout_details_btn.setToolTip("Pop out into a separate window")
-        self._popout_details_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_details_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_details_btn.clicked.connect(self._on_popout_details)
-
-        # Inline header row: stretch pushes pop-out icon to far right
-        details_header_row = QHBoxLayout()
-        details_header_row.addStretch(1)
-        details_header_row.addWidget(self._popout_details_btn)
-        self._details_layout.addLayout(details_header_row)
 
         self._details = QTableWidget(0, 5)
         self._details.setHorizontalHeaderLabels([
@@ -71,6 +59,9 @@ class Phase2ExcelPage(PhasePage):
         self._details.setAlternatingRowColors(True)
         self._details_layout.addWidget(self._details)
         self.add_widget(details_box, stretch=1)
+
+        # Pop-out icon glued to the top-right of the group box border
+        add_popout_to_groupbox(details_box, self._on_popout_details)
 
         # Actions
         self._convert_btn = primary(QPushButton("Convert and save .xlsx"))
@@ -231,6 +222,7 @@ class Phase2ExcelPage(PhasePage):
     def _on_popout_details(self) -> None:
         if hasattr(self, '_details_dialog') and self._details_dialog is not None:
             self._details_dialog.raise_()
+            self._details_dialog.activateWindow()
             return
         self._details_dialog = QDialog(self)
         self._details_dialog.setWindowTitle("Content Details")
@@ -243,20 +235,8 @@ class Phase2ExcelPage(PhasePage):
         layout.addWidget(self._details)
         self._details_dialog.finished.connect(self._on_details_dialog_closed)
         self._details_dialog.show()
-        self._popout_details_btn.setText("\u2199")
-        self._popout_details_btn.setToolTip("Dock back into the page")
-        self._popout_details_btn.clicked.disconnect()
-        self._popout_details_btn.clicked.connect(self._on_dock_details_back)
-
-    def _on_dock_details_back(self) -> None:
-        if hasattr(self, '_details_dialog') and self._details_dialog is not None:
-            self._details_dialog.close()
 
     def _on_details_dialog_closed(self) -> None:
-        self._details.setParent(self)
+        self._details.setParent(self._details_box)
         self._details_layout.addWidget(self._details)
         self._details_dialog = None
-        self._popout_details_btn.setText("\u2197")
-        self._popout_details_btn.setToolTip("Pop out into a separate window")
-        self._popout_details_btn.clicked.disconnect()
-        self._popout_details_btn.clicked.connect(self._on_popout_details)
