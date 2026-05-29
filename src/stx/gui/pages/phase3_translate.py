@@ -1,29 +1,21 @@
 """Phase 3 (index 2) -- Translate.
 
-v1.3 simplification: this page now asks only what a translator needs
-to answer:
-
-* **Target language** (and optional source language).
-* **Which components** to translate (default: all).
-* **Where to save** the translated workbook.
-
-Everything else -- backend, API key, worker count, rate limit,
-wake-lock, glossary path, translation memory path, batch targets --
-lives in the Settings dialog (``Edit -> Settings...``).  We read those
-values when the user clicks Start.
-
-The live feed in the lower half shows the actual ``EN -> JA`` pair
-plus running counters (translated / TM hits / dedup / skipped) so the
-user can confirm at a glance that the translator is working.
+v1.4 layout: compact form at top, progress bar, then the live feed
+taking all remaining space.  Counter boxes replaced by inline counts
+in the feed.  Component selection moved to a dialog behind a button.
 """
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -34,7 +26,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -52,14 +43,94 @@ from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
 from .base import PhasePage, make_action_row, primary
 
-try:
-    from PySide6.QtWidgets import QComboBox  # noqa: F401  -- kept for type completeness
-except ImportError:  # pragma: no cover
-    QComboBox = None  # type: ignore[assignment]
 
+# ---------------------------------------------------------------------------
+# Component filter dialog
+# ---------------------------------------------------------------------------
+
+class _ComponentFilterDialog(QDialog):
+    """Modal dialog for selecting which component types to translate."""
+
+    def __init__(self, document, previously_selected: Optional[set[str]], parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Filter Components")
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(350)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        # Actions row
+        actions = QHBoxLayout()
+        select_all_btn = QPushButton("Select all")
+        select_all_btn.clicked.connect(lambda: self._set_all(True))
+        select_none_btn = QPushButton("Select none")
+        select_none_btn.clicked.connect(lambda: self._set_all(False))
+        invert_btn = QPushButton("Invert")
+        invert_btn.clicked.connect(self._invert)
+        actions.addWidget(select_all_btn)
+        actions.addWidget(select_none_btn)
+        actions.addWidget(invert_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+
+        # Component list
+        self._list = QListWidget()
+        self._list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        layout.addWidget(self._list, stretch=1)
+
+        # Populate
+        components = sorted({e.component_type for e in document.entries})
+        counts: dict[str, int] = {}
+        for e in document.entries:
+            if not e.translation.strip():
+                counts[e.component_type] = counts.get(e.component_type, 0) + 1
+
+        for comp in components:
+            count = counts.get(comp, 0)
+            item = QListWidgetItem(f"{comp}  \u2014  {count} untranslated")
+            item.setData(Qt.ItemDataRole.UserRole, comp)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            should_check = previously_selected is None or comp in previously_selected
+            item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
+            self._list.addItem(item)
+
+        # Buttons
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        layout.addWidget(btn_box)
+
+    def _set_all(self, checked: bool) -> None:
+        for i in range(self._list.count()):
+            self._list.item(i).setCheckState(
+                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+            )
+
+    def _invert(self) -> None:
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            item.setCheckState(
+                Qt.CheckState.Unchecked
+                if item.checkState() == Qt.CheckState.Checked
+                else Qt.CheckState.Checked
+            )
+
+    def selected_components(self) -> set[str]:
+        selected = set()
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.add(item.data(Qt.ItemDataRole.UserRole))
+        return selected
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 page
+# ---------------------------------------------------------------------------
 
 class Phase3TranslatePage(PhasePage):
-    """Configure and run automatic translation -- minimal version."""
+    """Configure and run automatic translation -- compact version."""
 
     def __init__(self, state: AppState, parent=None) -> None:
         super().__init__(
@@ -74,37 +145,49 @@ class Phase3TranslatePage(PhasePage):
             parent=parent,
         )
         self._worker: Optional[TranslationWorker] = None
-        # Live counters that the run updates.
+        self._selected_components: Optional[set[str]] = None
+        # Live counters
         self._translated_count = 0
         self._cached_count = 0
         self._deduped_count = 0
         self._skipped_count = 0
+        self._total_rows = 0
+        self._current_row = 0
+        self._start_time: Optional[float] = None
         self._build()
 
     # ------------------------------------------------------------------ build
 
     def _build(self) -> None:
-        # Top split: Setup (left) | Components (right)
-        top = QSplitter(Qt.Orientation.Horizontal)
-
-        # ----- Setup card (left)
+        # ----- Setup section: compact form
         setup_box = QGroupBox("Setup")
-        setup_form = QFormLayout(setup_box)
-        setup_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        setup_form.setHorizontalSpacing(12)
+        setup_grid = QHBoxLayout()
+        setup_grid.setSpacing(16)
 
-        from PySide6.QtWidgets import QComboBox as _Combo  # local alias for clarity
+        # Left: source + target side by side
+        lang_form = QFormLayout()
+        lang_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        lang_form.setHorizontalSpacing(8)
+        lang_form.setVerticalSpacing(4)
 
-        self._source_combo = _Combo()
+        self._source_combo = QComboBox()
         self._source_combo.addItems(supported_language_names())
         self._source_combo.setCurrentText("English")
-        setup_form.addRow("Source language:", self._source_combo)
+        lang_form.addRow("Source:", self._source_combo)
 
-        self._target_combo = _Combo()
+        self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
-        setup_form.addRow("Target language:", self._target_combo)
+        lang_form.addRow("Target:", self._target_combo)
+
+        setup_grid.addLayout(lang_form)
+
+        # Right: output file
+        path_form = QFormLayout()
+        path_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        path_form.setHorizontalSpacing(8)
+        path_form.setVerticalSpacing(4)
 
         self._path_field = QLineEdit()
         self._path_field.setPlaceholderText("Choose where to save the translated .xlsx")
@@ -116,83 +199,50 @@ class Phase3TranslatePage(PhasePage):
         path_widget = QWidget()
         path_widget.setLayout(path_row)
         path_widget.layout().setContentsMargins(0, 0, 0, 0)
-        setup_form.addRow("Output file:", path_widget)
+        path_form.addRow("Output:", path_widget)
 
-        # Settings hint (read-only summary of advanced options)
+        # Filter Components button + estimate
+        filter_row = QHBoxLayout()
+        self._filter_btn = QPushButton("Filter Components...")
+        self._filter_btn.clicked.connect(self._on_filter_components)
+        filter_row.addWidget(self._filter_btn)
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 600;")
+        filter_row.addWidget(self._estimate_label)
+        filter_row.addStretch(1)
+        path_form.addRow("", filter_row)
+
+        setup_grid.addLayout(path_form, stretch=1)
+
+        setup_layout = QVBoxLayout(setup_box)
+        setup_layout.setContentsMargins(8, 6, 8, 6)
+        setup_layout.addLayout(setup_grid)
+
+        # Settings hint
         self._settings_summary = QLabel("")
         self._settings_summary.setWordWrap(True)
         self._settings_summary.setStyleSheet("color: #64748b; font-size: 11px;")
-        setup_form.addRow("Advanced:", self._settings_summary)
+        setup_layout.addWidget(self._settings_summary)
 
-        top.addWidget(setup_box)
+        self.add_widget(setup_box)
 
-        # ----- Components card (right)
-        comp_box = QGroupBox("Components to translate")
-        comp_layout = QVBoxLayout(comp_box)
-        comp_layout.setContentsMargins(8, 6, 8, 6)
-
-        comp_actions = QHBoxLayout()
-        self._select_all_btn = QPushButton("Select all")
-        self._select_all_btn.clicked.connect(lambda: self._set_all_components(True))
-        self._select_none_btn = QPushButton("Select none")
-        self._select_none_btn.clicked.connect(lambda: self._set_all_components(False))
-        self._invert_btn = QPushButton("Invert")
-        self._invert_btn.clicked.connect(self._invert_components)
-        comp_actions.addWidget(self._select_all_btn)
-        comp_actions.addWidget(self._select_none_btn)
-        comp_actions.addWidget(self._invert_btn)
-        comp_actions.addStretch(1)
-        comp_layout.addLayout(comp_actions)
-
-        self._component_list = QListWidget()
-        self._component_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
-        self._component_list.itemChanged.connect(self._update_estimate)
-        comp_layout.addWidget(self._component_list, stretch=1)
-
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 600;")
-        comp_layout.addWidget(self._estimate_label)
-
-        top.addWidget(comp_box)
-        top.setStretchFactor(0, 1)
-        top.setStretchFactor(1, 1)
-        self.add_widget(top)
-
-        # ----- Progress + Live feed
-        run_box = QGroupBox("Run")
-        run_layout = QVBoxLayout(run_box)
-
+        # ----- Progress bar
         self._progress = QProgressBar()
         self._progress.setRange(0, 100)
         self._progress.setValue(0)
-        run_layout.addWidget(self._progress)
+        self._progress.setMaximumHeight(18)
+        self.add_widget(self._progress)
 
         self._eta_label = QLabel("Idle.")
-        self._eta_label.setStyleSheet("color: #64748b;")
-        run_layout.addWidget(self._eta_label)
+        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px;")
+        self.add_widget(self._eta_label)
 
-        # Counters strip
-        counters = QHBoxLayout()
-        counters.setSpacing(20)
-        self._counter_translated = self._make_counter("Translated", "0", "#16a34a")
-        self._counter_tm = self._make_counter("From TM", "0", "#0284c7")
-        self._counter_dedup = self._make_counter("Deduped", "0", "#7c3aed")
-        self._counter_skipped = self._make_counter("Skipped", "0", "#64748b")
-        counters.addWidget(self._counter_translated["frame"])
-        counters.addWidget(self._counter_tm["frame"])
-        counters.addWidget(self._counter_dedup["frame"])
-        counters.addWidget(self._counter_skipped["frame"])
-        counters.addStretch(1)
-        run_layout.addLayout(counters)
-
-        # Live feed log
+        # ----- Live feed log (takes all remaining space)
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
         self._log.setMaximumBlockCount(800)
-        self._log.setPlaceholderText("Live feed -- each translated row appears here as 'EN: ...' / 'JA: ...'")
-        run_layout.addWidget(self._log)
-
-        self.add_widget(run_box, stretch=1)
+        self._log.setPlaceholderText("Live feed -- each translated row appears here with inline counters")
+        self.add_widget(self._log, stretch=1)
 
         # ----- Action buttons
         self._start_btn = primary(QPushButton("Start translation"))
@@ -207,25 +257,6 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
         self.add_layout(make_action_row(self._start_btn, self._cancel_btn, self._load_btn, self._next_btn))
-
-    def _make_counter(self, label: str, initial: str, accent: str) -> dict:
-        from PySide6.QtWidgets import QFrame
-        frame = QFrame()
-        frame.setProperty("role", "card")
-        frame.setStyleSheet(
-            f"QFrame {{ background: palette(base); border: 1px solid palette(mid); "
-            f"border-left: 3px solid {accent}; border-radius: 6px; padding: 6px 12px; }}"
-        )
-        v = QVBoxLayout(frame)
-        v.setContentsMargins(8, 6, 8, 6)
-        v.setSpacing(0)
-        title = QLabel(label.upper())
-        title.setStyleSheet("color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: 0.6px;")
-        v.addWidget(title)
-        value = QLabel(initial)
-        value.setStyleSheet(f"color: {accent}; font-size: 18px; font-weight: 700;")
-        v.addWidget(value)
-        return {"frame": frame, "value": value}
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -243,7 +274,12 @@ class Phase3TranslatePage(PhasePage):
             if base is not None:
                 self._path_field.setText(str(Path(base).with_suffix("")) + "_translated.xlsx")
 
-        self._populate_components()
+        # Restore previously selected components from state
+        if self._state.scope is not None and self._state.scope.components is not None:
+            self._selected_components = set(self._state.scope.components)
+        elif self._state.document is not None:
+            self._selected_components = {e.component_type for e in self._state.document.entries}
+
         self._update_estimate()
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
@@ -261,68 +297,26 @@ class Phase3TranslatePage(PhasePage):
         bits.append("(change via <i>Edit \u2192 Settings...</i>)")
         self._settings_summary.setText("  \u00b7  ".join(bits))
 
-    # ------------------------------------------------------------------ component panel
+    # ------------------------------------------------------------------ component filter dialog
 
-    def _populate_components(self) -> None:
-        self._component_list.blockSignals(True)
-        self._component_list.clear()
+    def _on_filter_components(self) -> None:
         if self._state.document is None:
-            self._component_list.blockSignals(False)
+            self.warn("Load a document first (Phase 1).")
             return
-        components = sorted({e.component_type for e in self._state.document.entries})
-        counts: dict[str, int] = {}
-        for e in self._state.document.entries:
-            if not e.translation.strip():
-                counts[e.component_type] = counts.get(e.component_type, 0) + 1
-
-        previously_selected: Optional[set[str]] = None
-        if self._state.scope is not None and self._state.scope.components is not None:
-            previously_selected = set(self._state.scope.components)
-
-        for comp in components:
-            count = counts.get(comp, 0)
-            item = QListWidgetItem(f"{comp}  \u2014  {count} untranslated")
-            item.setData(Qt.ItemDataRole.UserRole, comp)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            should_check = previously_selected is None or comp in previously_selected
-            item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
-            self._component_list.addItem(item)
-        self._component_list.blockSignals(False)
-
-    def _set_all_components(self, checked: bool) -> None:
-        self._component_list.blockSignals(True)
-        for i in range(self._component_list.count()):
-            self._component_list.item(i).setCheckState(
-                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-            )
-        self._component_list.blockSignals(False)
-        self._update_estimate()
-
-    def _invert_components(self) -> None:
-        self._component_list.blockSignals(True)
-        for i in range(self._component_list.count()):
-            item = self._component_list.item(i)
-            item.setCheckState(
-                Qt.CheckState.Unchecked
-                if item.checkState() == Qt.CheckState.Checked
-                else Qt.CheckState.Checked
-            )
-        self._component_list.blockSignals(False)
-        self._update_estimate()
-
-    def _selected_components(self) -> set[str]:
-        selected = set()
-        for i in range(self._component_list.count()):
-            item = self._component_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                selected.add(item.data(Qt.ItemDataRole.UserRole))
-        return selected
+        dlg = _ComponentFilterDialog(
+            self._state.document,
+            self._selected_components,
+            parent=self,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._selected_components = dlg.selected_components()
+            self._update_estimate()
 
     def _build_scope(self) -> Optional[Scope]:
         if self._state.document is None:
             return None
-        components = self._selected_components()
         all_components = {e.component_type for e in self._state.document.entries}
+        components = self._selected_components if self._selected_components else all_components
         return Scope(
             components=components if components != all_components else None,
             status=StatusFilter.UNTRANSLATED,
@@ -337,6 +331,7 @@ class Phase3TranslatePage(PhasePage):
         if scope is None:
             return
         count = scope.estimate_count(self._state.document)
+        self._total_rows = count
         self._estimate_label.setText(f"Rows to translate: <b>{count:,}</b>")
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
 
@@ -417,14 +412,16 @@ class Phase3TranslatePage(PhasePage):
         self._cached_count = 0
         self._deduped_count = 0
         self._skipped_count = 0
-        self._update_counter_widgets()
+        self._current_row = 0
+        self._total_rows = scope.estimate_count(self._state.document)
+        self._start_time = time.time()
         self._log.clear()
 
         # ---- Live feed header showing language pair
         src_code = code_for_language(self._source_combo.currentText()) or "en"
         self._log.appendPlainText(
             f"\u2500\u2500  {src_code.upper()} \u2192 {self._state.target_language_code.upper()}  "
-            f"\u2500\u2500  scope: {scope.estimate_count(self._state.document):,} rows  "
+            f"\u2500\u2500  scope: {self._total_rows:,} rows  "
             f"workers: {workers}\n"
         )
 
@@ -435,7 +432,7 @@ class Phase3TranslatePage(PhasePage):
 
         self.status_message.emit(
             f"Translating: {self._target_combo.currentText()}, "
-            f"workers={workers}, scope={scope.estimate_count(self._state.document)} rows"
+            f"workers={workers}, scope={self._total_rows} rows"
         )
 
         self._worker = TranslationWorker(
@@ -460,6 +457,8 @@ class Phase3TranslatePage(PhasePage):
         self._progress.setValue(percent)
 
     def _on_row_translated(self, source: str, translation: str, status: str) -> None:
+        self._current_row += 1
+
         # Update running counters from status keywords.
         if status.startswith("Translated"):
             self._translated_count += 1
@@ -469,28 +468,47 @@ class Phase3TranslatePage(PhasePage):
                 self._deduped_count += 1
         elif status.startswith("Skipped") or status.startswith("Cancelled") or "Fallback" in status:
             self._skipped_count += 1
-        self._update_counter_widgets()
 
-        # Live feed entry showing source -> target.
+        # Inline counters in the feed line
+        src_code = (code_for_language(self._source_combo.currentText()) or "en").upper()
+        tgt_code = (self._state.target_language_code or "ja").upper()
+        prefix = (
+            f"[{self._current_row}/{self._total_rows} | "
+            f"T:{self._translated_count} TM:{self._cached_count} D:{self._deduped_count}]"
+        )
+
         if translation:
-            self._log.appendPlainText(f"[{status}]")
-            self._log.appendPlainText(f"  {self._state.source_language_code.upper() if False else 'EN'}: {source}")
-            self._log.appendPlainText(
-                f"  {self._state.target_language_code.upper()}: {translation}"
-            )
+            self._log.appendPlainText(f"{prefix} {src_code}: {source} -> {tgt_code}: {translation}")
         else:
-            self._log.appendPlainText(f"[{status}] {source}")
+            self._log.appendPlainText(f"{prefix} [{status}] {source}")
 
-    def _update_counter_widgets(self) -> None:
-        self._counter_translated["value"].setText(f"{self._translated_count:,}")
-        self._counter_tm["value"].setText(f"{self._cached_count:,}")
-        self._counter_dedup["value"].setText(f"{self._deduped_count:,}")
-        self._counter_skipped["value"].setText(f"{self._skipped_count:,}")
+        # Intermittent summary every 50 rows
+        if self._current_row % 50 == 0 and self._start_time is not None:
+            elapsed = time.time() - self._start_time
+            rate = self._current_row / elapsed if elapsed > 0 else 0
+            remaining = self._total_rows - self._current_row
+            eta = remaining / rate if rate > 0 else 0
+            self._log.appendPlainText(
+                f"  --- {self._current_row}/{self._total_rows} "
+                f"({self._current_row * 100 // self._total_rows}%) | "
+                f"{rate:.1f} rows/s | ETA: {eta:.0f}s ---"
+            )
 
     def _on_translation_done(self, done) -> None:
         self._state.translation_summaries = done.summaries
         self._state.translation_statuses = done.statuses
         elapsed = done.elapsed_seconds
+
+        # Append summary line to the feed
+        rate = done.translated_count / elapsed if elapsed > 0 else 0
+        self._log.appendPlainText("")
+        self._log.appendPlainText("\u2501\u2501\u2501 DONE \u2501\u2501\u2501")
+        self._log.appendPlainText(
+            f"Translated: {done.translated_count} | TM hits: {done.cached_count} | "
+            f"Deduped: {done.deduped_count} | Skipped: {done.skipped_count}"
+        )
+        self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
+
         msg = (
             f"Done.  Translated {done.translated_count:,} "
             f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
@@ -598,7 +616,4 @@ class Phase3TranslatePage(PhasePage):
         self._load_btn.setEnabled(not running)
         self._target_combo.setEnabled(not running)
         self._source_combo.setEnabled(not running)
-        self._select_all_btn.setEnabled(not running)
-        self._select_none_btn.setEnabled(not running)
-        self._invert_btn.setEnabled(not running)
-        self._component_list.setEnabled(not running)
+        self._filter_btn.setEnabled(not running)

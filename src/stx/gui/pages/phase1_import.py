@@ -7,12 +7,16 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFormLayout,
+    QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ...stf import write_stf_files
@@ -52,12 +56,14 @@ class Phase1ImportPage(PhasePage):
         self._path_label.setWordWrap(True)
 
         path_box = QGroupBox("Source file")
-        path_layout = QFormLayout(path_box)
-        path_layout.addRow(self._path_label)
-        path_layout.addRow(picker_row)
+        path_layout = QVBoxLayout(path_box)
+        path_layout.setContentsMargins(8, 4, 8, 4)
+        path_layout.setSpacing(4)
+        path_layout.addWidget(self._path_label)
+        path_layout.addLayout(picker_row)
         self.add_widget(path_box)
 
-        # ---------- Parsed metadata
+        # ---------- Parsed metadata (2-column grid)
         self._language_field = QLineEdit()
         self._language_code_field = QLineEdit()
         self._stf_type_field = QLineEdit(); self._stf_type_field.setReadOnly(True)
@@ -67,25 +73,44 @@ class Phase1ImportPage(PhasePage):
         self._components_field = QLineEdit(); self._components_field.setReadOnly(True)
 
         meta_box = QGroupBox("Parsed metadata")
-        meta_form = QFormLayout(meta_box)
-        meta_form.addRow("Language", self._language_field)
-        meta_form.addRow("Language code", self._language_code_field)
-        meta_form.addRow("STF type", self._stf_type_field)
-        meta_form.addRow("Total rows", self._total_field)
-        meta_form.addRow("Translated", self._translated_field)
-        meta_form.addRow("Untranslated", self._untranslated_field)
-        meta_form.addRow("Component types", self._components_field)
+        meta_grid = QGridLayout(meta_box)
+        meta_grid.setContentsMargins(8, 4, 8, 4)
+        meta_grid.setHorizontalSpacing(16)
+        meta_grid.setVerticalSpacing(4)
+
+        # Row 0
+        meta_grid.addWidget(QLabel("Language:"), 0, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._language_field, 0, 1)
+        meta_grid.addWidget(QLabel("Language code:"), 0, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._language_code_field, 0, 3)
+        # Row 1
+        meta_grid.addWidget(QLabel("STF type:"), 1, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._stf_type_field, 1, 1)
+        meta_grid.addWidget(QLabel("Total rows:"), 1, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._total_field, 1, 3)
+        # Row 2
+        meta_grid.addWidget(QLabel("Translated:"), 2, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._translated_field, 2, 1)
+        meta_grid.addWidget(QLabel("Untranslated:"), 2, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._untranslated_field, 2, 3)
+        # Row 3
+        meta_grid.addWidget(QLabel("Component types:"), 3, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._components_field, 3, 1, 1, 3)
+
+        meta_grid.setColumnStretch(1, 1)
+        meta_grid.setColumnStretch(3, 1)
         self.add_widget(meta_box)
 
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
-        preview_layout = QFormLayout(preview_box)
+        preview_layout = QVBoxLayout(preview_box)
+        preview_layout.setContentsMargins(4, 4, 4, 4)
         self._preview = QTableWidget(0, 3)
         self._preview.setHorizontalHeaderLabels(["Key", "Label", "Translation"])
         self._preview.horizontalHeader().setStretchLastSection(True)
         self._preview.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._preview.setAlternatingRowColors(True)
-        preview_layout.addRow(self._preview)
+        preview_layout.addWidget(self._preview)
         self.add_widget(preview_box, stretch=1)
 
         # ---------- Actions
@@ -103,6 +128,12 @@ class Phase1ImportPage(PhasePage):
         if key:
             setattr(self, key, btn)
         return btn
+
+    @staticmethod
+    def _set_field(field: QLineEdit, value: str) -> None:
+        """Set field text and tooltip so long values can be seen on hover."""
+        field.setText(value)
+        field.setToolTip(value)
 
     # ------------------------------------------------------------------ slots
 
@@ -138,13 +169,13 @@ class Phase1ImportPage(PhasePage):
             self._state.target_language_code = doc.language_code
 
         stats = doc.stats()
-        self._language_field.setText(doc.language)
-        self._language_code_field.setText(doc.language_code)
-        self._stf_type_field.setText(doc.stf_type)
-        self._total_field.setText(f"{stats['total']:,}")
-        self._translated_field.setText(f"{stats['translated']:,}")
-        self._untranslated_field.setText(f"{stats['untranslated']:,}")
-        self._components_field.setText(str(stats["components"]))
+        self._set_field(self._language_field, doc.language)
+        self._set_field(self._language_code_field, doc.language_code)
+        self._set_field(self._stf_type_field, doc.stf_type)
+        self._set_field(self._total_field, f"{stats['total']:,}")
+        self._set_field(self._translated_field, f"{stats['translated']:,}")
+        self._set_field(self._untranslated_field, f"{stats['untranslated']:,}")
+        self._set_field(self._components_field, str(stats["components"]))
 
         self._populate_preview(doc)
         self._save_stf_btn.setEnabled(True)
