@@ -151,6 +151,38 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(16, 24, 16, 16)
         v.setSpacing(12)
 
+        # Logo icon beside the title text
+        header_row = QHBoxLayout()
+        header_row.setSpacing(8)
+        header_row.setContentsMargins(0, 0, 0, 0)
+
+        # Render the SVG logo as a 28x28 pixmap
+        logo_label = QLabel()
+        try:
+            from PySide6.QtSvg import QSvgRenderer
+            from PySide6.QtGui import QPixmap, QPainter
+            from PySide6.QtCore import QSize
+            from pathlib import Path as _Path
+
+            svg_path = _Path(__file__).parent / "assets" / "logo.svg"
+            if svg_path.exists():
+                renderer = QSvgRenderer(str(svg_path))
+                pixmap = QPixmap(QSize(28, 28))
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                logo_label.setPixmap(pixmap)
+            else:
+                # Fallback: text-based hex indicator
+                logo_label.setText("\u2b22")
+                logo_label.setStyleSheet("font-size: 22px; color: #818cf8;")
+        except ImportError:
+            # PySide6-Svg not installed -- use unicode hex as fallback
+            logo_label.setText("\u2b22")
+            logo_label.setStyleSheet("font-size: 22px; color: #818cf8;")
+        header_row.addWidget(logo_label)
+
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
@@ -158,7 +190,9 @@ class MainWindow(QMainWindow):
             "color: #c7d2fe; background: #312e81; padding: 3px 8px; border-radius: 4px;'>"
             "STF</span> <span style='font-size: 13px; font-weight: 600; color: #f1f5f9;'>Handler</span>"
         )
-        v.addWidget(title)
+        header_row.addWidget(title)
+        header_row.addStretch(1)
+        v.addLayout(header_row)
 
         version = QLabel(f"v{__version__}")
         version.setStyleSheet("color:#64748b; font-size:11px;")
