@@ -146,7 +146,7 @@ class Phase5ValidatePage(PhasePage):
         meta_row.addWidget(self._issue_label, stretch=2)
         editor_layout.addLayout(meta_row)
 
-        fields_row = QSplitter(Qt.Orientation.Horizontal)
+        fields_row = QSplitter(Qt.Orientation.Vertical)
         fields_row.setChildrenCollapsible(False)
 
         src_widget = QWidget()
@@ -168,7 +168,7 @@ class Phase5ValidatePage(PhasePage):
         tgt_col.addWidget(self._tgt_field)
         fields_row.addWidget(tgt_widget)
 
-        fields_row.setSizes([400, 400])
+        fields_row.setSizes([100, 100])  # equal vertical halves
 
         editor_layout.addWidget(fields_row)
 

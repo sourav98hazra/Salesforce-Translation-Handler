@@ -259,37 +259,47 @@ def add_popout_to_groupbox(groupbox, callback):
     The button automatically repositions whenever the group box is
     resized or shown so it stays glued to the corner.
 
+    Double-clicking on the group box title area also triggers the
+    pop-out, so users have two clear ways to activate it.
+
     Returns the QPushButton for further customization.
     """
     from PySide6.QtCore import QObject, QEvent
     from PySide6.QtWidgets import QPushButton
 
     btn = QPushButton("\u2197", groupbox)
-    btn.setFixedSize(18, 18)
+    btn.setFixedSize(22, 22)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    # Soft-white pill with dark bold arrow -- stands out on both light
+    # content backgrounds and the dark sidebar.
     btn.setStyleSheet(
-        "QPushButton { font-size: 11px; padding: 0; border: none; "
-        "background: transparent; color: #94a3b8; } "
-        "QPushButton:hover { color: #4338ca; background: rgba(67,56,202,0.10); border-radius: 3px; }"
+        "QPushButton { font-size: 14px; font-weight: 900; padding: 0; border: 1px solid transparent; "
+        "background: rgba(241, 245, 249, 0.85); color: #0f172a; border-radius: 3px; } "
+        "QPushButton:hover { background: #4338ca; color: white; border: 1px solid #4338ca; }"
     )
-    btn.setToolTip("Pop out into a separate window")
+    btn.setToolTip("Pop out into a separate window (double-click also works)")
     btn.clicked.connect(callback)
 
     def reposition():
         btn.move(groupbox.width() - btn.width() - 6, 2)
 
-    class Repositioner(QObject):
+    class DoubleClickFilter(QObject):
         def eventFilter(self, obj, event):
+            if event.type() == QEvent.Type.MouseButtonDblClick:
+                # Only trigger if click is in the title area (top ~22px)
+                if event.position().y() < 22:
+                    callback()
+                    return True
             if event.type() == QEvent.Type.Resize or event.type() == QEvent.Type.Show:
                 reposition()
             return False
 
-    repositioner = Repositioner(groupbox)
-    groupbox.installEventFilter(repositioner)
+    double_click_filter = DoubleClickFilter(groupbox)
+    groupbox.installEventFilter(double_click_filter)
     btn.show()
     btn.raise_()
     reposition()
 
-    groupbox._popout_repositioner = repositioner
+    groupbox._popout_double_click_filter = double_click_filter
     groupbox._popout_btn = btn
     return btn

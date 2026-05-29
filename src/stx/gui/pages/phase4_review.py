@@ -287,7 +287,7 @@ class Phase4ReviewPage(PhasePage):
         meta.addWidget(self._reset_btn)
         self._editor_layout.addLayout(meta)
 
-        side_by_side = QSplitter(Qt.Orientation.Horizontal)
+        side_by_side = QSplitter(Qt.Orientation.Vertical)
         side_by_side.setChildrenCollapsible(False)
 
         src_widget = QWidget()
@@ -311,7 +311,7 @@ class Phase4ReviewPage(PhasePage):
         tgt_col.addWidget(self._translation_field)
         side_by_side.addWidget(tgt_widget)
 
-        side_by_side.setSizes([400, 400])
+        side_by_side.setSizes([100, 100])  # equal vertical halves
         self._editor_layout.addWidget(side_by_side)
 
         splitter.addWidget(editor)

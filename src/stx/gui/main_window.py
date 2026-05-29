@@ -188,9 +188,9 @@ class MainWindow(QMainWindow):
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
-            '<div style="line-height: 1.25;">'
+            '<div style="line-height: 1.2;">'
             '<div style="font-size: 14px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">Salesforce</div>'
-            '<div style="font-size: 12px; font-weight: 600; color: #cbd5e1; letter-spacing: 0.3px;">Translation Handler</div>'
+            '<div style="font-size: 13px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">Translation Handler</div>'
             '</div>'
         )
         title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
