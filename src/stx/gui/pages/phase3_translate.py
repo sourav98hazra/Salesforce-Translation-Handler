@@ -49,16 +49,49 @@ from .base import PhasePage, make_action_row, primary
 # ---------------------------------------------------------------------------
 
 class _ComponentFilterDialog(QDialog):
-    """Modal dialog for selecting which component types to translate."""
+    """Modal dialog for selecting which component types to translate.
+
+    Features:
+    - Search field to filter components by name
+    - Status filter combo (all / untranslated only / translated only / both)
+    - Select all / Select none / Invert buttons
+    - Per-component row counts
+    - Summary label showing selected count and estimated rows
+    """
 
     def __init__(self, document, previously_selected: Optional[set[str]], parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Filter Components")
-        self.setMinimumWidth(400)
-        self.setMinimumHeight(350)
+        self.setMinimumWidth(480)
+        self.setMinimumHeight(450)
+
+        self._document = document
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
+
+        # Search field
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Search:"))
+        self._search_field = QLineEdit()
+        self._search_field.setPlaceholderText("Type to filter components by name...")
+        self._search_field.textChanged.connect(self._apply_filters)
+        search_row.addWidget(self._search_field, stretch=1)
+        layout.addLayout(search_row)
+
+        # Status filter combo
+        status_row = QHBoxLayout()
+        status_row.addWidget(QLabel("Status:"))
+        self._status_combo = QComboBox()
+        self._status_combo.addItems([
+            "Show all components",
+            "Only components with untranslated rows",
+            "Only components with translated rows (for retranslation)",
+            "Only components with both translated and untranslated",
+        ])
+        self._status_combo.currentIndexChanged.connect(self._apply_filters)
+        status_row.addWidget(self._status_combo, stretch=1)
+        layout.addLayout(status_row)
 
         # Actions row
         actions = QHBoxLayout()
@@ -79,42 +112,118 @@ class _ComponentFilterDialog(QDialog):
         self._list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self._list, stretch=1)
 
-        # Populate
+        # Populate -- compute per-component counts
         components = sorted({e.component_type for e in document.entries})
-        counts: dict[str, int] = {}
+        self._untranslated_counts: dict[str, int] = {}
+        self._translated_counts: dict[str, int] = {}
         for e in document.entries:
             if not e.translation.strip():
-                counts[e.component_type] = counts.get(e.component_type, 0) + 1
+                self._untranslated_counts[e.component_type] = (
+                    self._untranslated_counts.get(e.component_type, 0) + 1
+                )
+            else:
+                self._translated_counts[e.component_type] = (
+                    self._translated_counts.get(e.component_type, 0) + 1
+                )
 
         for comp in components:
-            count = counts.get(comp, 0)
-            item = QListWidgetItem(f"{comp}  \u2014  {count} untranslated")
+            untrans = self._untranslated_counts.get(comp, 0)
+            trans = self._translated_counts.get(comp, 0)
+            label = f"{comp}  \u2014  {untrans} untranslated"
+            if trans:
+                label += f", {trans} translated"
+            item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, comp)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             should_check = previously_selected is None or comp in previously_selected
             item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
             self._list.addItem(item)
 
+        # Connect itemChanged for live summary updates
+        self._list.itemChanged.connect(self._update_summary)
+
+        # Summary label
+        self._summary_label = QLabel("")
+        self._summary_label.setStyleSheet("font-weight: 600; color: #475569; padding: 4px 0;")
+        layout.addWidget(self._summary_label)
+
         # Buttons
-        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        btn_box.accepted.connect(self.accept)
+        btn_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Apply
+        )
+        btn_box.button(QDialogButtonBox.StandardButton.Apply).setText("Apply")
+        btn_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         layout.addWidget(btn_box)
 
-    def _set_all(self, checked: bool) -> None:
+        self._update_summary()
+
+    def _apply_filters(self) -> None:
+        """Hide items that don't match the search text or status filter."""
+        search_text = self._search_field.text().strip().lower()
+        status_index = self._status_combo.currentIndex()
+
         for i in range(self._list.count()):
-            self._list.item(i).setCheckState(
-                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-            )
+            item = self._list.item(i)
+            comp = item.data(Qt.ItemDataRole.UserRole)
+
+            # Search filter
+            matches_search = not search_text or search_text in comp.lower()
+
+            # Status filter
+            has_untranslated = self._untranslated_counts.get(comp, 0) > 0
+            has_translated = self._translated_counts.get(comp, 0) > 0
+
+            if status_index == 0:
+                matches_status = True
+            elif status_index == 1:
+                matches_status = has_untranslated
+            elif status_index == 2:
+                matches_status = has_translated
+            elif status_index == 3:
+                matches_status = has_untranslated and has_translated
+            else:
+                matches_status = True
+
+            item.setHidden(not (matches_search and matches_status))
+
+        self._update_summary()
+
+    def _set_all(self, checked: bool) -> None:
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            if not item.isHidden():
+                item.setCheckState(state)
+        self._update_summary()
 
     def _invert(self) -> None:
         for i in range(self._list.count()):
             item = self._list.item(i)
-            item.setCheckState(
-                Qt.CheckState.Unchecked
-                if item.checkState() == Qt.CheckState.Checked
-                else Qt.CheckState.Checked
-            )
+            if not item.isHidden():
+                item.setCheckState(
+                    Qt.CheckState.Unchecked
+                    if item.checkState() == Qt.CheckState.Checked
+                    else Qt.CheckState.Checked
+                )
+        self._update_summary()
+
+    def _update_summary(self) -> None:
+        """Update the summary label with selection count and estimated rows."""
+        total_components = self._list.count()
+        selected = self.selected_components()
+        selected_count = len(selected)
+
+        # Count rows that will be translated (untranslated rows in selected components)
+        rows = 0
+        for e in self._document.entries:
+            if e.component_type in selected and not e.translation.strip():
+                rows += 1
+
+        self._summary_label.setText(
+            f"{selected_count} of {total_components} selected  \u00b7  "
+            f"{rows:,} rows will be translated"
+        )
 
     def selected_components(self) -> set[str]:
         selected = set()
@@ -201,17 +310,6 @@ class Phase3TranslatePage(PhasePage):
         path_widget.layout().setContentsMargins(0, 0, 0, 0)
         path_form.addRow("Output:", path_widget)
 
-        # Filter Components button + estimate
-        filter_row = QHBoxLayout()
-        self._filter_btn = QPushButton("Filter Components...")
-        self._filter_btn.clicked.connect(self._on_filter_components)
-        filter_row.addWidget(self._filter_btn)
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 600;")
-        filter_row.addWidget(self._estimate_label)
-        filter_row.addStretch(1)
-        path_form.addRow("", filter_row)
-
         setup_grid.addLayout(path_form, stretch=1)
 
         setup_layout = QVBoxLayout(setup_box)
@@ -225,6 +323,23 @@ class Phase3TranslatePage(PhasePage):
         setup_layout.addWidget(self._settings_summary)
 
         self.add_widget(setup_box)
+
+        # ----- Filter row (standalone, between Setup and progress bar)
+        filter_row = QHBoxLayout()
+        self._filter_btn = QPushButton("Filter Components...")
+        self._filter_btn.clicked.connect(self._on_filter_components)
+        filter_row.addWidget(self._filter_btn)
+        self._filter_summary_label = QLabel("All components")
+        self._filter_summary_label.setStyleSheet("color: #475569; font-size: 12px;")
+        filter_row.addWidget(self._filter_summary_label)
+        sep_label = QLabel("\u00b7")
+        sep_label.setStyleSheet("color: #94a3b8; font-size: 12px; margin: 0 6px;")
+        filter_row.addWidget(sep_label)
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
+        filter_row.addWidget(self._estimate_label)
+        filter_row.addStretch(1)
+        self.add_layout(filter_row)
 
         # ----- Progress bar
         self._progress = QProgressBar()
@@ -346,6 +461,7 @@ class Phase3TranslatePage(PhasePage):
     def _update_estimate(self) -> None:
         if self._state.document is None:
             self._estimate_label.setText("Rows to translate: \u2014 (load a document first)")
+            self._filter_summary_label.setText("No document loaded")
             return
         scope = self._build_scope()
         if scope is None:
@@ -354,6 +470,15 @@ class Phase3TranslatePage(PhasePage):
         self._total_rows = count
         self._estimate_label.setText(f"Rows to translate: <b>{count:,}</b>")
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
+
+        # Update filter summary text
+        all_components = {e.component_type for e in self._state.document.entries}
+        if self._selected_components is None or self._selected_components == all_components:
+            self._filter_summary_label.setText("All components selected")
+        else:
+            n_selected = len(self._selected_components) if self._selected_components else 0
+            n_total = len(all_components)
+            self._filter_summary_label.setText(f"{n_selected} of {n_total} components selected")
 
     # ------------------------------------------------------------------ output path
 
