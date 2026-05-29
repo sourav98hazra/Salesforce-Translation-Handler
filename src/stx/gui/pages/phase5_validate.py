@@ -33,10 +33,12 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...autofix import auto_fix_document, auto_fix_entry
@@ -144,21 +146,31 @@ class Phase5ValidatePage(PhasePage):
         meta_row.addWidget(self._issue_label, stretch=2)
         editor_layout.addLayout(meta_row)
 
-        fields_row = QHBoxLayout()
-        src_col = QVBoxLayout()
+        fields_row = QSplitter(Qt.Orientation.Horizontal)
+        fields_row.setChildrenCollapsible(False)
+
+        src_widget = QWidget()
+        src_col = QVBoxLayout(src_widget)
+        src_col.setContentsMargins(0, 0, 0, 0)
         src_col.addWidget(QLabel("Source label (read-only)"))
         self._src_field = QPlainTextEdit()
         self._src_field.setReadOnly(True)
+        self._src_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         src_col.addWidget(self._src_field)
-        fields_row.addLayout(src_col, stretch=1)
+        fields_row.addWidget(src_widget)
 
-        tgt_col = QVBoxLayout()
+        tgt_widget = QWidget()
+        tgt_col = QVBoxLayout(tgt_widget)
+        tgt_col.setContentsMargins(0, 0, 0, 0)
         tgt_col.addWidget(QLabel("Translation (editable)"))
         self._tgt_field = QPlainTextEdit()
+        self._tgt_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         tgt_col.addWidget(self._tgt_field)
-        fields_row.addLayout(tgt_col, stretch=1)
+        fields_row.addWidget(tgt_widget)
 
-        editor_layout.addLayout(fields_row)
+        fields_row.setSizes([400, 400])
+
+        editor_layout.addWidget(fields_row)
 
         edit_actions = QHBoxLayout()
         self._apply_btn = primary(QPushButton("Apply edit"))
@@ -195,7 +207,7 @@ class Phase5ValidatePage(PhasePage):
         if self._state.document is None:
             self._banner.setText("No document loaded.  Complete earlier phases first.")
             self._banner.setStyleSheet(
-                "padding: 10px; border-radius: 6px; font-weight: 600; "
+                "padding: 10px; border-radius: 6px; font-weight: 700; "
                 "background-color: #f1f5f9; color: #475569;"
             )
             self._banner.setVisible(True)

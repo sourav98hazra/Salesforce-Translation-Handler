@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTableView,
     QVBoxLayout,
@@ -194,7 +195,7 @@ class Phase4ReviewPage(PhasePage):
         self._status_pill = QLabel("\u2022  No document loaded")
         self._status_pill.setStyleSheet(
             "padding: 4px 10px; border-radius: 12px; "
-            "background: #f1f5f9; color: #475569; font-weight: 600;"
+            "background: #f1f5f9; color: #475569; font-weight: 700;"
         )
         tb_layout.addWidget(self._status_pill)
 
@@ -286,24 +287,32 @@ class Phase4ReviewPage(PhasePage):
         meta.addWidget(self._reset_btn)
         self._editor_layout.addLayout(meta)
 
-        side_by_side = QHBoxLayout()
-        side_by_side.setSpacing(8)
-        src_col = QVBoxLayout()
+        side_by_side = QSplitter(Qt.Orientation.Horizontal)
+        side_by_side.setChildrenCollapsible(False)
+
+        src_widget = QWidget()
+        src_col = QVBoxLayout(src_widget)
+        src_col.setContentsMargins(0, 0, 0, 0)
         src_col.setSpacing(2)
         src_col.addWidget(QLabel("Source"))
         self._source_field = QPlainTextEdit()
         self._source_field.setReadOnly(True)
-        self._source_field.setMaximumHeight(110)
+        self._source_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         src_col.addWidget(self._source_field)
-        tgt_col = QVBoxLayout()
+        side_by_side.addWidget(src_widget)
+
+        tgt_widget = QWidget()
+        tgt_col = QVBoxLayout(tgt_widget)
+        tgt_col.setContentsMargins(0, 0, 0, 0)
         tgt_col.setSpacing(2)
         tgt_col.addWidget(QLabel("Translation (editable)"))
         self._translation_field = QPlainTextEdit()
-        self._translation_field.setMaximumHeight(110)
+        self._translation_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         tgt_col.addWidget(self._translation_field)
-        side_by_side.addLayout(src_col, stretch=1)
-        side_by_side.addLayout(tgt_col, stretch=1)
-        self._editor_layout.addLayout(side_by_side)
+        side_by_side.addWidget(tgt_widget)
+
+        side_by_side.setSizes([400, 400])
+        self._editor_layout.addWidget(side_by_side)
 
         splitter.addWidget(editor)
         self._editor_widget = editor
@@ -346,7 +355,7 @@ class Phase4ReviewPage(PhasePage):
             self._status_pill.setText("\u2022  No document loaded")
             self._status_pill.setStyleSheet(
                 "padding: 4px 10px; border-radius: 12px; "
-                "background: #f1f5f9; color: #475569; font-weight: 600;"
+                "background: #f1f5f9; color: #475569; font-weight: 700;"
             )
             self._save_btn.setEnabled(False)
             return

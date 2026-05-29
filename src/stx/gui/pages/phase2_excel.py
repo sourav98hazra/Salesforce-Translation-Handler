@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QTableWidget,
@@ -54,7 +55,11 @@ class Phase2ExcelPage(PhasePage):
         self._details.setHorizontalHeaderLabels([
             "SheetName", "SavedAs", "ComponentType", "TranslationStatus", "TotalRecords",
         ])
-        self._details.horizontalHeader().setStretchLastSection(True)
+        header = self._details.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # Last column (TotalRecords) stretches to fill remaining space so
+        # all the previous columns stay fully visible without truncation.
+        header.setSectionResizeMode(self._details.columnCount() - 1, QHeaderView.ResizeMode.Stretch)
         self._details.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._details.setAlternatingRowColors(True)
         self._details_layout.addWidget(self._details)

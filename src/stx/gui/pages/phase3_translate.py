@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -273,7 +274,7 @@ class Phase3TranslatePage(PhasePage):
         setup_grid = QHBoxLayout()
         setup_grid.setSpacing(16)
 
-        # Left: source + target side by side
+        # Left column: Source + Target (QFormLayout)
         lang_form = QFormLayout()
         lang_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         lang_form.setHorizontalSpacing(8)
@@ -284,31 +285,15 @@ class Phase3TranslatePage(PhasePage):
         self._source_combo.setCurrentText("English")
         lang_form.addRow("Source:", self._source_combo)
 
-        # Target row: combo + filter button + estimate label
-        target_row = QHBoxLayout()
-        target_row.setSpacing(12)  # Q4: explicit spacing between elements
         self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
-        target_row.addWidget(self._target_combo)
-        target_row.addSpacing(20)  # Q4: gap before the filter button
-        self._filter_btn = QPushButton("Filter Components...")
-        self._filter_btn.setStyleSheet("padding: 4px 14px;")  # Q4: padding inside button
-        self._filter_btn.clicked.connect(self._on_filter_components)
-        target_row.addWidget(self._filter_btn)
-        target_row.addSpacing(12)  # Q4: gap after filter button before estimate label
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
-        target_row.addWidget(self._estimate_label)
-        target_widget = QWidget()
-        target_widget.setLayout(target_row)
-        target_widget.layout().setContentsMargins(0, 0, 0, 0)
-        lang_form.addRow("Target:", target_widget)
+        lang_form.addRow("Target:", self._target_combo)
 
         setup_grid.addLayout(lang_form)
 
-        # Right: output file
+        # Right column: Output (QFormLayout with path field + Browse button)
         path_form = QFormLayout()
         path_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         path_form.setHorizontalSpacing(8)
@@ -331,6 +316,33 @@ class Phase3TranslatePage(PhasePage):
         setup_layout = QVBoxLayout(setup_box)
         setup_layout.setContentsMargins(8, 6, 8, 6)
         setup_layout.addLayout(setup_grid)
+
+        # ----- Filter row: button + estimate, sits BELOW the two columns
+        # so it isn't visually competing with the Target combo or Output field.
+        self._filter_btn = QPushButton("Filter Components...")
+        self._filter_btn.setStyleSheet("padding: 5px 16px; font-weight: 600;")
+        self._filter_btn.clicked.connect(self._on_filter_components)
+
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 600; color: #94a3b8;")
+
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(0, 8, 0, 0)
+        filter_row.setSpacing(12)
+        filter_row.addWidget(self._filter_btn)
+        filter_row.addSpacing(8)
+
+        # Vertical divider for visual separation between the action and the metric
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.VLine)
+        divider.setStyleSheet("color: #475569;")
+        filter_row.addWidget(divider)
+        filter_row.addSpacing(8)
+
+        filter_row.addWidget(self._estimate_label)
+        filter_row.addStretch(1)
+
+        setup_layout.addLayout(filter_row)
 
         # Settings hint
         self._settings_summary = QLabel("")

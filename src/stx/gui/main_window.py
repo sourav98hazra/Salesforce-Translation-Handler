@@ -153,11 +153,13 @@ class MainWindow(QMainWindow):
 
         # Logo icon beside the title text
         header_row = QHBoxLayout()
-        header_row.setSpacing(8)
+        header_row.setSpacing(10)
         header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # Render the SVG logo as a 32x32 pixmap (Q3: bumped from 28x28)
         logo_label = QLabel()
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         try:
             from PySide6.QtSvg import QSvgRenderer
             from PySide6.QtGui import QPixmap, QPainter
@@ -186,11 +188,12 @@ class MainWindow(QMainWindow):
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
-            '<div style="line-height: 1.2;">'
-            '<div style="font-size: 13px; font-weight: 600; color: #f8fafc; letter-spacing: 0.2px;">Salesforce</div>'
-            '<div style="font-size: 12px; font-weight: 400; color: #94a3b8; letter-spacing: 0.2px;">Translation Handler</div>'
+            '<div style="line-height: 1.25;">'
+            '<div style="font-size: 14px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">Salesforce</div>'
+            '<div style="font-size: 12px; font-weight: 600; color: #cbd5e1; letter-spacing: 0.3px;">Translation Handler</div>'
             '</div>'
         )
+        title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_row.addWidget(title)
         header_row.addStretch(1)
         v.addLayout(header_row)

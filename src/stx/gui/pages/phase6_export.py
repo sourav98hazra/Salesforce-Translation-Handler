@@ -75,7 +75,7 @@ class Phase6ExportPage(PhasePage):
         self._load_btn.clicked.connect(self._on_load_excel)
         load_layout.addWidget(self._load_btn)
         self._load_status = QLabel("Or use the document already loaded from previous phases.")
-        self._load_status.setStyleSheet("color: #4a5568;")
+        self._load_status.setStyleSheet("font-weight: 600; color: #4a5568;")
         load_layout.addWidget(self._load_status, stretch=1)
         self.add_widget(load_box)
 

@@ -49,7 +49,7 @@ class Phase1ImportPage(PhasePage):
     def _build(self) -> None:
         # ---------- File picker row (label + buttons on ONE line)
         self._path_label = QLabel("No file selected.")
-        self._path_label.setStyleSheet("color: #4a5568;")
+        self._path_label.setStyleSheet("font-weight: 600; color: #cbd5e1;")
         self._path_label.setWordWrap(False)
 
         path_box = QGroupBox("Source file")
