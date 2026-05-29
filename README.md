@@ -168,7 +168,7 @@ stx-app
 
 (or `stx gui` — both launch the same window.)
 
-The window has five phases in the left sidebar; each one writes its own
+The window has six phases in the left sidebar; each one writes its own
 artifact to disk so you can independently verify it:
 
 | Phase | Action | Saved artifact |
@@ -177,7 +177,8 @@ artifact to disk so you can independently verify it:
 | 2. STF → Excel | Convert to organised workbook | `*_organized.xlsx` |
 | 3. Translate | Auto-translate untranslated rows | `*_translated.xlsx` (with audit sheets) |
 | 4. Review | Inline edit translations with filters | `*_reviewed.xlsx` |
-| 5. Export STF | Validate + emit final files | `Super_STF_<code>.stf` + 2 more |
+| 5. Validate & Fix | Auto-fix errors, manual correction | `*_fixed.xlsx` |
+| 6. Export STF | Validate + emit final files | `Super_STF_<code>.stf` + 2 more |
 
 Every phase has a **Load existing ...** button so you can re-enter the
 workflow from any saved artifact (e.g. drop in an Excel a colleague
@@ -457,19 +458,7 @@ Cross-platform: `caffeinate` on macOS, `SetThreadExecutionState` on Windows, `sy
 
 Note: this prevents *idle* sleep. Closing a laptop lid still suspends every process -- there is no way around that. Keep the lid open.
 
-### 9. Project files (`.stxproject`)
-
-Save the entire pipeline state -- file paths, target language, backend, scope, glossary, TM -- to a single JSON file you can reopen later or share with a teammate.
-
-```bash
-stx project show my-project.stxproject
-```
-
 ## GUI improvements
-
-### Welcome screen (Phase 0)
-
-Recent files list, quick actions ("Open STF", "Load project", "Load Excel"), and the project description. Drag-and-drop files anywhere in the window.
 
 ### Sidebar status badges
 
@@ -477,7 +466,7 @@ Each phase now shows its status as an icon (`▶` running, `✓` done, `⚠` err
 
 ### Drag-and-drop
 
-Drop an `.stf`, `.xlsx`, or `.stxproject` file anywhere in the window. The app routes you to the appropriate phase automatically.
+Drop an `.stf` or `.xlsx` file anywhere in the window. The app routes you to the appropriate phase automatically.
 
 ### Keyboard shortcuts
 
@@ -535,7 +524,6 @@ stx run input.stf ./out --target ja --targets fr,de,es --memory-db ./tm.sqlite
 # New subcommands
 stx scope new input.stf scope.stxscope.json --components CustomLabel,ButtonOrLink
 stx scope show scope.stxscope.json
-stx project show my-project.stxproject
 stx backends   # list available translator backends
 ```
 
@@ -553,10 +541,10 @@ stx backends   # list available translator backends
 
 # v1.2 -- Review, Validate & Fix, and Export refinements
 
-The flow now has **seven phases** (the prior six plus a dedicated *Validate & Fix* between Review and Export):
+The flow now has **six phases**:
 
 ```
-0. Welcome  ->  1. Import STF  ->  2. STF -> Excel  ->  3. Translate  ->
+1. Import STF  ->  2. STF -> Excel  ->  3. Translate  ->
 4. Review (browse + edit + re-upload Excel)  ->
 5. Validate & Fix (auto-fix errors)  ->
 6. Export STF  (or load any Excel and convert directly)
@@ -612,13 +600,12 @@ Export already worked from earlier-phase output.  v1.2 adds a **Load translated 
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+0` | Welcome |
-| `Ctrl+1` | Import STF |
-| `Ctrl+2` | STF -> Excel |
-| `Ctrl+3` | Translate |
-| `Ctrl+4` | Review |
-| `Ctrl+5` | Validate & Fix |
-| `Ctrl+6` | Export STF |
+| `Ctrl+0` | Import STF |
+| `Ctrl+1` | STF -> Excel |
+| `Ctrl+2` | Translate |
+| `Ctrl+3` | Review |
+| `Ctrl+4` | Validate & Fix |
+| `Ctrl+5` | Export STF |
 | `Ctrl+O` | Open file |
 | `Ctrl+S` | Save current phase artifact |
 | `Ctrl+Q` | Quit |
@@ -634,8 +621,7 @@ This release is about **less, not more**.
 ## What changed
 
 * **Welcome page is gone.**  The app now opens directly on Phase 1.  Recent files live under `File -> Recent files` only.
-* **`.stxproject` files are gone.**  The translation memory + `Recent files` menu cover the same "resume where I left off" need without an extra concept.
-* **Six phases instead of seven.**  Numbered 1-6 in the sidebar:
+* **Six phases.**  Numbered 1-6 in the sidebar:
   1. Import STF
   2. STF -> Excel
   3. Translate
@@ -662,4 +648,37 @@ You can use the app two ways and they're equally first-class:
 | Independent per phase | Already have a workbook from a colleague / external source / earlier run | Click the phase in the sidebar, then **Load ...** |
 
 The `USER_GUIDE.md` documents every common workflow.
+
+
+---
+
+# v1.4 -- Compact layout and live feed improvements
+
+Focused on reducing visual clutter and making translation progress more informative.
+
+## Phase 1 (Import STF) -- compact metadata
+
+* **2-column grid** for parsed metadata fields (language/code, STF type/total rows, translated/untranslated side by side) instead of a stacked vertical list. This cuts vertical space usage roughly in half.
+* **Tooltips on hover** for fields with long values so nothing is hidden by truncation.
+* **Source file section** made more compact with reduced margins and spacing.
+
+## Phase 3 (Translate) -- streamlined layout
+
+The previous layout (counter boxes + inline component list + QSplitter) was replaced with a much simpler structure:
+
+* **Counter boxes removed.** Translated / From TM / Deduped / Skipped are no longer separate UI widgets.
+* **Component selection via dialog.** A "Filter Components..." button opens a selection dialog instead of showing the full component list inline.
+* **Source and Target language fields side by side** in a compact form at the top.
+* **No more QSplitter.** The layout is now: compact form at top, progress bar, then the live feed takes all remaining space.
+* **Inline counters in the live feed.** Each line shows:
+  ```
+  [42/1000 | T:30 TM:5 D:7] EN: Hello -> JA: こんにちは
+  ```
+* **Intermittent summary** every 50 rows showing progress percentage, translation rate, and ETA.
+* **Final summary block** when translation completes:
+  ```
+  ━━━ DONE ━━━
+  Translated: 800 | TM: 120 | Deduped: 50 | Skipped: 30
+  Elapsed: 5m 32s | Rate: 3.2 rows/s
+  ```
 

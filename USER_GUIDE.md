@@ -54,7 +54,7 @@ Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and t
 **How to use:**
 
 1. Click **"Browse STF..."** and pick the `.stf` you exported from Salesforce.
-2. Verify the parsed metadata (language, language code, total rows, untranslated count, component types).
+2. Verify the parsed metadata displayed in a **2-column grid** (language and code side by side, STF type and total rows side by side, translated and untranslated counts side by side). Hover over any field to see the full value in a tooltip if it is truncated.
 3. (Optional) Edit the language fields if Salesforce's preamble was missing or wrong.
 4. (Optional) Click **"Save copy as STF..."** to write a clean copy to disk.
 5. Click **"Continue to Phase 2 →"**.
@@ -81,12 +81,23 @@ Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and t
 
 **How to use:**
 
-1. Pick the **Source** language (default English) and **Target** language.
-2. Tick the **components to translate** (default: all).  Use Select all / none / Invert as shortcuts.  The estimate at the bottom shows how many rows will be translated.
+1. Pick the **Source** and **Target** language (displayed side by side in a compact form at the top).
+2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). The dialog shows per-component row counts and provides Select all / none / Invert shortcuts.
 3. Choose the **Output file** for the translated `.xlsx`.
 4. Click **"Start translation"**.
-5. Watch the live feed — you'll see `EN: <source>` / `JA: <translation>` for each row plus running counters for Translated / TM hits / Deduped / Skipped.
-6. Click **"Continue to Phase 4 →"** when it's done.
+5. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
+   ```
+   [42/1000 | T:30 TM:5 D:7] EN: Hello -> JA: こんにちは
+   ```
+   - `T` = translated via API, `TM` = from translation memory, `D` = deduplicated
+6. Every 50 rows an **intermittent summary** appears with progress percentage, rate (rows/s), and ETA.
+7. When translation completes, a **final summary block** is printed:
+   ```
+   ━━━ DONE ━━━
+   Translated: 800 | TM: 120 | Deduped: 50 | Skipped: 30
+   Elapsed: 5m 32s | Rate: 3.2 rows/s
+   ```
+8. Click **"Continue to Phase 4 →"** when done.
 
 **Independent path:** click **"Load translated .xlsx..."** to skip translation and continue with a workbook you already translated.
 
