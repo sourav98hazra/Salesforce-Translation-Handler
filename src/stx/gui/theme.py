@@ -395,14 +395,12 @@ def build_stylesheet(palette: dict) -> str:
     }}
     QDockWidget::title {{
         background-color: {p["surface_alt"]};
-        padding: 6px 12px;
+        padding: 3px 12px;
         border: 1px solid {p["border"]};
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
         color: {p["text_muted"]};
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
         font-size: 11px;
     }}
 
