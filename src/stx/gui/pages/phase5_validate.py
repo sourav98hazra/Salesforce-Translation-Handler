@@ -24,6 +24,7 @@ from typing import List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -182,12 +183,25 @@ class Phase5ValidatePage(PhasePage):
             )
             self._banner.setVisible(True)
             self._fix_all_btn.setEnabled(False)
-            self._fix_selected_btn.setEnabled(False)
             self._save_btn.setEnabled(False)
             return
         self._fix_all_btn.setEnabled(True)
-        self._fix_selected_btn.setEnabled(True)
         self._save_btn.setEnabled(True)
+
+        # Show "data loaded" state before running validation
+        stats = self._state.document.stats()
+        self._banner.setText(
+            f"Document loaded: {stats['total']:,} rows "
+            f"({stats['translated']:,} translated, {stats['untranslated']:,} untranslated). "
+            f"Running validation..."
+        )
+        self._banner.setStyleSheet(
+            "padding: 10px; border-radius: 6px; font-weight: 600; "
+            "background-color: #e0e7ff; color: #3730a3;"
+        )
+        self._banner.setVisible(True)
+        QApplication.processEvents()
+
         # Auto-validate on entry.
         self._on_validate()
 

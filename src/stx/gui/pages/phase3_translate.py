@@ -316,15 +316,7 @@ class Phase3TranslatePage(PhasePage):
         setup_layout.setContentsMargins(8, 6, 8, 6)
         setup_layout.addLayout(setup_grid)
 
-        # Settings hint
-        self._settings_summary = QLabel("")
-        self._settings_summary.setWordWrap(True)
-        self._settings_summary.setStyleSheet("color: #64748b; font-size: 11px;")
-        setup_layout.addWidget(self._settings_summary)
-
-        self.add_widget(setup_box)
-
-        # ----- Filter row (standalone, between Setup and progress bar)
+        # Filter row (inside setup box, below output path)
         filter_row = QHBoxLayout()
         self._filter_btn = QPushButton("Filter Components...")
         self._filter_btn.clicked.connect(self._on_filter_components)
@@ -339,7 +331,15 @@ class Phase3TranslatePage(PhasePage):
         self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
         filter_row.addWidget(self._estimate_label)
         filter_row.addStretch(1)
-        self.add_layout(filter_row)
+        setup_layout.addLayout(filter_row)
+
+        # Settings hint
+        self._settings_summary = QLabel("")
+        self._settings_summary.setWordWrap(True)
+        self._settings_summary.setStyleSheet("color: #64748b; font-size: 11px;")
+        setup_layout.addWidget(self._settings_summary)
+
+        self.add_widget(setup_box)
 
         # ----- Progress bar
         self._progress = QProgressBar()

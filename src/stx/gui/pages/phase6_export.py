@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -124,11 +125,24 @@ class Phase6ExportPage(PhasePage):
         self.add_layout(make_action_row(self._export_btn))
 
         # ---------- Result table
+        result_box = QGroupBox("Export results")
+        self._result_layout = QVBoxLayout(result_box)
+        self._result_layout.setContentsMargins(4, 4, 4, 4)
+
+        self._popout_results_btn = QPushButton("\u2197")
+        self._popout_results_btn.setFixedSize(20, 20)
+        self._popout_results_btn.setToolTip("Pop out into a separate window")
+        self._popout_results_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_results_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._popout_results_btn.clicked.connect(self._on_popout_results)
+        self._result_layout.addWidget(self._popout_results_btn, 0, Qt.AlignmentFlag.AlignRight)
+
         self._result_table = QTableWidget(0, 2)
         self._result_table.setHorizontalHeaderLabels(["File", "Size"])
         self._result_table.horizontalHeader().setStretchLastSection(True)
         self._result_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.add_widget(self._result_table)
+        self._result_layout.addWidget(self._result_table)
+        self.add_widget(result_box)
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -284,3 +298,38 @@ class Phase6ExportPage(PhasePage):
         self.set_busy(False)
         self._state.set_phase(5, PhaseStatus.ERROR)
         self.error(message, "Export failed")
+
+    # ------------------------------------------------------------------ pop-out results
+
+    def _on_popout_results(self) -> None:
+        if hasattr(self, '_results_dialog') and self._results_dialog is not None:
+            self._results_dialog.raise_()
+            return
+        self._results_dialog = QDialog(self)
+        self._results_dialog.setWindowTitle("Export Results")
+        self._results_dialog.resize(700, 300)
+        self._results_dialog.setWindowFlags(
+            self._results_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._results_dialog)
+        self._result_table.setParent(self._results_dialog)
+        layout.addWidget(self._result_table)
+        self._results_dialog.finished.connect(self._on_results_dialog_closed)
+        self._results_dialog.show()
+        self._popout_results_btn.setText("\u2199")
+        self._popout_results_btn.setToolTip("Dock back into the page")
+        self._popout_results_btn.clicked.disconnect()
+        self._popout_results_btn.clicked.connect(self._on_dock_results_back)
+
+    def _on_dock_results_back(self) -> None:
+        if hasattr(self, '_results_dialog') and self._results_dialog is not None:
+            self._results_dialog.close()
+
+    def _on_results_dialog_closed(self) -> None:
+        self._result_table.setParent(self)
+        self._result_layout.addWidget(self._result_table)
+        self._results_dialog = None
+        self._popout_results_btn.setText("\u2197")
+        self._popout_results_btn.setToolTip("Pop out into a separate window")
+        self._popout_results_btn.clicked.disconnect()
+        self._popout_results_btn.clicked.connect(self._on_popout_results)

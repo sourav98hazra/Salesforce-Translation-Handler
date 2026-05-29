@@ -28,7 +28,9 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
+    QDialog,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -255,9 +257,18 @@ class Phase4ReviewPage(PhasePage):
         # Slim editor pane (smaller than v1.2's giant box)
         editor = QFrame()
         editor.setProperty("role", "card")
-        ed_layout = QVBoxLayout(editor)
-        ed_layout.setContentsMargins(12, 10, 12, 10)
-        ed_layout.setSpacing(6)
+        self._editor_layout = QVBoxLayout(editor)
+        self._editor_layout.setContentsMargins(12, 10, 12, 10)
+        self._editor_layout.setSpacing(6)
+
+        # Pop-out button for editor pane
+        self._popout_editor_btn = QPushButton("\u2197")
+        self._popout_editor_btn.setFixedSize(20, 20)
+        self._popout_editor_btn.setToolTip("Pop out into a separate window")
+        self._popout_editor_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_editor_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._popout_editor_btn.clicked.connect(self._on_popout_editor)
+        self._editor_layout.addWidget(self._popout_editor_btn, 0, Qt.AlignmentFlag.AlignRight)
 
         meta = QHBoxLayout()
         meta.setSpacing(8)
@@ -272,7 +283,7 @@ class Phase4ReviewPage(PhasePage):
         self._reset_btn.clicked.connect(self._reset_row)
         meta.addWidget(self._apply_btn)
         meta.addWidget(self._reset_btn)
-        ed_layout.addLayout(meta)
+        self._editor_layout.addLayout(meta)
 
         side_by_side = QHBoxLayout()
         side_by_side.setSpacing(8)
@@ -291,9 +302,11 @@ class Phase4ReviewPage(PhasePage):
         tgt_col.addWidget(self._translation_field)
         side_by_side.addLayout(src_col, stretch=1)
         side_by_side.addLayout(tgt_col, stretch=1)
-        ed_layout.addLayout(side_by_side)
+        self._editor_layout.addLayout(side_by_side)
 
         splitter.addWidget(editor)
+        self._editor_widget = editor
+        self._splitter = splitter
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
         self.add_widget(splitter, stretch=1)
@@ -302,7 +315,7 @@ class Phase4ReviewPage(PhasePage):
         self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
         self._save_btn.clicked.connect(self._on_save)
         self._next_btn = QPushButton("Continue to Phase 5 (Validate & Fix) \u2192")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(4))
+        self._next_btn.clicked.connect(self._on_continue_to_phase5)
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
 
     def _make_inline_stat(self, label: str, value: str, accent: str) -> dict:
@@ -332,6 +345,15 @@ class Phase4ReviewPage(PhasePage):
             self._save_btn.setEnabled(False)
             return
         self._save_btn.setEnabled(True)
+
+        # Show loading indicator for large documents
+        if len(self._state.document.entries) > 1000:
+            self._status_pill.setText("\u23f3  Loading...")
+            self._status_pill.setStyleSheet(
+                "padding: 4px 10px; border-radius: 12px; "
+                "background: #e0e7ff; color: #3730a3; font-weight: 600;"
+            )
+            QApplication.processEvents()
 
         if self._model is None:
             self._model = _EntriesModel(self._state.document, self)
@@ -546,3 +568,51 @@ class Phase4ReviewPage(PhasePage):
         self.set_busy(False)
         self._state.set_phase(3, PhaseStatus.ERROR)
         self.error(message, "Save failed")
+
+    # ------------------------------------------------------------------ continue to Phase 5
+
+    def _on_continue_to_phase5(self) -> None:
+        if self._state.document is not None:
+            stats = self._state.document.stats()
+            self.status_message.emit(
+                f"Document carried forward to Phase 5 "
+                f"({stats['total']:,} rows, {stats['translated']:,} translated)."
+            )
+        self.request_navigate.emit(4)
+
+    # ------------------------------------------------------------------ pop-out editor
+
+    def _on_popout_editor(self) -> None:
+        if hasattr(self, '_editor_dialog') and self._editor_dialog is not None:
+            self._editor_dialog.raise_()
+            return
+        self._editor_dialog = QDialog(self)
+        self._editor_dialog.setWindowTitle("Editor - Key / Source / Translation")
+        self._editor_dialog.resize(800, 400)
+        self._editor_dialog.setWindowFlags(
+            self._editor_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._editor_dialog)
+        self._editor_widget.setParent(self._editor_dialog)
+        layout.addWidget(self._editor_widget)
+        self._editor_dialog.finished.connect(self._on_editor_dialog_closed)
+        self._editor_dialog.show()
+        self._popout_editor_btn.setText("\u2199")
+        self._popout_editor_btn.setToolTip("Dock back into the page")
+        self._popout_editor_btn.clicked.disconnect()
+        self._popout_editor_btn.clicked.connect(self._on_dock_editor_back)
+
+    def _on_dock_editor_back(self) -> None:
+        if hasattr(self, '_editor_dialog') and self._editor_dialog is not None:
+            self._editor_dialog.close()
+
+    def _on_editor_dialog_closed(self) -> None:
+        self._editor_widget.setParent(self)
+        self._splitter.addWidget(self._editor_widget)
+        self._splitter.setStretchFactor(0, 4)
+        self._splitter.setStretchFactor(1, 1)
+        self._editor_dialog = None
+        self._popout_editor_btn.setText("\u2197")
+        self._popout_editor_btn.setToolTip("Pop out into a separate window")
+        self._popout_editor_btn.clicked.disconnect()
+        self._popout_editor_btn.clicked.connect(self._on_popout_editor)

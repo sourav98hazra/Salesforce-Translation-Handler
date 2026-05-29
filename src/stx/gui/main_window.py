@@ -58,8 +58,8 @@ _PHASES = [
     ("1. Import STF", "Pick the source .stf file"),
     ("2. STF \u2192 Excel", "Convert to organised workbook"),
     ("3. Translate", "Auto-translate untranslated rows"),
-    ("4. Review", "Inspect, edit, re-upload Excel"),
-    ("5. Validate & Fix", "Auto-fix errors, re-validate"),
+    ("4. Browse & Review", "View translations, edit, re-upload"),
+    ("5. Validate & Fix", "Find issues, auto-fix, re-validate"),
     ("6. Export STF", "Write final STF files"),
 ]
 

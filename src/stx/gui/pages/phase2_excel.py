@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -12,6 +14,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from ..state import AppState
@@ -54,7 +57,17 @@ class Phase2ExcelPage(PhasePage):
 
         # Content Details preview
         details_box = QGroupBox("Content Details (post-export preview)")
-        details_layout = QHBoxLayout(details_box)
+        self._details_layout = QVBoxLayout(details_box)
+        self._details_layout.setContentsMargins(4, 4, 4, 4)
+
+        self._popout_details_btn = QPushButton("\u2197")
+        self._popout_details_btn.setFixedSize(20, 20)
+        self._popout_details_btn.setToolTip("Pop out into a separate window")
+        self._popout_details_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_details_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._popout_details_btn.clicked.connect(self._on_popout_details)
+        self._details_layout.addWidget(self._popout_details_btn, 0, Qt.AlignmentFlag.AlignRight)
+
         self._details = QTableWidget(0, 5)
         self._details.setHorizontalHeaderLabels([
             "SheetName", "SavedAs", "ComponentType", "TranslationStatus", "TotalRecords",
@@ -62,7 +75,7 @@ class Phase2ExcelPage(PhasePage):
         self._details.horizontalHeader().setStretchLastSection(True)
         self._details.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._details.setAlternatingRowColors(True)
-        details_layout.addWidget(self._details)
+        self._details_layout.addWidget(self._details)
         self.add_widget(details_box, stretch=1)
 
         # Actions
@@ -230,3 +243,38 @@ class Phase2ExcelPage(PhasePage):
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
+
+    # ------------------------------------------------------------------ pop-out details
+
+    def _on_popout_details(self) -> None:
+        if hasattr(self, '_details_dialog') and self._details_dialog is not None:
+            self._details_dialog.raise_()
+            return
+        self._details_dialog = QDialog(self)
+        self._details_dialog.setWindowTitle("Content Details")
+        self._details_dialog.resize(800, 500)
+        self._details_dialog.setWindowFlags(
+            self._details_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._details_dialog)
+        self._details.setParent(self._details_dialog)
+        layout.addWidget(self._details)
+        self._details_dialog.finished.connect(self._on_details_dialog_closed)
+        self._details_dialog.show()
+        self._popout_details_btn.setText("\u2199")
+        self._popout_details_btn.setToolTip("Dock back into the page")
+        self._popout_details_btn.clicked.disconnect()
+        self._popout_details_btn.clicked.connect(self._on_dock_details_back)
+
+    def _on_dock_details_back(self) -> None:
+        if hasattr(self, '_details_dialog') and self._details_dialog is not None:
+            self._details_dialog.close()
+
+    def _on_details_dialog_closed(self) -> None:
+        self._details.setParent(self)
+        self._details_layout.addWidget(self._details)
+        self._details_dialog = None
+        self._popout_details_btn.setText("\u2197")
+        self._popout_details_btn.setToolTip("Pop out into a separate window")
+        self._popout_details_btn.clicked.disconnect()
+        self._popout_details_btn.clicked.connect(self._on_popout_details)
