@@ -20,12 +20,14 @@ from typing import Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QSplitter,
     QTableView,
@@ -154,11 +156,12 @@ class Phase4ReviewPage(PhasePage):
             state,
             title="Phase 4 \u2014 Review",
             subtitle=(
-                "Review translations and edit any that need correction.  "
-                "You can also re-upload an externally edited Excel here -- "
-                "it will replace the current document and become the latest "
-                "version.  Validation runs automatically on entry so you "
-                "can see issues before moving to the next phase."
+                "Browse every translation side-by-side with the source, filter "
+                "by component or status, and edit on demand.  You can also "
+                "re-upload an externally edited Excel here \u2014 it replaces "
+                "the current document and becomes the latest version.  "
+                "Validation runs automatically on entry so you can spot issues "
+                "at a glance before moving on."
             ),
             parent=parent,
         )
@@ -176,6 +179,32 @@ class Phase4ReviewPage(PhasePage):
         )
         self._validation_banner.setVisible(False)
         self.add_widget(self._validation_banner)
+
+        # ---------- Translation summary card (the "browse translations" view)
+        summary_box = QGroupBox("Translation summary")
+        summary_layout = QVBoxLayout(summary_box)
+
+        # Three big counter cards in a row.
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(12)
+        self._total_card = self._make_stat_card("Total rows", "0", "#1e293b")
+        self._translated_card = self._make_stat_card("Translated", "0", "#16a34a")
+        self._untranslated_card = self._make_stat_card("Untranslated", "0", "#d97706")
+        self._issues_card = self._make_stat_card("Issues", "0", "#dc2626")
+        cards_row.addWidget(self._total_card["frame"])
+        cards_row.addWidget(self._translated_card["frame"])
+        cards_row.addWidget(self._untranslated_card["frame"])
+        cards_row.addWidget(self._issues_card["frame"])
+        summary_layout.addLayout(cards_row)
+
+        # Visual progress bar showing translation completion %.
+        self._progress = QProgressBar()
+        self._progress.setRange(0, 100)
+        self._progress.setValue(0)
+        self._progress.setTextVisible(True)
+        self._progress.setFormat("Translation completeness: %p%")
+        summary_layout.addWidget(self._progress)
+        self.add_widget(summary_box)
 
         # ---------- Load Excel row (prominent)
         load_box = QGroupBox("Load / re-upload reviewed Excel")
@@ -334,6 +363,23 @@ class Phase4ReviewPage(PhasePage):
             self._validation_banner.setVisible(False)
             return
         report = validate_document(self._state.document)
+
+        # Update the "Issues" stat card to reflect what we just saw.
+        issue_count = len(report.issues)
+        self._issues_card["value"].setText(f"{issue_count:,}")
+        if issue_count == 0:
+            self._issues_card["value"].setStyleSheet(
+                "color: #16a34a; font-size: 26px; font-weight: 700;"
+            )
+        elif report.has_errors:
+            self._issues_card["value"].setStyleSheet(
+                "color: #dc2626; font-size: 26px; font-weight: 700;"
+            )
+        else:
+            self._issues_card["value"].setStyleSheet(
+                "color: #d97706; font-size: 26px; font-weight: 700;"
+            )
+
         if not report.issues:
             self._validation_banner.setText(
                 "\u2713  No validation issues found.  You may proceed to export."
@@ -366,14 +412,55 @@ class Phase4ReviewPage(PhasePage):
 
     # ------------------------------------------------------------------ counters
 
+    def _make_stat_card(self, label: str, initial_value: str, accent: str) -> dict:
+        """Build a small summary card with a label, a big number, and an accent bar.
+
+        Returns a dict with the frame plus references to the value
+        :class:`QLabel` so :meth:`_update_counters` can update it cheaply.
+        """
+        frame = QFrame()
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setStyleSheet(
+            "QFrame { background: palette(base); border: 1px solid palette(mid); "
+            f"border-top: 4px solid {accent}; border-radius: 6px; padding: 10px; }}"
+        )
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(2)
+
+        title = QLabel(label)
+        title.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 600; "
+                            "text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(title)
+
+        value = QLabel(initial_value)
+        value.setStyleSheet(f"color: {accent}; font-size: 26px; font-weight: 700;")
+        layout.addWidget(value)
+
+        return {"frame": frame, "value": value}
+
     def _update_counters(self) -> None:
         if self._state.document is None:
+            self._counters.setText("No document loaded.")
             return
         stats = self._state.document.stats()
         self._counters.setText(
-            f"Total: {stats['total']:,}   Translated: {stats['translated']:,}   "
-            f"Untranslated: {stats['untranslated']:,}   Components: {stats['components']}"
+            f"Components: {stats['components']}   "
+            f"Source: {self._state.target_language_name or '?'} "
+            f"({self._state.target_language_code or '?'})"
         )
+
+        # Update the big stat cards.
+        self._total_card["value"].setText(f"{stats['total']:,}")
+        self._translated_card["value"].setText(f"{stats['translated']:,}")
+        self._untranslated_card["value"].setText(f"{stats['untranslated']:,}")
+
+        # Translation completeness percentage.
+        if stats["total"] > 0:
+            pct = int(stats["translated"] * 100 / stats["total"])
+            self._progress.setValue(pct)
+        else:
+            self._progress.setValue(0)
 
     # ------------------------------------------------------------------ selection
 

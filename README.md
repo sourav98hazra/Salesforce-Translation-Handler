@@ -546,3 +546,79 @@ stx backends   # list available translator backends
 - **Gap-prevention sweep** -- after every translation run, the runner walks the entries array and ensures every slot has both a final entry and a status entry. The audit log is guaranteed to have one row per source row.
 - **Verified on the 36245-row sample**: round-trip preserves every row, scope filter correctly accounts for in-scope vs out-of-scope rows, no rows are ever lost.
 
+
+
+
+---
+
+# v1.2 -- Review, Validate & Fix, and Export refinements
+
+The flow now has **seven phases** (the prior six plus a dedicated *Validate & Fix* between Review and Export):
+
+```
+0. Welcome  ->  1. Import STF  ->  2. STF -> Excel  ->  3. Translate  ->
+4. Review (browse + edit + re-upload Excel)  ->
+5. Validate & Fix (auto-fix errors)  ->
+6. Export STF  (or load any Excel and convert directly)
+```
+
+## Phase 4 (Review) -- now a translation browser
+
+Review is no longer just an editor: it's the place to **browse the translations** and confirm what's been done, with editing on demand.
+
+* **Translation summary card** at the top with four big counters (Total / Translated / Untranslated / Issues) and a visual progress bar showing translation completeness percentage.
+* **Auto-validation on entry** -- a colour-coded banner (green / amber / red) immediately tells you whether the document is ready to export.
+* **Re-upload reviewed Excel** -- prominent button at the top.  If you'd rather edit the workbook in Excel itself, do that, then drop the file back in here -- it replaces the in-memory document and becomes the latest version for all subsequent phases.
+* **Filter / search / sort** by component type, status, or substring.
+* **Side-by-side editor pane** below the table (read-only source on the left, editable translation on the right) -- much nicer than editing long HTML strings inside a single table cell.
+
+## Phase 5 (Validate & Fix) -- a dedicated correction phase
+
+A new phase that focuses *only* on the rows with validation issues, so you don't have to scroll through 36k clean rows to find the broken ones.
+
+* Color-coded banner shows error / warning / clean state.
+* The issues table lists every row that triggered a validator -- with severity, category, key, label, current translation, and the specific message.
+* **Three auto-fix buttons** powered by the new `stx/autofix.py` module:
+  * **Auto-fix all** -- run every safe fixer over every issue.
+  * **Auto-fix selected** -- only act on the rows you've selected.
+  * **Auto-fix this row** -- fix just the row in the inline editor.
+* Inline side-by-side editor for manual corrections.
+* Double-click any row to **jump to Phase 4** with full table context.
+* **Re-validate** at any time to confirm fixes worked.
+* Save a "fixed" workbook (`fixed.xlsx`) at any point.
+
+### What the auto-fixer does
+
+| Fixer | What it does |
+|---|---|
+| `restore_placeholders` | If `{!Foo}` is in the source but missing from the translation, append it back. |
+| `restore_message_format` | Same for `{0}`, `{1}`, `{name}` MessageFormat tokens. |
+| `trim_to_length` | If the translation exceeds the Salesforce length limit for its component type, truncate at a word boundary and append `...`. |
+| `strip_whitespace_translation` | Whitespace-only translations are cleared so they re-import as untranslated (honest rather than misleading). |
+| `restore_html_tags` | Wrap the translation in a missing tag pair when there's exactly one. |
+| `deduplicate_keys` | Document-wide -- keep the last occurrence of each duplicate key (Salesforce's own behaviour). |
+
+Every fix is **deterministic and safe**.  Fixers never invent data; if they can't help confidently they return None and the row stays flagged for manual attention.
+
+## Phase 6 (Export STF) -- now also a "direct convert" entry point
+
+Export already worked from earlier-phase output.  v1.2 adds a **Load translated Excel** button at the top so users with an externally translated workbook can convert it to STF in one click without going through Phases 1-5.
+
+* If you went through earlier phases, the document is already in memory -- just pick language / output dir and Export.
+* If you have your own translated Excel, click **Load translated Excel...**, pick language / output dir, and Export.  No validation is forced -- the app trusts that you've validated yourself (with a tooltip reminder pointing at Phase 5 if you want to check).
+* Optional **Run validation** button shows issues but never blocks export -- it's purely advisory at this stage.
+
+## Updated keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+0` | Welcome |
+| `Ctrl+1` | Import STF |
+| `Ctrl+2` | STF -> Excel |
+| `Ctrl+3` | Translate |
+| `Ctrl+4` | Review |
+| `Ctrl+5` | Validate & Fix |
+| `Ctrl+6` | Export STF |
+| `Ctrl+O` | Open file |
+| `Ctrl+S` | Save current phase artifact |
+| `Ctrl+Q` | Quit |
