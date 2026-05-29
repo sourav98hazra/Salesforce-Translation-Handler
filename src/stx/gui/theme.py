@@ -187,8 +187,10 @@ def build_stylesheet(palette: dict) -> str:
         subcontrol-position: top left;
         left: 12px;
         top: -2px;
-        padding: 0 6px;
+        padding: 2px 8px;
         background-color: {p["surface"]};
+        border: 1px solid {p["border"]};
+        border-radius: 6px;
         color: {p["text_subtle"]};
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -387,10 +389,16 @@ def build_stylesheet(palette: dict) -> str:
     }}
 
     /* ---------- Dock ---------- */
+    QDockWidget {{
+        border: 1px solid {p["border"]};
+        border-radius: 8px;
+    }}
     QDockWidget::title {{
         background-color: {p["surface_alt"]};
         padding: 6px 12px;
-        border-bottom: 1px solid {p["border"]};
+        border: 1px solid {p["border"]};
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
         color: {p["text_muted"]};
         font-weight: 600;
         text-transform: uppercase;
