@@ -392,18 +392,15 @@ def build_stylesheet(palette: dict) -> str:
     QDockWidget {{
         border: none;
         background: transparent;
+        titlebar-close-icon: none;
     }}
     QDockWidget::title {{
         background-color: {p["surface_alt"]};
-        padding: 8px 14px;
-        border: 1px solid {p["border"]};
-        border-radius: 6px;
-        margin-bottom: 2px;
+        padding: 6px 12px;
+        border-bottom: 1px solid {p["border"]};
         color: {p["text_muted"]};
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-size: 11px;
+        font-size: 12px;
     }}
 
     /* ---------- Tabs ---------- */
