@@ -682,3 +682,17 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
   Elapsed: 5m 32s | Rate: 3.2 rows/s
   ```
 
+---
+
+# Latest (v1.4)
+
+Summary of the most recent improvements shipped in this release:
+
+- **Minimalist hexagonal logo** in the sidebar, rendered from an inline SVG beside the full "Salesforce Translation Handler" title.
+- **Sidebar footer** showing document stats (total/translated/untranslated rows), target language, and a mini progress bar visible during translation.
+- **Enhanced Filter Components dialog** in Phase 3 with a search field, status filter (all / untranslated only / translated for retranslation / both), and a live summary of selection count and estimated rows.
+- **Filter button separated from estimate label** for a cleaner Phase 3 layout.
+- **Pop-out capability** for Preview (Phase 1) and Live feed (Phase 3) panels, allowing them to be detached into independent windows.
+- **Status log toggle** via `View -> Show Status Log` (`Ctrl+L`) so the bottom log panel can be hidden when not needed.
+- **Compact fields/buttons/margins globally** -- reduced padding, 2-column metadata grids, smaller font sizes where appropriate, and tighter spacing throughout.
+

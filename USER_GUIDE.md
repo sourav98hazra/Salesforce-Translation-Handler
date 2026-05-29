@@ -26,7 +26,17 @@ After install, three equivalent ways to start:
 * From a terminal: `stx-app`.
 * From a terminal: `stx gui`.
 
-The Window opens on **Phase 1 — Import STF**.
+The Window opens on **Phase 1 -- Import STF**.
+
+### The sidebar
+
+The sidebar on the left shows:
+
+- The **app logo** (a hexagonal "STH" icon) beside the full title **"Salesforce Translation Handler"**.
+- The six phase buttons with status badges (`✓` done, `▶` running, `⚠` error).
+- Below the phases: **document stats** (total / translated / untranslated rows), the **target language**, and a **mini progress bar** (visible during translation).
+
+The **Status log** at the bottom of the window can be hidden or shown via `View -> Show Status Log` (`Ctrl+L`).
 
 ---
 
@@ -61,6 +71,8 @@ Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and t
 
 **Independent path:** drop an `.stf` directly here and parse it; no need to do anything else.
 
+The Preview panel in Phase 1 has a **"Pop out"** button that detaches the preview into an independent window, useful for viewing the parsed content alongside other phases.
+
 ### Phase 2 — STF → Organised Excel
 
 **What it does:** groups the parsed rows by component type (`CustomLabel`, `ButtonOrLink`, etc.) into a structured workbook with one sheet per group plus a `Content Details` index sheet.
@@ -82,7 +94,11 @@ Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and t
 **How to use:**
 
 1. Pick the **Source** and **Target** language (displayed side by side in a compact form at the top).
-2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). The dialog shows per-component row counts and provides Select all / none / Invert shortcuts.
+2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). The dialog includes:
+   - A **search field** to filter components by name.
+   - A **status filter** (all / untranslated only / translated for retranslation / both).
+   - A **live summary** showing the selection count and estimated rows.
+   - Select all / none / Invert shortcuts and per-component row counts.
 3. Choose the **Output file** for the translated `.xlsx`.
 4. Click **"Start translation"**.
 5. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
@@ -98,6 +114,8 @@ Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and t
    Elapsed: 5m 32s | Rate: 3.2 rows/s
    ```
 8. Click **"Continue to Phase 4 →"** when done.
+
+The live feed panel has a **"Pop out"** button that detaches it into an independent window so you can monitor translation progress while navigating other phases.
 
 **Independent path:** click **"Load translated .xlsx..."** to skip translation and continue with a workbook you already translated.
 

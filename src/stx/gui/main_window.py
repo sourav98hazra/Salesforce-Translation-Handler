@@ -186,9 +186,10 @@ class MainWindow(QMainWindow):
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
-            "<span style='font-family: monospace; font-size: 14px; font-weight: 900; "
-            "color: #c7d2fe; background: #312e81; padding: 3px 8px; border-radius: 4px;'>"
-            "STF</span> <span style='font-size: 13px; font-weight: 600; color: #f1f5f9;'>Handler</span>"
+            "<div style='line-height: 1.3;'>"
+            "<span style='font-size: 13px; font-weight: 700; color: #f1f5f9;'>Salesforce</span><br/>"
+            "<span style='font-size: 13px; font-weight: 700; color: #f1f5f9;'>Translation Handler</span>"
+            "</div>"
         )
         header_row.addWidget(title)
         header_row.addStretch(1)
