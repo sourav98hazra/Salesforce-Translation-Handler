@@ -77,6 +77,91 @@ DARK_PALETTE = {
 }
 
 
+# Cool blue/teal -- vibrant but easy to look at.  Sky-blue accent.
+OCEAN_PALETTE = {
+    "bg":                "#e0f2fe",       # sky-100 -- main canvas
+    "surface":           "#f0f9ff",       # sky-50  -- cards / group boxes
+    "surface_alt":       "#e0f2fe",       # between bg and surface
+    "surface_raised":    "#ffffff",       # inputs / tooltips only
+    "border":            "#7dd3fc",       # sky-300 -- visible
+    "border_strong":     "#38bdf8",       # sky-400
+    "text":              "#0c4a6e",       # sky-900
+    "text_muted":        "#075985",       # sky-800
+    "text_subtle":       "#0369a1",       # sky-700
+    "accent":            "#0284c7",       # sky-600 -- main accent
+    "accent_hover":      "#0369a1",       # sky-700
+    "accent_soft":       "#bae6fd",       # sky-200
+    "sidebar_bg":        "#0c4a6e",       # sky-900
+    "sidebar_text":      "#7dd3fc",       # sky-300
+    "sidebar_text_active": "#ffffff",
+    "sidebar_item_hover":  "#075985",     # sky-800
+    "sidebar_item_active": "#0284c7",     # sky-600
+    "danger":            "#b91c1c",
+    "danger_soft":       "#fef2f2",
+    "warning":           "#b45309",
+    "warning_soft":      "#fffbeb",
+    "success":           "#15803d",
+    "success_soft":      "#f0fdf4",
+    "info":              "#0369a1",
+}
+
+
+# Green / earth -- easy on the eyes.  Forest green accent.
+FOREST_PALETTE = {
+    "bg":                "#f0fdf4",       # green-50  -- main canvas
+    "surface":           "#ffffff",       # cards / group boxes
+    "surface_alt":       "#dcfce7",       # green-100
+    "surface_raised":    "#ffffff",       # inputs / tooltips
+    "border":            "#86efac",       # green-300
+    "border_strong":     "#4ade80",       # green-400
+    "text":              "#14532d",       # green-900
+    "text_muted":        "#166534",       # green-800
+    "text_subtle":       "#15803d",       # green-700
+    "accent":            "#15803d",       # green-700 -- main accent
+    "accent_hover":      "#166534",       # green-800
+    "accent_soft":       "#bbf7d0",       # green-200
+    "sidebar_bg":        "#14532d",       # green-900
+    "sidebar_text":      "#86efac",       # green-300
+    "sidebar_text_active": "#ffffff",
+    "sidebar_item_hover":  "#166534",     # green-800
+    "sidebar_item_active": "#15803d",     # green-700
+    "danger":            "#b91c1c",
+    "danger_soft":       "#fef2f2",
+    "warning":           "#b45309",
+    "warning_soft":      "#fffbeb",
+    "success":           "#15803d",
+    "success_soft":      "#f0fdf4",
+    "info":              "#0369a1",
+}
+
+
+# Warm amber / orange -- inviting, sunset-y.
+SUNSET_PALETTE = {
+    "bg":                "#fffbeb",       # amber-50  -- main canvas
+    "surface":           "#ffffff",       # cards / group boxes
+    "surface_alt":       "#fef3c7",       # amber-100
+    "surface_raised":    "#ffffff",       # inputs / tooltips
+    "border":            "#fcd34d",       # amber-300
+    "border_strong":     "#f59e0b",       # amber-500
+    "text":              "#78350f",       # amber-900
+    "text_muted":        "#92400e",       # amber-800
+    "text_subtle":       "#b45309",       # amber-700
+    "accent":            "#b45309",       # amber-700 -- main accent
+    "accent_hover":      "#92400e",       # amber-800
+    "accent_soft":       "#fde68a",       # amber-200
+    "sidebar_bg":        "#78350f",       # amber-900
+    "sidebar_text":      "#fcd34d",       # amber-300
+    "sidebar_text_active": "#ffffff",
+    "sidebar_item_hover":  "#92400e",     # amber-800
+    "sidebar_item_active": "#b45309",     # amber-700
+    "danger":            "#b91c1c",
+    "danger_soft":       "#fef2f2",
+    "warning":           "#b45309",
+    "warning_soft":      "#fffbeb",
+    "success":           "#15803d",
+    "success_soft":      "#f0fdf4",
+    "info":              "#0369a1",
+}
 def build_stylesheet(palette: dict) -> str:
     p = palette
     return f"""
@@ -416,7 +501,11 @@ def build_stylesheet(palette: dict) -> str:
 
 
 def apply_theme(theme: str = "auto") -> dict:
-    """Apply ``light`` / ``dark`` / ``auto`` to the running QApplication.
+    """Apply a named theme to the running QApplication.
+
+    Supported names: ``light``, ``dark``, ``ocean``, ``forest``,
+    ``sunset``, ``auto``.  ``auto`` follows the OS color scheme and
+    resolves to either ``light`` or ``dark``.
 
     Returns the active palette dict so callers can tint widgets that
     aren't covered by the stylesheet (e.g. dynamic chart colours).
@@ -436,7 +525,14 @@ def apply_theme(theme: str = "auto") -> dict:
         except Exception:  # noqa: BLE001
             resolved = "light"
 
-    palette = DARK_PALETTE if resolved == "dark" else LIGHT_PALETTE
+    palettes = {
+        "light":   LIGHT_PALETTE,
+        "dark":    DARK_PALETTE,
+        "ocean":   OCEAN_PALETTE,
+        "forest":  FOREST_PALETTE,
+        "sunset":  SUNSET_PALETTE,
+    }
+    palette = palettes.get(resolved, LIGHT_PALETTE)
     app.setStyleSheet(build_stylesheet(palette))
 
     # Tweak QPalette so native dialogs follow suit.

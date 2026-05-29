@@ -43,7 +43,7 @@ LOGGER = logging.getLogger(__name__)
 class WakeLock:
     """Best-effort cross-platform wake lock."""
 
-    def __init__(self, reason: str = "Salesforce Translation Handler") -> None:
+    def __init__(self, reason: str = "Salesforce Translation Manager") -> None:
         self.reason = reason
         self._impl: Optional["_PlatformLock"] = None
         self._held = False

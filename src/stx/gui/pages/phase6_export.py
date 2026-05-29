@@ -85,12 +85,20 @@ class Phase6ExportPage(PhasePage):
         lang_row.addWidget(QLabel("Target:"))
         self._lang_combo = QComboBox()
         self._lang_combo.addItems(supported_language_names())
+        self._lang_combo.setToolTip(
+            "Target language written into the STF header. "
+            "Auto-fills the language code below when changed."
+        )
         self._lang_combo.currentTextChanged.connect(self._on_lang_changed)
         lang_row.addWidget(self._lang_combo)
         lang_row.addSpacing(12)
         lang_row.addWidget(QLabel("Code:"))
         self._code_field = QLineEdit()
         self._code_field.setMaximumWidth(120)
+        self._code_field.setToolTip(
+            "Salesforce language code (e.g. ja, fr, de). Used in the STF "
+            "filenames and header. Auto-filled from the language selection."
+        )
         lang_row.addWidget(self._code_field)
         lang_row.addStretch(1)
         self.add_layout(lang_row)
@@ -99,6 +107,10 @@ class Phase6ExportPage(PhasePage):
         validate_box = QGroupBox("Quick validation check (optional)")
         v_layout = QHBoxLayout(validate_box)
         self._validate_btn = QPushButton("Run validation")
+        self._validate_btn.setToolTip(
+            "Run a quick pre-export validation check on the loaded document. "
+            "Advisory only -- export is not blocked."
+        )
         self._validate_btn.clicked.connect(self._on_validate)
         v_layout.addWidget(self._validate_btn)
         self._validation_summary = QLabel("Not run.  Click to check before exporting.")
@@ -108,6 +120,11 @@ class Phase6ExportPage(PhasePage):
 
         # ---------- Export button
         self._export_btn = primary(QPushButton("Export 3 STF files"))
+        self._export_btn.setToolTip(
+            "Write the three Salesforce STF files (full / translated-only / "
+            "untranslated-only) into a folder you choose. Ready to upload "
+            "back to Salesforce."
+        )
         self._export_btn.clicked.connect(self._on_export)
         self.add_layout(make_action_row(self._export_btn))
 

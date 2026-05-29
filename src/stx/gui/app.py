@@ -36,8 +36,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     app = QApplication(argv if argv is not None else sys.argv)
-    app.setApplicationName("Salesforce Translation Handler")
-    app.setOrganizationName("Salesforce Translation Handler")
+    app.setApplicationName("Salesforce Translation Manager")
+    app.setOrganizationName("Salesforce Translation Manager")
 
     # Force the Fusion style engine -- it fully honours QSS on every platform
     # (Windows / macOS / Linux).  Without this, the native Windows style

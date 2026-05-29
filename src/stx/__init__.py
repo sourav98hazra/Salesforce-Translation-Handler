@@ -1,4 +1,4 @@
-"""Salesforce Translation Handler core package.
+"""Salesforce Translation Manager core package.
 
 A professional toolkit for the Salesforce Translation Workbench (STF) workflow:
 

@@ -283,12 +283,14 @@ class Phase3TranslatePage(PhasePage):
         self._source_combo = QComboBox()
         self._source_combo.addItems(supported_language_names())
         self._source_combo.setCurrentText("English")
+        self._source_combo.setToolTip("Source language of your STF file.")
         lang_form.addRow("Source:", self._source_combo)
 
         self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
+        self._target_combo.setToolTip("Language to translate into.")
         lang_form.addRow("Target:", self._target_combo)
 
         setup_grid.addLayout(lang_form)
@@ -301,8 +303,13 @@ class Phase3TranslatePage(PhasePage):
 
         self._path_field = QLineEdit()
         self._path_field.setPlaceholderText("Choose where to save the translated .xlsx")
+        self._path_field.setToolTip(
+            "File path where the translated workbook will be saved. "
+            "Auto-suggested from the source file; click Browse to pick another."
+        )
         path_browse = QPushButton("Browse...")
         path_browse.clicked.connect(self._on_browse_save)
+        path_browse.setToolTip("Choose a different location for the translated .xlsx output.")
         path_row = QHBoxLayout()
         path_row.addWidget(self._path_field, stretch=1)
         path_row.addWidget(path_browse)
@@ -321,6 +328,10 @@ class Phase3TranslatePage(PhasePage):
         # so it isn't visually competing with the Target combo or Output field.
         self._filter_btn = QPushButton("Filter Components...")
         self._filter_btn.setStyleSheet("padding: 5px 16px; font-weight: 600;")
+        self._filter_btn.setToolTip(
+            "Choose which component types to translate. By default all "
+            "components are selected."
+        )
         self._filter_btn.clicked.connect(self._on_filter_components)
 
         self._estimate_label = QLabel("Rows to translate: --")
@@ -382,9 +393,17 @@ class Phase3TranslatePage(PhasePage):
 
         # ----- Action buttons
         self._start_btn = primary(QPushButton("Start translation"))
+        self._start_btn.setToolTip(
+            "Start translating untranslated rows in the selected components. "
+            "Progress and live source/translation pairs appear in the feed below."
+        )
         self._start_btn.clicked.connect(self._on_start)
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setEnabled(False)
+        self._cancel_btn.setToolTip(
+            "Cancel a running translation. In-flight rows finish, then the "
+            "translated portion is still saved."
+        )
         self._cancel_btn.clicked.connect(self._on_cancel)
         self._load_btn = QPushButton("Load .xlsx ...")
         self._load_btn.setToolTip(
@@ -394,6 +413,7 @@ class Phase3TranslatePage(PhasePage):
         self._load_btn.clicked.connect(self._on_load_existing)
         self._next_btn = QPushButton("Continue to Phase 4 \u2192")
         self._next_btn.setEnabled(False)
+        self._next_btn.setToolTip("Move to the next phase (Browse & Review).")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
         self.add_layout(make_action_row(self._start_btn, self._cancel_btn, self._load_btn, self._next_btn))

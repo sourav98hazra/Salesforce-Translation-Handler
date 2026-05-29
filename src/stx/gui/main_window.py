@@ -63,6 +63,15 @@ _PHASES = [
     ("6. Export STF", "Write final STF files"),
 ]
 
+_PHASE_TOOLTIPS = [
+    "Phase 1: select and parse the source .stf file from Salesforce Translation Workbench.",
+    "Phase 2: convert the parsed STF into an organised Excel workbook (one sheet per component type).",
+    "Phase 3: auto-translate untranslated rows using the configured backend.",
+    "Phase 4: browse all translations, search, edit on demand, or re-upload an externally edited workbook.",
+    "Phase 5: detect validation issues and apply deterministic auto-fixes.",
+    "Phase 6: write the final three .stf files ready to upload back to Salesforce.",
+]
+
 _STATUS_ICONS = {
     PhaseStatus.IDLE: "  ",
     PhaseStatus.RUNNING: "\u25b6",  # play
@@ -76,7 +85,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Salesforce Translation Handler")
+        self.setWindowTitle("Salesforce Translation Manager")
         self.resize(1400, 900)
         self.setAcceptDrops(True)
         self._state = AppState()
@@ -188,9 +197,8 @@ class MainWindow(QMainWindow):
         title = QLabel()
         title.setTextFormat(Qt.TextFormat.RichText)
         title.setText(
-            '<div style="line-height: 1.2;">'
-            '<div style="font-size: 14px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">Salesforce</div>'
-            '<div style="font-size: 13px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">Translation Handler</div>'
+            '<div style="font-size: 13px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px;">'
+            'Salesforce<br>Translation Manager'
             '</div>'
         )
         title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -207,9 +215,11 @@ class MainWindow(QMainWindow):
         self._phase_list = QListWidget()
         self._phase_list.setSpacing(0)
         self._phase_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        for label, hint in _PHASES:
+        for index, (label, hint) in enumerate(_PHASES):
             item = QListWidgetItem(self._format_phase_label(label, hint, PhaseStatus.IDLE))
             item.setData(Qt.ItemDataRole.UserRole, label)
+            if index < len(_PHASE_TOOLTIPS):
+                item.setToolTip(_PHASE_TOOLTIPS[index])
             self._phase_list.addItem(item)
         self._phase_list.currentRowChanged.connect(self._goto)
         v.addWidget(self._phase_list)
@@ -337,7 +347,15 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(settings_action)
 
         view_menu = bar.addMenu("&View")
-        for name, label in (("light", "&Light theme"), ("dark", "&Dark theme"), ("auto", "&Auto theme")):
+        themes = [
+            ("light", "&Light theme"),
+            ("dark", "&Dark theme"),
+            ("ocean", "&Ocean theme"),
+            ("forest", "Fo&rest theme"),
+            ("sunset", "&Sunset theme"),
+            ("auto", "&Auto (system)"),
+        ]
+        for name, label in themes:
             act = QAction(label, self)
             act.triggered.connect(lambda _checked=False, n=name: self._switch_theme(n))
             view_menu.addAction(act)

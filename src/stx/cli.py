@@ -1,4 +1,4 @@
-"""Command line interface for the Salesforce Translation Handler.
+"""Command line interface for the Salesforce Translation Manager.
 
 The CLI mirrors every GUI phase plus a ``run`` convenience command that
 performs the full pipeline.  v1.1 adds:
@@ -80,7 +80,7 @@ from .validate import validate_document
 
 app = typer.Typer(
     name="stx",
-    help="Salesforce Translation Handler -- STF <-> Excel <-> Translate pipeline.",
+    help="Salesforce Translation Manager -- STF <-> Excel <-> Translate pipeline.",
     no_args_is_help=True,
     add_completion=False,
 )

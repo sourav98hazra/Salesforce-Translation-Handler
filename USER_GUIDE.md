@@ -1,4 +1,4 @@
-# Salesforce Translation Handler — User Guide
+# Salesforce Translation Manager — User Guide
 
 A practical, end-to-end walkthrough of the desktop application.
 
@@ -32,7 +32,7 @@ The Window opens on **Phase 1 -- Import STF**.
 
 The sidebar on the left shows:
 
-- The **app logo** (a hexagonal "STH" icon) beside the full title **"Salesforce Translation Handler"**.
+- The **app logo** (a hexagonal "STM" icon) beside the full title **"Salesforce Translation Manager"**.
 - The six phase buttons with status badges (`✓` done, `▶` running, `⚠` error).
 - Below the phases: **document stats** (total / translated / untranslated rows), the **target language**, and a **mini progress bar** (visible during translation).
 

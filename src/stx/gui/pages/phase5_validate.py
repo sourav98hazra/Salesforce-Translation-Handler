@@ -86,14 +86,21 @@ class Phase5ValidatePage(PhasePage):
         )
         self._load_btn.clicked.connect(self._on_load_excel)
         self._validate_btn = QPushButton("Re-validate")
+        self._validate_btn.setToolTip(
+            "Re-run validation on the current document. Use this after editing "
+            "or auto-fixing to confirm issues are resolved."
+        )
         self._validate_btn.clicked.connect(self._on_validate)
         self._fix_all_btn = primary(QPushButton("Auto-fix all"))
         self._fix_all_btn.setToolTip(
-            "Apply every safe fixer to every issue.  Use 'Auto-fix this row' "
-            "in the editor below for finer control."
+            "Automatically fix common issues like length overflow and lost "
+            "placeholders. Use 'Auto-fix this row' below for finer control."
         )
         self._fix_all_btn.clicked.connect(self._on_fix_all)
         self._save_btn = QPushButton("Save (.xlsx)")
+        self._save_btn.setToolTip(
+            "Save the current (fixed) document as an .xlsx file."
+        )
         self._save_btn.clicked.connect(self._on_save)
 
         actions = make_action_row(
@@ -146,7 +153,7 @@ class Phase5ValidatePage(PhasePage):
         meta_row.addWidget(self._issue_label, stretch=2)
         editor_layout.addLayout(meta_row)
 
-        fields_row = QSplitter(Qt.Orientation.Vertical)
+        fields_row = QSplitter(Qt.Orientation.Horizontal)
         fields_row.setChildrenCollapsible(False)
 
         src_widget = QWidget()
@@ -156,6 +163,7 @@ class Phase5ValidatePage(PhasePage):
         self._src_field = QPlainTextEdit()
         self._src_field.setReadOnly(True)
         self._src_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._src_field.setMinimumHeight(60)
         src_col.addWidget(self._src_field)
         fields_row.addWidget(src_widget)
 
@@ -165,19 +173,31 @@ class Phase5ValidatePage(PhasePage):
         tgt_col.addWidget(QLabel("Translation (editable)"))
         self._tgt_field = QPlainTextEdit()
         self._tgt_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._tgt_field.setMinimumHeight(60)
         tgt_col.addWidget(self._tgt_field)
         fields_row.addWidget(tgt_widget)
 
-        fields_row.setSizes([100, 100])  # equal vertical halves
+        fields_row.setSizes([400, 400])  # equal halves horizontally
 
         editor_layout.addWidget(fields_row)
 
         edit_actions = QHBoxLayout()
         self._apply_btn = primary(QPushButton("Apply edit"))
+        self._apply_btn.setToolTip(
+            "Apply your manual edit from the translation field above to this row."
+        )
         self._apply_btn.clicked.connect(self._on_apply_edit)
         self._fix_row_btn = QPushButton("Auto-fix this row")
+        self._fix_row_btn.setToolTip(
+            "Run the safe fixers on just the currently selected row "
+            "(placeholder restoration, length trimming, etc.)."
+        )
         self._fix_row_btn.clicked.connect(self._on_fix_current_row)
         self._jump_btn = QPushButton("Jump to Phase 4 for context")
+        self._jump_btn.setToolTip(
+            "Open Phase 4 (Browse & Review) focused on this row so you can see "
+            "it in the full table context with its neighbours."
+        )
         self._jump_btn.clicked.connect(self._on_jump_to_review)
         edit_actions.addWidget(self._apply_btn)
         edit_actions.addWidget(self._fix_row_btn)
@@ -198,6 +218,7 @@ class Phase5ValidatePage(PhasePage):
 
         # ---------- Bottom: next phase
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
+        self._next_btn.setToolTip("Move to the next phase (Export STF).")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(5))
         self.add_layout(make_action_row(self._next_btn))
 

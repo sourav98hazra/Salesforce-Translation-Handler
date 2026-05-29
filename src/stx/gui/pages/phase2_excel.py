@@ -85,10 +85,15 @@ class Phase2ExcelPage(PhasePage):
         )
 
         self._load_btn = QPushButton("Load existing organised .xlsx ...")
+        self._load_btn.setToolTip(
+            "Open a previously generated organised workbook so you can resume from "
+            "Phase 3 (Translate) without re-parsing the STF."
+        )
         self._load_btn.clicked.connect(self._on_load_existing)
 
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
+        self._next_btn.setToolTip("Move to the next phase (Translate).")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
 
         self.add_layout(make_action_row(

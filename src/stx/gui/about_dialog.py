@@ -3,9 +3,9 @@
 Layout::
 
     +-------------------------------------------------------+
-    | About -- Salesforce Translation Handler         [X]   |
+    | About -- Salesforce Translation Manager         [X]   |
     +-------------------------------------------------------+
-    |  [LOGO 64]   Salesforce Translation Handler           |
+    |  [LOGO 64]   Salesforce Translation Manager           |
     |              Version 1.3.0                            |
     |              Professional desktop app for ...         |
     |  -----------------------------------------------      |
@@ -68,7 +68,7 @@ class UserGuideDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("User Guide -- Salesforce Translation Handler")
+        self.setWindowTitle("User Guide -- Salesforce Translation Manager")
         self.resize(820, 640)
         self.setModal(True)
 
@@ -132,7 +132,7 @@ class AboutDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("About -- Salesforce Translation Handler")
+        self.setWindowTitle("About -- Salesforce Translation Manager")
         self.setMinimumSize(QSize(600, 500))
         self.resize(640, 540)
         self.setModal(True)
@@ -181,7 +181,7 @@ class AboutDialog(QDialog):
         text_col.setSpacing(2)
         text_col.setContentsMargins(0, 0, 0, 0)
 
-        name = QLabel("Salesforce Translation Handler")
+        name = QLabel("Salesforce Translation Manager")
         name.setStyleSheet("font-size: 18px; font-weight: 700;")
         text_col.addWidget(name)
 
@@ -242,7 +242,7 @@ class AboutDialog(QDialog):
 
         layout.addWidget(_heading("What it does"))
         layout.addWidget(_body(
-            "Salesforce Translation Handler streamlines the Translation "
+            "Salesforce Translation Manager streamlines the Translation "
             "Workbench round-trip with a six-phase pipeline that you can "
             "walk end-to-end -- or jump into at any single step."
         ))

@@ -226,17 +226,29 @@ class Phase4ReviewPage(PhasePage):
         fr_layout.addWidget(QLabel("Component:"))
         self._component_combo = QComboBox()
         self._component_combo.addItem("All")
+        self._component_combo.setToolTip(
+            "Filter the table to show rows from a single component type "
+            "(e.g. CustomLabel). 'All' shows everything."
+        )
         self._component_combo.currentTextChanged.connect(self._proxy.set_component)
         fr_layout.addWidget(self._component_combo)
 
         fr_layout.addWidget(QLabel("Status:"))
         self._status_combo = QComboBox()
         self._status_combo.addItems(["All", "Translated", "Untranslated"])
+        self._status_combo.setToolTip(
+            "Filter the table by translation status. Use 'Untranslated' to "
+            "focus on rows that still need work."
+        )
         self._status_combo.currentTextChanged.connect(self._proxy.set_status)
         fr_layout.addWidget(self._status_combo)
 
         self._search = QLineEdit()
         self._search.setPlaceholderText("Search by key or label...")
+        self._search.setToolTip(
+            "Filter rows whose key or source label contains this text. "
+            "Case-insensitive substring match."
+        )
         self._search.textChanged.connect(self._proxy.set_search)
         fr_layout.addWidget(self._search, stretch=1)
         self.add_widget(filter_row)
@@ -280,14 +292,19 @@ class Phase4ReviewPage(PhasePage):
         self._key_field.setStyleSheet("font-family: monospace;")
         meta.addWidget(self._key_field, stretch=1)
         self._apply_btn = primary(QPushButton("Apply"))
+        self._apply_btn.setToolTip("Apply your edits to the translation in the table above.")
         self._apply_btn.clicked.connect(self._apply_editor_to_row)
         self._reset_btn = QPushButton("Reset to source")
+        self._reset_btn.setToolTip(
+            "Clear the translation back to the source label. Use this to "
+            "discard a bad translation and start fresh."
+        )
         self._reset_btn.clicked.connect(self._reset_row)
         meta.addWidget(self._apply_btn)
         meta.addWidget(self._reset_btn)
         self._editor_layout.addLayout(meta)
 
-        side_by_side = QSplitter(Qt.Orientation.Vertical)
+        side_by_side = QSplitter(Qt.Orientation.Horizontal)
         side_by_side.setChildrenCollapsible(False)
 
         src_widget = QWidget()
@@ -298,6 +315,7 @@ class Phase4ReviewPage(PhasePage):
         self._source_field = QPlainTextEdit()
         self._source_field.setReadOnly(True)
         self._source_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._source_field.setMinimumHeight(60)
         src_col.addWidget(self._source_field)
         side_by_side.addWidget(src_widget)
 
@@ -308,10 +326,11 @@ class Phase4ReviewPage(PhasePage):
         tgt_col.addWidget(QLabel("Translation (editable)"))
         self._translation_field = QPlainTextEdit()
         self._translation_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._translation_field.setMinimumHeight(60)
         tgt_col.addWidget(self._translation_field)
         side_by_side.addWidget(tgt_widget)
 
-        side_by_side.setSizes([100, 100])  # equal vertical halves
+        side_by_side.setSizes([400, 400])  # equal halves horizontally
         self._editor_layout.addWidget(side_by_side)
 
         splitter.addWidget(editor)
@@ -328,8 +347,13 @@ class Phase4ReviewPage(PhasePage):
 
         # ---------- Bottom action buttons
         self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
+        self._save_btn.setToolTip(
+            "Save the current document (with all edits applied) as an .xlsx file. "
+            "This becomes the canonical reviewed workbook used by Phase 5/6."
+        )
         self._save_btn.clicked.connect(self._on_save)
         self._next_btn = QPushButton("Continue to Phase 5 (Validate & Fix) \u2192")
+        self._next_btn.setToolTip("Move to the next phase (Validate & Fix).")
         self._next_btn.clicked.connect(self._on_continue_to_phase5)
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
 

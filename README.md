@@ -1,4 +1,4 @@
-# Salesforce Translation Handler
+# Salesforce Translation Manager
 
 A professional cross-platform desktop application for the Salesforce
 Translation Workbench (STF) workflow:
@@ -688,7 +688,7 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
 
 Summary of the most recent improvements shipped in this release:
 
-- **Minimalist hexagonal logo** in the sidebar, rendered from an inline SVG beside the full "Salesforce Translation Handler" title.
+- **Minimalist hexagonal logo** in the sidebar, rendered from an inline SVG beside the full "Salesforce Translation Manager" title.
 - **Sidebar footer** showing document stats (total/translated/untranslated rows), target language, and a mini progress bar visible during translation.
 - **Enhanced Filter Components dialog** in Phase 3 with a search field, status filter (all / untranslated only / translated for retranslation / both), and a live summary of selection count and estimated rows.
 - **Filter button separated from estimate label** for a cleaner Phase 3 layout.

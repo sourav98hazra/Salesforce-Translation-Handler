@@ -212,9 +212,12 @@ class SettingsDialog(QDialog):
         theme_box = QGroupBox("Theme")
         theme_form = QFormLayout(theme_box)
         self._theme_combo = QComboBox()
-        self._theme_combo.addItem("Auto (follow system)", "auto")
         self._theme_combo.addItem("Light", "light")
         self._theme_combo.addItem("Dark", "dark")
+        self._theme_combo.addItem("Ocean (blue/teal)", "ocean")
+        self._theme_combo.addItem("Forest (green)", "forest")
+        self._theme_combo.addItem("Sunset (warm amber)", "sunset")
+        self._theme_combo.addItem("Auto (follow system)", "auto")
         theme_form.addRow("Application theme:", self._theme_combo)
 
         note = QLabel("Theme changes apply immediately when you click OK.")

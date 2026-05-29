@@ -57,13 +57,31 @@ class Phase1ImportPage(PhasePage):
         path_row.setContentsMargins(8, 4, 8, 4)
         path_row.setSpacing(8)
         path_row.addWidget(self._path_label, stretch=1)
-        path_row.addWidget(self._make_button("Browse STF...", self._on_browse))
-        path_row.addWidget(self._make_button("Re-parse", self._on_reparse, enabled=False, primary=False, key="reparse_btn"))
+        browse_btn = self._make_button("Browse STF...", self._on_browse)
+        browse_btn.setToolTip(
+            "Select a .stf file exported from Salesforce Translation Workbench. "
+            "The file is parsed locally; nothing is sent over the network here."
+        )
+        path_row.addWidget(browse_btn)
+        reparse_btn = self._make_button("Re-parse", self._on_reparse, enabled=False, primary=False, key="reparse_btn")
+        reparse_btn.setToolTip(
+            "Re-read the same .stf file from disk. "
+            "Useful if the file changed externally since you last loaded it."
+        )
+        path_row.addWidget(reparse_btn)
         self.add_widget(path_box)
 
         # ---------- Parsed metadata (2-column grid)
         self._language_field = QLineEdit()
+        self._language_field.setToolTip(
+            "Human-readable target language name (e.g. Japanese). "
+            "Auto-filled from the STF header; edit if it's missing or wrong."
+        )
         self._language_code_field = QLineEdit()
+        self._language_code_field.setToolTip(
+            "Salesforce language code (e.g. ja, fr, de). "
+            "Auto-filled from the STF header; edit if it's missing or wrong."
+        )
         self._stf_type_field = QLineEdit(); self._stf_type_field.setReadOnly(True)
         self._total_field = QLineEdit(); self._total_field.setReadOnly(True)
         self._translated_field = QLineEdit(); self._translated_field.setReadOnly(True)
@@ -111,6 +129,10 @@ class Phase1ImportPage(PhasePage):
         self._preview.horizontalHeader().setStretchLastSection(True)
         self._preview.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._preview.setAlternatingRowColors(True)
+        self._preview.setToolTip(
+            "Read-only preview of the first {} rows of the parsed STF. "
+            "Use the pop-out icon (top-right) to view it in a larger window.".format(_PREVIEW_ROWS)
+        )
         self._preview_layout.addWidget(self._preview)
         self.add_widget(preview_box, stretch=1)
 
@@ -119,7 +141,12 @@ class Phase1ImportPage(PhasePage):
 
         # ---------- Actions
         self._save_stf_btn = self._make_button("Save copy as STF...", self._on_save_stf, enabled=False)
+        self._save_stf_btn.setToolTip(
+            "Write the parsed document back out as the three Salesforce STF files "
+            "(full / translated-only / untranslated-only) into a folder you choose."
+        )
         self._next_btn = self._make_button("Continue to Phase 2 \u2192", self._on_next, enabled=False, primary=True)
+        self._next_btn.setToolTip("Move to the next phase (STF \u2192 Excel).")
         actions = make_action_row(self._save_stf_btn, self._next_btn)
         self.add_layout(actions)
 
