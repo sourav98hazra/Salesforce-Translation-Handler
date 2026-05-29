@@ -227,7 +227,7 @@ class MainWindow(QMainWindow):
 
         # ---- sidebar footer: stats + progress
         self._footer_stats = QLabel("No file loaded")
-        self._footer_stats.setStyleSheet("color: #64748b; font-size: 10px;")
+        self._footer_stats.setStyleSheet("color: #64748b; font-size: 10px; font-weight: 700;")
         self._footer_stats.setWordWrap(True)
         v.addWidget(self._footer_stats)
 
@@ -320,11 +320,13 @@ class MainWindow(QMainWindow):
         file_menu = bar.addMenu("&File")
         open_action = QAction("&Open file...", self)
         open_action.setShortcut("Ctrl+O")
+        open_action.setToolTip("Open an .stf or .xlsx file")
         open_action.triggered.connect(self._action_open_file)
         file_menu.addAction(open_action)
 
         save_action = QAction("&Save current phase", self)
         save_action.setShortcut("Ctrl+S")
+        save_action.setToolTip("Save the current phase's output")
         save_action.triggered.connect(self._action_save_current)
         file_menu.addAction(save_action)
 

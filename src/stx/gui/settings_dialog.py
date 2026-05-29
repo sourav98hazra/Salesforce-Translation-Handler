@@ -75,6 +75,15 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_translation_tab(), "Translation")
         self._tabs.addTab(self._build_resources_tab(), "Resources")
         self._tabs.addTab(self._build_appearance_tab(), "Appearance")
+        self._tabs.setTabToolTip(
+            0, "Translator backend, API key, performance, multi-language batch"
+        )
+        self._tabs.setTabToolTip(
+            1, "Glossary CSV and translation memory database paths"
+        )
+        self._tabs.setTabToolTip(
+            2, "Application theme and visual preferences"
+        )
         layout.addWidget(self._tabs)
 
         buttons = QDialogButtonBox(

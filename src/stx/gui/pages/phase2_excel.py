@@ -41,7 +41,7 @@ class Phase2ExcelPage(PhasePage):
     def _build(self) -> None:
         # Status / summary
         self._summary_label = QLabel("No document loaded yet \u2014 complete Phase 1 first.")
-        self._summary_label.setStyleSheet("color: #4a5568;")
+        self._summary_label.setStyleSheet("color: #4a5568; font-weight: 700;")
         self.add_widget(self._summary_label)
 
         # Content Details preview

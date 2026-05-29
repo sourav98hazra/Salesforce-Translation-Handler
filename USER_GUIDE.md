@@ -94,26 +94,37 @@ The Preview panel in Phase 1 has a **"Pop out"** button that detaches the previe
 **How to use:**
 
 1. Pick the **Source** and **Target** language (displayed side by side in a compact form at the top).
-2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). The dialog includes:
-   - A **search field** to filter components by name.
-   - A **status filter** (all / untranslated only / translated for retranslation / both).
-   - A **live summary** showing the selection count and estimated rows.
-   - Select all / none / Invert shortcuts and per-component row counts.
-3. Choose the **Output file** for the translated `.xlsx`.
-4. Click **"Start translation"**.
-5. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
+2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). See the [Filter Components dialog](#filter-components-dialog-phase-3) section below for full details on the search, status filter, and bulk-action controls.
+3. Click **"Start translation"**.
+4. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
    ```
    [42/1000 | T:30 TM:5 D:7] EN: Hello -> JA: こんにちは
    ```
    - `T` = translated via API, `TM` = from translation memory, `D` = deduplicated
-6. Every 50 rows an **intermittent summary** appears with progress percentage, rate (rows/s), and ETA.
-7. When translation completes, a **final summary block** is printed:
+5. Every 50 rows an **intermittent summary** appears with progress percentage, rate (rows/s), and ETA.
+6. When translation completes, a **final summary block** is printed:
    ```
    ━━━ DONE ━━━
    Translated: 800 | TM: 120 | Deduped: 50 | Skipped: 30
    Elapsed: 5m 32s | Rate: 3.2 rows/s
    ```
+7. The translated document is held **in memory** — click **"Save copy to..."** to write it to a file of your choice. The default suggested filename is `<source>_translated.xlsx` in the same folder as the source. Audit sheets (per-row status log + summary) are appended to the saved workbook automatically.
 8. Click **"Continue to Phase 4 →"** when done.
+
+#### Filter Components dialog (Phase 3)
+
+Click "Filter Components..." to open the component selection dialog. Use it to:
+
+- **Search**: Type to filter the component list by name (case-insensitive substring match).
+- **Status filter**: Choose what kinds of components to show:
+  - "Show all components" — every type, regardless of status (default)
+  - "Only components with untranslated rows" — focus on what needs translation
+  - "Only components with translated rows (for retranslation)" — useful if you want to redo translations
+  - "Only components with both translated and untranslated" — mixed-state components
+- **Select all / Select none / Invert**: Bulk actions on the visible (filtered) component list.
+- **Live summary**: At the bottom of the dialog, see "X of Y selected · Z rows will be translated" updating as you tick boxes.
+
+Click **Apply** to confirm your selection. The estimate next to the Filter button on the main screen shows the resulting row count.
 
 The live feed panel has a **"Pop out"** button that detaches it into an independent window so you can monitor translation progress while navigating other phases.
 
@@ -137,7 +148,7 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 
 1. The **status pill** at the top tells you whether the document is clean (green), has warnings (amber), or has errors (red).
 2. The **counters** show translated / untranslated / issue counts.
-3. **Filter** the table by component, status, or substring search.
+3. **Filter** the table by component, status, or substring search — see [Filters (Phase 4)](#filters-phase-4--browse--review) below for details.
 4. Click any row to populate the **side-by-side editor** at the bottom (source on the left, translation on the right).  Edit the translation and click **Apply** to save the change.  Click **Reset to source** to revert.
 5. **"Save reviewed workbook (.xlsx)"** writes the current state to disk.
 6. Click **"Continue to Phase 5 (Validate & Fix) →"**.
@@ -145,6 +156,18 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 **Re-upload externally edited Excel:** Click **"Load reviewed Excel..."** at the top right.  The uploaded workbook *replaces* the in-memory document and becomes the latest version for all subsequent phases.
 
 **Independent path:** identical — load any workbook into Review and start editing.
+
+#### Filters (Phase 4 — Browse & Review)
+
+The filter row at the top of Phase 4 lets you focus on a subset of translations:
+
+- **Component dropdown**: Show only rows belonging to one component type (e.g. `CustomLabel`). Choose "All" to show everything.
+- **Status dropdown**: Show only "Translated" or "Untranslated" rows, or "All".
+- **Search field**: Substring search across the Key and Source label columns. Useful for finding specific labels (e.g. type "Account" to find all account-related fields).
+
+The three filters combine: e.g. setting Component=CustomLabel + Status=Untranslated + Search="error" shows only untranslated CustomLabel rows whose key or label contains "error".
+
+The table updates immediately as you type or change dropdowns.
 
 ### Phase 5 — Validate & Fix
 
@@ -195,7 +218,39 @@ All three are UTF-8 with LF line endings (no BOM), byte-compatible with Salesfor
 
 ---
 
-## 4. Common workflows
+## 4. Settings (`Edit → Settings...` or `Ctrl+,`)
+
+The Settings dialog has three tabs that group all advanced configuration:
+
+### Translation tab
+- **Translator backend** — Choose between Google Translate (free, default), DeepL, Microsoft Azure Translator, or OpenAI. The free tier (Google) requires no setup. Paid backends require an API key.
+- **API key** — Required for paid backends. Either paste it here or set the corresponding environment variable (e.g. `DEEPL_API_KEY`, `AZURE_TRANSLATOR_KEY`, `OPENAI_API_KEY`).
+- **Workers** — Number of concurrent translation requests. 4 is a safe default. Increase to 8 or higher if your backend has high quotas; reduce to 1 for very rate-limited backends.
+- **Rate limit** — Max requests per second. 8 is safe for Google free tier. Set to 0 (unlimited) for paid backends.
+- **Prevent system sleep** — Prevents your laptop from sleeping during a long translation run. Recommended on for runs >5 minutes.
+- **Multi-language batch** — Translate to multiple target languages in one run. Comma-separated codes (e.g. `fr, de, es`).
+
+### Resources tab
+- **Glossary** — Optional CSV file with three columns: `source, target, do_not_translate`.
+  - Mark brand/product names with `do_not_translate=true` so they're never modified during translation.
+  - Or provide a fixed translation in `target` to enforce a specific term.
+  - Example row: `Bayer, , true` (protects "Bayer" from translation).
+- **Translation memory** — Optional SQLite database that caches every translation across runs. Subsequent translations of the same source text reuse the cached result, which is much faster and consumes no API quota. The default path is `~/.cache/salesforce-translation-handler/tm.sqlite`.
+
+### Appearance tab
+- **Theme** — Application color scheme. Options:
+  - Light (default) — clean, readable
+  - Dark — for low-light environments
+  - Ocean — sky blue & teal palette
+  - Forest — earthy green palette
+  - Sunset — warm amber palette
+  - Auto (system) — follows your OS color scheme
+
+Theme changes take effect immediately when you click OK.
+
+---
+
+## 5. Common workflows
 
 ### "I have an STF, give me STF" (full pipeline)
 
@@ -234,7 +289,7 @@ Open `Edit → Settings → Resources` and set the **Glossary** path.  Brand ter
 
 ---
 
-## 5. Output formats
+## 6. Output formats
 
 ### Excel workbook layout
 
@@ -253,7 +308,7 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Cause / Fix |
 |---|---|
@@ -266,7 +321,7 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 
 ---
 
-## 7. Keyboard shortcuts
+## 8. Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
@@ -279,7 +334,7 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 
 ---
 
-## 8. Where settings are stored
+## 9. Where settings are stored
 
 User preferences (window geometry, theme, last target language, recent files, translator backend, API keys, glossary path, TM path) live in your platform's standard QSettings location:
 

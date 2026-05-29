@@ -28,7 +28,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from ...glossary import Glossary
@@ -271,10 +270,10 @@ class Phase3TranslatePage(PhasePage):
     def _build(self) -> None:
         # ----- Setup section: compact form
         setup_box = QGroupBox("Setup")
-        setup_grid = QHBoxLayout()
-        setup_grid.setSpacing(16)
 
-        # Left column: Source + Target (QFormLayout)
+        # Source + Target form only (Output field removed in v1.4 -- the
+        # translated document stays in memory until the user clicks
+        # "Save copy to..." in the action row below).
         lang_form = QFormLayout()
         lang_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         lang_form.setHorizontalSpacing(8)
@@ -293,36 +292,9 @@ class Phase3TranslatePage(PhasePage):
         self._target_combo.setToolTip("Language to translate into.")
         lang_form.addRow("Target:", self._target_combo)
 
-        setup_grid.addLayout(lang_form)
-
-        # Right column: Output (QFormLayout with path field + Browse button)
-        path_form = QFormLayout()
-        path_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        path_form.setHorizontalSpacing(8)
-        path_form.setVerticalSpacing(4)
-
-        self._path_field = QLineEdit()
-        self._path_field.setPlaceholderText("Choose where to save the translated .xlsx")
-        self._path_field.setToolTip(
-            "File path where the translated workbook will be saved. "
-            "Auto-suggested from the source file; click Browse to pick another."
-        )
-        path_browse = QPushButton("Browse...")
-        path_browse.clicked.connect(self._on_browse_save)
-        path_browse.setToolTip("Choose a different location for the translated .xlsx output.")
-        path_row = QHBoxLayout()
-        path_row.addWidget(self._path_field, stretch=1)
-        path_row.addWidget(path_browse)
-        path_widget = QWidget()
-        path_widget.setLayout(path_row)
-        path_widget.layout().setContentsMargins(0, 0, 0, 0)
-        path_form.addRow("Output:", path_widget)
-
-        setup_grid.addLayout(path_form, stretch=1)
-
         setup_layout = QVBoxLayout(setup_box)
         setup_layout.setContentsMargins(8, 6, 8, 6)
-        setup_layout.addLayout(setup_grid)
+        setup_layout.addLayout(lang_form)
 
         # ----- Filter row: button + estimate, sits BELOW the two columns
         # so it isn't visually competing with the Target combo or Output field.
@@ -335,7 +307,7 @@ class Phase3TranslatePage(PhasePage):
         self._filter_btn.clicked.connect(self._on_filter_components)
 
         self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 600; color: #94a3b8;")
+        self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
 
         filter_row = QHBoxLayout()
         filter_row.setContentsMargins(0, 8, 0, 0)
@@ -371,7 +343,7 @@ class Phase3TranslatePage(PhasePage):
         self.add_widget(self._progress)
 
         self._eta_label = QLabel("Idle.")
-        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px;")
+        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700;")
         self.add_widget(self._eta_label)
 
         # ----- Live feed log (takes all remaining space)
@@ -405,6 +377,13 @@ class Phase3TranslatePage(PhasePage):
             "translated portion is still saved."
         )
         self._cancel_btn.clicked.connect(self._on_cancel)
+        self._save_copy_btn = QPushButton("Save copy to...")
+        self._save_copy_btn.setEnabled(False)
+        self._save_copy_btn.setToolTip(
+            "Save the translated document to a file of your choice. "
+            "Default filename will be suggested based on the source file."
+        )
+        self._save_copy_btn.clicked.connect(self._on_save_copy_to)
         self._load_btn = QPushButton("Load .xlsx ...")
         self._load_btn.setToolTip(
             "Load any Excel (organised or translated) directly into this phase.\n"
@@ -416,7 +395,13 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.setToolTip("Move to the next phase (Browse & Review).")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
-        self.add_layout(make_action_row(self._start_btn, self._cancel_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(
+            self._start_btn,
+            self._cancel_btn,
+            self._save_copy_btn,
+            self._load_btn,
+            self._next_btn,
+        ))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -428,11 +413,14 @@ class Phase3TranslatePage(PhasePage):
         if self._state.target_language_name in LANGUAGE_NAME_TO_CODE:
             self._target_combo.setCurrentText(self._state.target_language_name)
 
-        # Default output path.
-        if not self._path_field.text():
+        # Auto-generate a default suggested output path so Save copy to...
+        # has a sensible filename ready when the user clicks it.
+        if self._state.translated_xlsx_path is None:
             base = self._state.organized_xlsx_path or self._state.source_stf_path
             if base is not None:
-                self._path_field.setText(str(Path(base).with_suffix("")) + "_translated.xlsx")
+                self._state.translated_xlsx_path = Path(
+                    str(Path(base).with_suffix("")) + "_translated.xlsx"
+                )
 
         # Restore previously selected components from state
         if self._state.scope is not None and self._state.scope.components is not None:
@@ -501,13 +489,6 @@ class Phase3TranslatePage(PhasePage):
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
 
     # ------------------------------------------------------------------ output path
-
-    def _on_browse_save(self) -> None:
-        path = self.pick_save_file(
-            "Save translated workbook as", "Excel files (*.xlsx)", "translated.xlsx"
-        )
-        if path:
-            self._path_field.setText(str(path))
 
     def _on_target_changed(self, name: str) -> None:
         code = code_for_language(name)
@@ -678,33 +659,69 @@ class Phase3TranslatePage(PhasePage):
         )
         self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
 
+        # The translated document is held in memory (self._state.document).
+        # Don't auto-save: surface the "Save copy to..." button instead so
+        # the user picks where to save.
         msg = (
-            f"Done.  Translated {done.translated_count:,} "
+            f"Translation complete -- click 'Save copy to...' to save the translated file.  "
+            f"Translated {done.translated_count:,} "
             f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
-            f"skipped {done.skipped_count:,})  -  elapsed {elapsed:.1f}s."
+            f"skipped {done.skipped_count:,}) in {elapsed:.1f}s."
         )
         self._eta_label.setText(msg)
         self.status_message.emit(msg)
-        self._save_translated()
+
+        # Mark the phase done so users can navigate forward; the Save
+        # copy to... button is now available for explicit file save.
+        self._set_running(False)
+        self._save_copy_btn.setEnabled(True)
+        self._next_btn.setEnabled(True)
+        self._state.set_phase(2, PhaseStatus.DONE)
 
     def _on_translation_failed(self, message: str) -> None:
         self._set_running(False)
         self._state.set_phase(2, PhaseStatus.ERROR)
         self.error(message, "Translation failed")
 
-    def _save_translated(self) -> None:
+    def _on_save_copy_to(self) -> None:
+        """Open a save dialog and persist the in-memory translated document.
+
+        Suggests ``<source_stem>_translated.xlsx`` in the same folder as
+        the source/organised file by default.  The audit sheets (summary
+        and per-row status log) are still appended to the saved workbook.
+        """
         if self._state.document is None:
-            self._set_running(False)
+            self.warn("No translated document to save -- run translation first.")
             return
-        path_text = self._path_field.text().strip()
-        if not path_text:
-            self._set_running(False)
-            self.warn("Choose an output path so the translated workbook can be saved.")
+        if self.is_busy:
             return
-        path = Path(path_text)
+
+        # Suggest a default filename based on the source/organised file.
+        suggested_path = self._state.translated_xlsx_path
+        if suggested_path is None:
+            base = self._state.organized_xlsx_path or self._state.source_stf_path
+            if base is not None:
+                suggested_path = Path(str(Path(base).with_suffix("")) + "_translated.xlsx")
+        suggested_name = suggested_path.name if suggested_path else "translated.xlsx"
+
+        path = self.pick_save_file(
+            "Save translated workbook as",
+            "Excel files (*.xlsx)",
+            suggested_name,
+        )
+        if not path:
+            return
+        self._save_translated(path)
+
+    def _save_translated(self, path: Path) -> None:
+        """Persist the in-memory document to ``path`` as .xlsx with audit sheets."""
+        if self._state.document is None:
+            return
         if path.suffix.lower() != ".xlsx":
             path = path.with_suffix(".xlsx")
 
+        self.set_busy(True)
+        self._save_copy_btn.setEnabled(False)
         self.status_message.emit(f"Saving translated workbook -> {path} ...")
         worker = ExportExcelWorker(self._state.document, path, self)
         worker.finished_ok.connect(lambda res: self._save_audit_sheets(res.path))
@@ -727,14 +744,15 @@ class Phase3TranslatePage(PhasePage):
         self._state.output_dir = path.parent
         gui_settings.remember_output_dir(path.parent)
         gui_settings.add_recent_file(path)
-        self._set_running(False)
+        self.set_busy(False)
+        self._save_copy_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
         self._state.set_phase(2, PhaseStatus.DONE)
         self.status_message.emit(f"Translated workbook saved: {path}")
 
     def _on_save_failed(self, message: str) -> None:
-        self._set_running(False)
-        self._state.set_phase(2, PhaseStatus.ERROR)
+        self.set_busy(False)
+        self._save_copy_btn.setEnabled(self._state.document is not None)
         self.error(message, "Save failed")
 
     def _on_cancel(self) -> None:
@@ -777,9 +795,10 @@ class Phase3TranslatePage(PhasePage):
             gui_settings.add_recent_file(path)
             # Reset component selection so Filter Components picks up the new doc.
             self._selected_components = {e.component_type for e in doc.entries}
-            # Suggest output path based on loaded file.
-            if not self._path_field.text() or "translated" not in self._path_field.text().lower():
-                self._path_field.setText(str(Path(path).with_suffix("")) + "_translated.xlsx")
+            # Suggest a default translated output path for Save copy to...
+            self._state.translated_xlsx_path = Path(
+                str(Path(path).with_suffix("")) + "_translated.xlsx"
+            )
             self._next_btn.setEnabled(True)
             self.on_enter()
             self.status_message.emit(
@@ -802,6 +821,11 @@ class Phase3TranslatePage(PhasePage):
         self._target_combo.setEnabled(not running)
         self._source_combo.setEnabled(not running)
         self._filter_btn.setEnabled(not running)
+        # Disable Save copy to... while translating; re-enable it once a
+        # translation has completed (handled in _on_translation_done /
+        # _on_save_done).
+        if running:
+            self._save_copy_btn.setEnabled(False)
 
     # ------------------------------------------------------------------ pop-out feed
 
