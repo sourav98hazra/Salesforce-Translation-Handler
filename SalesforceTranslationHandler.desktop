@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Salesforce Translation Handler
+Name=Salesforce Translation Manager
 Comment=STF -> Excel -> Translate -> Review -> STF workflow
 Exec=bash -c 'cd "$(dirname %k)" && exec ./launch.sh'
 Icon=text-x-generic

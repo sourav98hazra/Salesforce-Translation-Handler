@@ -1,0 +1,133 @@
+"""Persistent settings via :class:`QSettings`.
+
+A thin wrapper that the rest of the GUI uses for reading / writing
+preferences such as the last-used target language, default output
+folder, theme, recent files, and translator backend choice.
+
+Storage location is platform-default:
+
+* macOS: ``~/Library/Preferences/com.salesforce-translation-handler.plist``
+* Windows: ``HKEY_CURRENT_USER\\Software\\SalesforceTranslationHandler``
+* Linux: ``~/.config/SalesforceTranslationHandler/SalesforceTranslationHandler.conf``
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
+
+from PySide6.QtCore import QSettings
+
+ORG = "SalesforceTranslationHandler"
+APP = "SalesforceTranslationHandler"
+
+_MAX_RECENT = 10
+
+
+@dataclass
+class SettingsKeys:
+    """Centralised key names so typos can't drift between callers."""
+
+    target_language: str = "translation/target_language"
+    target_language_code: str = "translation/target_language_code"
+    source_language_code: str = "translation/source_language_code"
+    backend: str = "translation/backend"
+    workers: str = "translation/workers"
+    output_dir: str = "io/output_dir"
+    recent_files: str = "io/recent_files"
+    glossary_path: str = "io/glossary_path"
+    scope_path: str = "io/scope_path"
+    memory_path: str = "io/memory_path"
+    theme: str = "ui/theme"
+    window_geometry: str = "ui/window_geometry"
+    window_state: str = "ui/window_state"
+
+
+KEYS = SettingsKeys()
+
+
+def settings() -> QSettings:
+    """Return a fresh :class:`QSettings` instance bound to our org/app names."""
+    return QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope, ORG, APP)
+
+
+# ---------------------------------------------------------------------------
+# Convenience getters / setters
+# ---------------------------------------------------------------------------
+
+def get_str(key: str, default: str = "") -> str:
+    val = settings().value(key, default)
+    return str(val) if val is not None else default
+
+
+def set_str(key: str, value: str) -> None:
+    settings().setValue(key, value)
+
+
+def get_int(key: str, default: int = 0) -> int:
+    val = settings().value(key, default)
+    try:
+        return int(val) if val is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def set_int(key: str, value: int) -> None:
+    settings().setValue(key, int(value))
+
+
+def get_recent_files() -> List[str]:
+    raw = settings().value(KEYS.recent_files, [])
+    if isinstance(raw, str):
+        return [raw] if raw else []
+    if isinstance(raw, (list, tuple)):
+        return [str(p) for p in raw if p]
+    return []
+
+
+def add_recent_file(path: str | Path) -> None:
+    path = str(Path(path).resolve())
+    current = get_recent_files()
+    # Move-to-front semantics: if it's already there, hoist it to the top.
+    if path in current:
+        current.remove(path)
+    current.insert(0, path)
+    settings().setValue(KEYS.recent_files, current[:_MAX_RECENT])
+
+
+def clear_recent_files() -> None:
+    settings().setValue(KEYS.recent_files, [])
+
+
+def get_theme() -> str:
+    """Return the active theme name -- ``light``, ``dark`` or ``auto``."""
+    value = get_str(KEYS.theme, "auto")
+    return value if value in {"light", "dark", "auto"} else "auto"
+
+
+def set_theme(name: str) -> None:
+    if name in {"light", "dark", "auto"}:
+        set_str(KEYS.theme, name)
+
+
+# ---------------------------------------------------------------------------
+# Back-compat / typed helpers used by main_window
+# ---------------------------------------------------------------------------
+
+def remembered_target_language(default: str = "Japanese") -> str:
+    return get_str(KEYS.target_language, default)
+
+
+def remember_target_language(name: str, code: Optional[str] = None) -> None:
+    set_str(KEYS.target_language, name)
+    if code:
+        set_str(KEYS.target_language_code, code)
+
+
+def remembered_output_dir(default: str = "") -> str:
+    return get_str(KEYS.output_dir, default)
+
+
+def remember_output_dir(path: str | Path) -> None:
+    set_str(KEYS.output_dir, str(path))

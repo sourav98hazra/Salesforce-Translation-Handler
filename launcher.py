@@ -26,7 +26,7 @@ def _show_fatal_error(message: str) -> None:
 
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror("Salesforce Translation Handler", message)
+        messagebox.showerror("Salesforce Translation Manager", message)
         root.destroy()
     except Exception:  # noqa: BLE001
         sys.stderr.write(message + "\n")

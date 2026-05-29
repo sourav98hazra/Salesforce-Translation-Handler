@@ -4,19 +4,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
-    QLineEdit,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from ..state import AppState
 from ..workers import ExportExcelWorker, ImportExcelWorker
-from .base import PhasePage, make_action_row
+from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
 
 class Phase2ExcelPage(PhasePage):
@@ -36,48 +39,66 @@ class Phase2ExcelPage(PhasePage):
         self._build()
 
     def _build(self) -> None:
-        # Output path row
-        path_box = QGroupBox("Output workbook")
-        path_layout = QHBoxLayout(path_box)
-        self._path_field = QLineEdit()
-        self._path_field.setPlaceholderText("Choose where to write the organised .xlsx ...")
-        browse_btn = QPushButton("Browse...")
-        browse_btn.clicked.connect(self._on_browse_save)
-        path_layout.addWidget(self._path_field, stretch=1)
-        path_layout.addWidget(browse_btn)
-        self.add_widget(path_box)
-
         # Status / summary
         self._summary_label = QLabel("No document loaded yet \u2014 complete Phase 1 first.")
-        self._summary_label.setStyleSheet("color: #4a5568;")
+        self._summary_label.setStyleSheet("color: #4a5568; font-weight: 700;")
         self.add_widget(self._summary_label)
 
         # Content Details preview
         details_box = QGroupBox("Content Details (post-export preview)")
-        details_layout = QHBoxLayout(details_box)
+        self._details_box = details_box
+        self._details_layout = QVBoxLayout(details_box)
+        self._details_layout.setContentsMargins(4, 4, 4, 4)
+        self._details_layout.setSpacing(2)
+
         self._details = QTableWidget(0, 5)
         self._details.setHorizontalHeaderLabels([
             "SheetName", "SavedAs", "ComponentType", "TranslationStatus", "TotalRecords",
         ])
-        self._details.horizontalHeader().setStretchLastSection(True)
+        header = self._details.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # Last column (TotalRecords) stretches to fill remaining space so
+        # all the previous columns stay fully visible without truncation.
+        header.setSectionResizeMode(self._details.columnCount() - 1, QHeaderView.ResizeMode.Stretch)
         self._details.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._details.setAlternatingRowColors(True)
-        details_layout.addWidget(self._details)
+        self._details_layout.addWidget(self._details)
         self.add_widget(details_box, stretch=1)
 
+        # Pop-out icon glued to the top-right of the group box border
+        add_popout_to_groupbox(details_box, self._on_popout_details)
+
         # Actions
-        self._convert_btn = QPushButton("Convert and save .xlsx")
+        self._convert_btn = primary(QPushButton("Convert and save .xlsx"))
         self._convert_btn.clicked.connect(self._on_convert)
-        self._convert_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
+        self._convert_btn.setToolTip(
+            "Save the organised workbook (auto-named from source file).\n"
+            "This is the path used by later phases."
+        )
+
+        self._save_copy_btn = QPushButton("Save copy to...")
+        self._save_copy_btn.clicked.connect(self._on_save_copy)
+        self._save_copy_btn.setEnabled(False)
+        self._save_copy_btn.setToolTip(
+            "Write an additional copy of the organised workbook to a "
+            "different location (handy for backups or sharing)."
+        )
 
         self._load_btn = QPushButton("Load existing organised .xlsx ...")
+        self._load_btn.setToolTip(
+            "Open a previously generated organised workbook so you can resume from "
+            "Phase 3 (Translate) without re-parsing the STF."
+        )
         self._load_btn.clicked.connect(self._on_load_existing)
 
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
+        self._next_btn.setToolTip("Move to the next phase (Translate).")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
 
-        self.add_layout(make_action_row(self._convert_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(
+            self._convert_btn, self._save_copy_btn, self._load_btn, self._next_btn
+        ))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -92,32 +113,21 @@ class Phase2ExcelPage(PhasePage):
             f"{stats['untranslated']:,} untranslated, {stats['components']} component types."
         )
         self._convert_btn.setEnabled(True)
-        # Suggest a default output path based on the source STF.
-        if not self._path_field.text():
-            src = self._state.source_stf_path
-            if src is not None:
-                self._path_field.setText(str(src.with_suffix("")) + "_organized.xlsx")
 
     # ------------------------------------------------------------------ slots
-
-    def _on_browse_save(self) -> None:
-        path = self.pick_save_file(
-            "Save organised workbook as",
-            "Excel files (*.xlsx)",
-            "organized.xlsx",
-        )
-        if path:
-            self._path_field.setText(str(path))
 
     def _on_convert(self) -> None:
         if self._state.document is None:
             self.warn("Load an STF file in Phase 1 first.")
             return
-        path_text = self._path_field.text().strip()
-        if not path_text:
-            self.warn("Choose an output path first.")
-            return
-        path = Path(path_text)
+        # Auto-generate output path: source stem + "_organized.xlsx" in same folder
+        src = self._state.source_stf_path
+        if src is not None:
+            path = Path(str(src.with_suffix("")) + "_organized.xlsx")
+        elif self._state.output_dir:
+            path = self._state.output_dir / "organized.xlsx"
+        else:
+            path = Path("organized.xlsx")
         if path.suffix.lower() != ".xlsx":
             path = path.with_suffix(".xlsx")
 
@@ -131,10 +141,47 @@ class Phase2ExcelPage(PhasePage):
         self._state.organized_xlsx_path = result.path
         self._state.output_dir = result.path.parent
         self._populate_details(result)
+        try:
+            from .. import settings as gui_settings
+            from ..state import PhaseStatus
+
+            gui_settings.add_recent_file(result.path)
+            gui_settings.remember_output_dir(result.path.parent)
+            self._state.set_phase(1, PhaseStatus.DONE)
+        except Exception:  # noqa: BLE001
+            pass
         self.status_message.emit(
             f"Wrote {len(result.sheets_written)} sheets to {result.path}"
         )
         self._next_btn.setEnabled(True)
+        self._save_copy_btn.setEnabled(True)
+
+    def _on_save_copy(self) -> None:
+        """Write an additional copy of the organised workbook elsewhere.
+
+        Useful for keeping a backup or sharing without disturbing the
+        ``organized_xlsx_path`` that subsequent phases rely on.
+        """
+        if self._state.document is None:
+            self.warn("Convert the document first before saving a copy.")
+            return
+        suggested_name = "organized_copy.xlsx"
+        if self._state.organized_xlsx_path is not None:
+            suggested_name = self._state.organized_xlsx_path.name
+        path = self.pick_save_file(
+            "Save additional copy as", "Excel files (*.xlsx)", suggested_name
+        )
+        if not path:
+            return
+        if path.suffix.lower() != ".xlsx":
+            path = path.with_suffix(".xlsx")
+        self.status_message.emit(f"Saving copy to {path} ...")
+        worker = ExportExcelWorker(self._state.document, path, self)
+        worker.finished_ok.connect(
+            lambda _result: self.status_message.emit(f"Copy saved: {path}")
+        )
+        worker.failed.connect(lambda msg: self.error(msg, "Save copy failed"))
+        worker.start()
 
     def _populate_details(self, result) -> None:
         # Re-derive Content Details from the in-memory document so we don't
@@ -176,7 +223,31 @@ class Phase2ExcelPage(PhasePage):
         self._state.document = doc
         self._state.organized_xlsx_path = path
         self._state.output_dir = path.parent
-        self._path_field.setText(str(path))
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
+
+    # ------------------------------------------------------------------ pop-out details
+
+    def _on_popout_details(self) -> None:
+        if hasattr(self, '_details_dialog') and self._details_dialog is not None:
+            self._details_dialog.raise_()
+            self._details_dialog.activateWindow()
+            return
+        self._details_dialog = QDialog(self)
+        self._details_dialog.setWindowTitle("Content Details")
+        from .base import clamp_to_screen
+        clamp_to_screen(self._details_dialog, 800, 500)
+        self._details_dialog.setWindowFlags(
+            self._details_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._details_dialog)
+        self._details.setParent(self._details_dialog)
+        layout.addWidget(self._details)
+        self._details_dialog.finished.connect(self._on_details_dialog_closed)
+        self._details_dialog.show()
+
+    def _on_details_dialog_closed(self) -> None:
+        self._details.setParent(self._details_box)
+        self._details_layout.addWidget(self._details)
+        self._details_dialog = None
