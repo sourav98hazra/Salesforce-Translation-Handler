@@ -552,25 +552,17 @@ class MainWindow(QMainWindow):
                 self._pages[current].on_enter()
 
     def _show_user_guide(self) -> None:
-        """Open the bundled user guide in the default browser, if available.
+        """Open the bundled user guide *inside the app*.
 
         The guide is the ``USER_GUIDE.md`` shipped alongside the source
-        tree.  When the file isn't packaged (e.g. PyInstaller frozen
-        builds with default config), we fall back to a short summary.
+        tree, rendered as Markdown in a modal :class:`UserGuideDialog`
+        so users never get bounced out to an external editor or
+        browser.
         """
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
+        from .about_dialog import UserGuideDialog
 
-        guide = Path(__file__).resolve().parent.parent.parent.parent / "USER_GUIDE.md"
-        if guide.is_file():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(guide)))
-            return
-        QMessageBox.information(
-            self,
-            "User guide",
-            "The user guide is shipped as USER_GUIDE.md alongside the "
-            "application source.  Visit the project repository to read it.",
-        )
+        viewer = UserGuideDialog(self)
+        viewer.exec()
 
     def _apply_remembered_theme(self) -> None:
         theme.apply_theme(gui_settings.get_theme())
@@ -591,18 +583,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _show_about(self) -> None:
-        QMessageBox.about(
-            self,
-            "About",
-            (
-                f"<h3>Salesforce Translation Handler</h3>"
-                f"<p>Version {__version__}</p>"
-                f"<p>Professional desktop app for the Salesforce Translation "
-                f"Workbench workflow: STF \u2192 Excel \u2192 Translate \u2192 "
-                f"Review \u2192 Validate & Fix \u2192 STF.</p>"
-                f"<p>v1.2 features: auto-validation on review entry, dedicated "
-                f"Validate & Fix phase with auto-fix, re-upload Excel in Review, "
-                f"direct Excel \u2192 STF in Export, plus all v1.1 features "
-                f"(TM, glossary, scope, backends, dark theme, drag-drop, etc.).</p>"
-            ),
-        )
+        from .about_dialog import AboutDialog
+
+        dialog = AboutDialog(self)
+        dialog.exec()
