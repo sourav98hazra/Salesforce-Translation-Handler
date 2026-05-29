@@ -50,23 +50,23 @@ LIGHT_PALETTE = {
 }
 
 DARK_PALETTE = {
-    "bg":                "#0b1220",
-    "surface":           "#111c33",
-    "surface_alt":       "#1a2742",
-    "surface_raised":    "#243254",
-    "border":            "#334155",
-    "border_strong":     "#475569",
-    "text":              "#f1f5f9",
-    "text_muted":        "#cbd5e1",
-    "text_subtle":       "#94a3b8",
-    "accent":            "#6366f1",  # indigo-500 (slightly brighter for dark bg)
-    "accent_hover":      "#818cf8",
-    "accent_soft":       "#1e1b4b",
-    "sidebar_bg":        "#020617",
-    "sidebar_text":      "#94a3b8",
+    "bg":                "#1e293b",       # slate-800 -- softer than black, professional
+    "surface":           "#283449",       # raised surface for cards
+    "surface_alt":       "#334155",       # slate-700
+    "surface_raised":    "#3f4b5f",       # inputs / tooltips slightly raised
+    "border":            "#475569",       # slate-600 -- visible against the bg
+    "border_strong":     "#64748b",       # slate-500
+    "text":              "#f1f5f9",       # slate-100
+    "text_muted":        "#cbd5e1",       # slate-300
+    "text_subtle":       "#94a3b8",       # slate-400
+    "accent":            "#818cf8",       # indigo-400 -- bright enough to stand out
+    "accent_hover":      "#a5b4fc",       # indigo-300
+    "accent_soft":       "#312e81",       # indigo-900
+    "sidebar_bg":        "#0f172a",       # slate-900 -- sidebar a touch darker than canvas for separation
+    "sidebar_text":      "#cbd5e1",       # slate-300 -- readable on sidebar_bg
     "sidebar_text_active": "#ffffff",
-    "sidebar_item_hover":  "#1e293b",
-    "sidebar_item_active": "#3730a3",
+    "sidebar_item_hover":  "#1e293b",     # slate-800
+    "sidebar_item_active": "#4338ca",     # indigo-700
     "danger":            "#f87171",
     "danger_soft":       "#7f1d1d",
     "warning":           "#fbbf24",
@@ -252,7 +252,7 @@ def build_stylesheet(palette: dict) -> str:
 
     /* ---------- Inputs ---------- */
     QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
-        background-color: {p["surface"]};
+        background-color: {p["surface_raised"]};
         border: 1px solid {p["border"]};
         border-radius: 6px;
         padding: 3px 6px;
@@ -266,7 +266,7 @@ def build_stylesheet(palette: dict) -> str:
         outline: none;
     }}
     QLineEdit:read-only, QPlainTextEdit:read-only, QTextEdit:read-only {{
-        background-color: {p["surface_alt"]};
+        background-color: {p["surface_raised"]};
         color: {p["text_muted"]};
     }}
     QPlainTextEdit, QTextEdit {{

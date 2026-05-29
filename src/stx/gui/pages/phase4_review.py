@@ -265,6 +265,12 @@ class Phase4ReviewPage(PhasePage):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
+        splitter.setHandleWidth(8)              # make handle thick enough to grab
+        splitter.setChildrenCollapsible(False)  # prevent accidental collapse
+        splitter.setStyleSheet(
+            "QSplitter::handle:vertical { background: #94a3b8; height: 4px; margin: 2px 0; border-radius: 2px; }"
+            "QSplitter::handle:vertical:hover { background: #4338ca; }"
+        )
 
         self._table = QTableView()
         self._table.setModel(self._proxy)
@@ -337,6 +343,7 @@ class Phase4ReviewPage(PhasePage):
         self._editor_widget = editor
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([400, 200])           # explicit initial sizes (table top, editor bottom)
 
         review_layout.addWidget(splitter)
         self.add_widget(review_box, stretch=1)

@@ -271,30 +271,36 @@ class Phase3TranslatePage(PhasePage):
         # ----- Setup section: compact form
         setup_box = QGroupBox("Setup")
 
-        # Source + Target form only (Output field removed in v1.4 -- the
-        # translated document stays in memory until the user clicks
-        # "Save copy to..." in the action row below).
-        lang_form = QFormLayout()
-        lang_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        lang_form.setHorizontalSpacing(8)
-        lang_form.setVerticalSpacing(4)
-
+        # Source + Target on the SAME ROW (saves a vertical line vs. the
+        # old QFormLayout that stacked them).  Output field already
+        # removed in v1.4 -- the translated document stays in memory
+        # until the user clicks "Save copy to..." in the action row.
         self._source_combo = QComboBox()
         self._source_combo.addItems(supported_language_names())
         self._source_combo.setCurrentText("English")
         self._source_combo.setToolTip("Source language of your STF file.")
-        lang_form.addRow("Source:", self._source_combo)
 
         self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
         self._target_combo.setToolTip("Language to translate into.")
-        lang_form.addRow("Target:", self._target_combo)
+
+        lang_row = QHBoxLayout()
+        lang_row.setSpacing(8)
+        src_label = QLabel("Source:")
+        src_label.setStyleSheet("font-weight: 600;")
+        lang_row.addWidget(src_label)
+        lang_row.addWidget(self._source_combo, stretch=1)
+        lang_row.addSpacing(20)
+        tgt_label = QLabel("Target:")
+        tgt_label.setStyleSheet("font-weight: 600;")
+        lang_row.addWidget(tgt_label)
+        lang_row.addWidget(self._target_combo, stretch=1)
 
         setup_layout = QVBoxLayout(setup_box)
         setup_layout.setContentsMargins(8, 6, 8, 6)
-        setup_layout.addLayout(lang_form)
+        setup_layout.addLayout(lang_row)
 
         # ----- Filter row: button + estimate, sits BELOW the two columns
         # so it isn't visually competing with the Target combo or Output field.

@@ -123,6 +123,12 @@ class Phase5ValidatePage(PhasePage):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
+        splitter.setHandleWidth(8)              # make handle thick enough to grab
+        splitter.setChildrenCollapsible(False)  # prevent accidental collapse
+        splitter.setStyleSheet(
+            "QSplitter::handle:vertical { background: #94a3b8; height: 4px; margin: 2px 0; border-radius: 2px; }"
+            "QSplitter::handle:vertical:hover { background: #4338ca; }"
+        )
 
         # Issues table
         self._table = QTableWidget(0, 6)
@@ -208,6 +214,7 @@ class Phase5ValidatePage(PhasePage):
         splitter.addWidget(editor_box)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([400, 200])           # explicit initial sizes (issues top, editor bottom)
 
         issues_layout.addWidget(splitter)
         self.add_widget(issues_box, stretch=1)
