@@ -261,15 +261,6 @@ class Phase4ReviewPage(PhasePage):
         self._editor_layout.setContentsMargins(12, 10, 12, 10)
         self._editor_layout.setSpacing(6)
 
-        # Pop-out button for editor pane
-        self._popout_editor_btn = QPushButton("\u2197")
-        self._popout_editor_btn.setFixedSize(20, 20)
-        self._popout_editor_btn.setToolTip("Pop out into a separate window")
-        self._popout_editor_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
-        self._popout_editor_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._popout_editor_btn.clicked.connect(self._on_popout_editor)
-        self._editor_layout.addWidget(self._popout_editor_btn, 0, Qt.AlignmentFlag.AlignRight)
-
         meta = QHBoxLayout()
         meta.setSpacing(8)
         meta.addWidget(QLabel("Key:"))
@@ -283,6 +274,16 @@ class Phase4ReviewPage(PhasePage):
         self._reset_btn.clicked.connect(self._reset_row)
         meta.addWidget(self._apply_btn)
         meta.addWidget(self._reset_btn)
+
+        # Pop-out button inline at far right of key row
+        self._popout_editor_btn = QPushButton("\u2197")
+        self._popout_editor_btn.setFixedSize(20, 20)
+        self._popout_editor_btn.setToolTip("Pop out into a separate window")
+        self._popout_editor_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_editor_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._popout_editor_btn.clicked.connect(self._on_popout_editor)
+        meta.addWidget(self._popout_editor_btn)
+
         self._editor_layout.addLayout(meta)
 
         side_by_side = QHBoxLayout()

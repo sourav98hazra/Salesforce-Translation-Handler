@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -39,17 +38,6 @@ class Phase2ExcelPage(PhasePage):
         self._build()
 
     def _build(self) -> None:
-        # Output path row
-        path_box = QGroupBox("Output workbook")
-        path_layout = QHBoxLayout(path_box)
-        self._path_field = QLineEdit()
-        self._path_field.setPlaceholderText("Choose where to write the organised .xlsx ...")
-        browse_btn = QPushButton("Browse...")
-        browse_btn.clicked.connect(self._on_browse_save)
-        path_layout.addWidget(self._path_field, stretch=1)
-        path_layout.addWidget(browse_btn)
-        self.add_widget(path_box)
-
         # Status / summary
         self._summary_label = QLabel("No document loaded yet \u2014 complete Phase 1 first.")
         self._summary_label.setStyleSheet("color: #4a5568;")
@@ -59,6 +47,7 @@ class Phase2ExcelPage(PhasePage):
         details_box = QGroupBox("Content Details (post-export preview)")
         self._details_layout = QVBoxLayout(details_box)
         self._details_layout.setContentsMargins(4, 4, 4, 4)
+        self._details_layout.setSpacing(2)
 
         self._popout_details_btn = QPushButton("\u2197")
         self._popout_details_btn.setFixedSize(20, 20)
@@ -66,7 +55,12 @@ class Phase2ExcelPage(PhasePage):
         self._popout_details_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
         self._popout_details_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_details_btn.clicked.connect(self._on_popout_details)
-        self._details_layout.addWidget(self._popout_details_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        # Inline header row: stretch pushes pop-out icon to far right
+        details_header_row = QHBoxLayout()
+        details_header_row.addStretch(1)
+        details_header_row.addWidget(self._popout_details_btn)
+        self._details_layout.addLayout(details_header_row)
 
         self._details = QTableWidget(0, 5)
         self._details.setHorizontalHeaderLabels([
@@ -82,7 +76,7 @@ class Phase2ExcelPage(PhasePage):
         self._convert_btn = primary(QPushButton("Convert and save .xlsx"))
         self._convert_btn.clicked.connect(self._on_convert)
         self._convert_btn.setToolTip(
-            "Save the organised workbook to the path above (the default).\n"
+            "Save the organised workbook (auto-named from source file).\n"
             "This is the path used by later phases."
         )
 
@@ -118,32 +112,21 @@ class Phase2ExcelPage(PhasePage):
             f"{stats['untranslated']:,} untranslated, {stats['components']} component types."
         )
         self._convert_btn.setEnabled(True)
-        # Suggest a default output path based on the source STF.
-        if not self._path_field.text():
-            src = self._state.source_stf_path
-            if src is not None:
-                self._path_field.setText(str(src.with_suffix("")) + "_organized.xlsx")
 
     # ------------------------------------------------------------------ slots
-
-    def _on_browse_save(self) -> None:
-        path = self.pick_save_file(
-            "Save organised workbook as",
-            "Excel files (*.xlsx)",
-            "organized.xlsx",
-        )
-        if path:
-            self._path_field.setText(str(path))
 
     def _on_convert(self) -> None:
         if self._state.document is None:
             self.warn("Load an STF file in Phase 1 first.")
             return
-        path_text = self._path_field.text().strip()
-        if not path_text:
-            self.warn("Choose an output path first.")
-            return
-        path = Path(path_text)
+        # Auto-generate output path: source stem + "_organized.xlsx" in same folder
+        src = self._state.source_stf_path
+        if src is not None:
+            path = Path(str(src.with_suffix("")) + "_organized.xlsx")
+        elif self._state.output_dir:
+            path = self._state.output_dir / "organized.xlsx"
+        else:
+            path = Path("organized.xlsx")
         if path.suffix.lower() != ".xlsx":
             path = path.with_suffix(".xlsx")
 
@@ -239,7 +222,6 @@ class Phase2ExcelPage(PhasePage):
         self._state.document = doc
         self._state.organized_xlsx_path = path
         self._state.output_dir = path.parent
-        self._path_field.setText(str(path))
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)

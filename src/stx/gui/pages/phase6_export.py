@@ -19,13 +19,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -35,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...languages import LANGUAGE_NAME_TO_CODE, code_for_language, supported_language_names
-from ...validate import ValidationReport, validate_document
+from ...validate import validate_document
 from ..state import AppState, PhaseStatus
 from ..workers import ImportExcelWorker, WriteStfWorker
 from .base import PhasePage, make_action_row, primary
@@ -81,32 +79,21 @@ class Phase6ExportPage(PhasePage):
         load_layout.addWidget(self._load_status, stretch=1)
         self.add_widget(load_box)
 
-        # ---------- Language config
-        cfg_box = QGroupBox("Target language")
-        cfg_layout = QHBoxLayout(cfg_box)
-        cfg_layout.addWidget(QLabel("Language:"))
+        # ---------- Language config (compact row, no group box)
+        lang_row = QHBoxLayout()
+        lang_row.setSpacing(8)
+        lang_row.addWidget(QLabel("Target:"))
         self._lang_combo = QComboBox()
         self._lang_combo.addItems(supported_language_names())
         self._lang_combo.currentTextChanged.connect(self._on_lang_changed)
-        cfg_layout.addWidget(self._lang_combo)
-        cfg_layout.addSpacing(12)
-        cfg_layout.addWidget(QLabel("Code:"))
+        lang_row.addWidget(self._lang_combo)
+        lang_row.addSpacing(12)
+        lang_row.addWidget(QLabel("Code:"))
         self._code_field = QLineEdit()
         self._code_field.setMaximumWidth(120)
-        cfg_layout.addWidget(self._code_field)
-        cfg_layout.addStretch(1)
-        self.add_widget(cfg_box)
-
-        # ---------- Output directory
-        path_box = QGroupBox("Output directory")
-        path_layout = QHBoxLayout(path_box)
-        self._dir_field = QLineEdit()
-        self._dir_field.setPlaceholderText("Where to write the three .stf files ...")
-        browse = QPushButton("Browse...")
-        browse.clicked.connect(self._on_browse_dir)
-        path_layout.addWidget(self._dir_field, stretch=1)
-        path_layout.addWidget(browse)
-        self.add_widget(path_box)
+        lang_row.addWidget(self._code_field)
+        lang_row.addStretch(1)
+        self.add_layout(lang_row)
 
         # ---------- Quick validation summary (optional, not blocking)
         validate_box = QGroupBox("Quick validation check (optional)")
@@ -124,10 +111,10 @@ class Phase6ExportPage(PhasePage):
         self._export_btn.clicked.connect(self._on_export)
         self.add_layout(make_action_row(self._export_btn))
 
-        # ---------- Result table
-        result_box = QGroupBox("Export results")
-        self._result_layout = QVBoxLayout(result_box)
-        self._result_layout.setContentsMargins(4, 4, 4, 4)
+        # ---------- Result table (no group box wrapper, pop-out inline)
+        result_header_row = QHBoxLayout()
+        result_header_row.addWidget(QLabel("Export results"))
+        result_header_row.addStretch(1)
 
         self._popout_results_btn = QPushButton("\u2197")
         self._popout_results_btn.setFixedSize(20, 20)
@@ -135,14 +122,14 @@ class Phase6ExportPage(PhasePage):
         self._popout_results_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
         self._popout_results_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_results_btn.clicked.connect(self._on_popout_results)
-        self._result_layout.addWidget(self._popout_results_btn, 0, Qt.AlignmentFlag.AlignRight)
+        result_header_row.addWidget(self._popout_results_btn)
+        self.add_layout(result_header_row)
 
         self._result_table = QTableWidget(0, 2)
         self._result_table.setHorizontalHeaderLabels(["File", "Size"])
         self._result_table.horizontalHeader().setStretchLastSection(True)
         self._result_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._result_layout.addWidget(self._result_table)
-        self.add_widget(result_box)
+        self.add_widget(self._result_table)
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -151,8 +138,6 @@ class Phase6ExportPage(PhasePage):
             self._lang_combo.setCurrentText(self._state.target_language_name)
         if self._state.target_language_code:
             self._code_field.setText(self._state.target_language_code)
-        if not self._dir_field.text() and self._state.output_dir:
-            self._dir_field.setText(str(self._state.output_dir))
 
         has_doc = self._state.document is not None
         self._export_btn.setEnabled(has_doc and not self.is_busy)
@@ -221,11 +206,6 @@ class Phase6ExportPage(PhasePage):
             self._state.target_language_name = name
             self._state.target_language_code = code
 
-    def _on_browse_dir(self) -> None:
-        path = self.pick_directory("Choose output directory")
-        if path:
-            self._dir_field.setText(str(path))
-
     # ------------------------------------------------------------------ validate (optional)
 
     def _on_validate(self) -> None:
@@ -252,11 +232,10 @@ class Phase6ExportPage(PhasePage):
     def _on_export(self) -> None:
         if self._state.document is None or self.is_busy:
             return
-        dir_text = self._dir_field.text().strip()
-        if not dir_text:
-            self.warn("Choose an output directory first.")
+        # Open directory picker on each export click
+        out_dir = self.pick_directory("Choose output directory for STF files")
+        if not out_dir:
             return
-        out_dir = Path(dir_text)
 
         lang_name = self._lang_combo.currentText()
         lang_code = self._code_field.text().strip() or code_for_language(lang_name) or "xx"
@@ -327,7 +306,8 @@ class Phase6ExportPage(PhasePage):
 
     def _on_results_dialog_closed(self) -> None:
         self._result_table.setParent(self)
-        self._result_layout.addWidget(self._result_table)
+        # Re-add to main layout (after the header row)
+        self.layout().addWidget(self._result_table)
         self._results_dialog = None
         self._popout_results_btn.setText("\u2197")
         self._popout_results_btn.setToolTip("Pop out into a separate window")

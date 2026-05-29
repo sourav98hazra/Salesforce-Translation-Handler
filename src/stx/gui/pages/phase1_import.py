@@ -47,21 +47,18 @@ class Phase1ImportPage(PhasePage):
     # ------------------------------------------------------------------ UI
 
     def _build(self) -> None:
-        # ---------- File picker row
-        picker_row = make_action_row(
-            self._make_button("Browse STF...", self._on_browse),
-            self._make_button("Re-parse", self._on_reparse, enabled=False, primary=False, key="reparse_btn"),
-        )
+        # ---------- File picker row (label + buttons on ONE line)
         self._path_label = QLabel("No file selected.")
         self._path_label.setStyleSheet("color: #4a5568;")
-        self._path_label.setWordWrap(True)
+        self._path_label.setWordWrap(False)
 
         path_box = QGroupBox("Source file")
-        path_layout = QVBoxLayout(path_box)
-        path_layout.setContentsMargins(8, 4, 8, 4)
-        path_layout.setSpacing(4)
-        path_layout.addWidget(self._path_label)
-        path_layout.addLayout(picker_row)
+        path_row = QHBoxLayout(path_box)
+        path_row.setContentsMargins(8, 4, 8, 4)
+        path_row.setSpacing(8)
+        path_row.addWidget(self._path_label, stretch=1)
+        path_row.addWidget(self._make_button("Browse STF...", self._on_browse))
+        path_row.addWidget(self._make_button("Re-parse", self._on_reparse, enabled=False, primary=False, key="reparse_btn"))
         self.add_widget(path_box)
 
         # ---------- Parsed metadata (2-column grid)
@@ -106,6 +103,7 @@ class Phase1ImportPage(PhasePage):
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
         self._preview_layout = QVBoxLayout(preview_box)
         self._preview_layout.setContentsMargins(4, 4, 4, 4)
+        self._preview_layout.setSpacing(2)
 
         self._popout_preview_btn = QPushButton("\u2197")
         self._popout_preview_btn.setFixedSize(20, 20)
@@ -113,7 +111,12 @@ class Phase1ImportPage(PhasePage):
         self._popout_preview_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
         self._popout_preview_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_preview_btn.clicked.connect(self._on_popout_preview)
-        self._preview_layout.addWidget(self._popout_preview_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        # Inline header row: stretch pushes pop-out icon to far right
+        preview_header_row = QHBoxLayout()
+        preview_header_row.addStretch(1)
+        preview_header_row.addWidget(self._popout_preview_btn)
+        self._preview_layout.addLayout(preview_header_row)
 
         self._preview = QTableWidget(0, 3)
         self._preview.setHorizontalHeaderLabels(["Key", "Label", "Translation"])

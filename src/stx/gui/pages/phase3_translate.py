@@ -284,11 +284,24 @@ class Phase3TranslatePage(PhasePage):
         self._source_combo.setCurrentText("English")
         lang_form.addRow("Source:", self._source_combo)
 
+        # Target row: combo + filter button + estimate label
+        target_row = QHBoxLayout()
         self._target_combo = QComboBox()
         self._target_combo.addItems(supported_language_names())
         self._target_combo.setCurrentText("Japanese")
         self._target_combo.currentTextChanged.connect(self._on_target_changed)
-        lang_form.addRow("Target:", self._target_combo)
+        target_row.addWidget(self._target_combo)
+        target_row.addSpacing(12)
+        self._filter_btn = QPushButton("Filter Components...")
+        self._filter_btn.clicked.connect(self._on_filter_components)
+        target_row.addWidget(self._filter_btn)
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
+        target_row.addWidget(self._estimate_label)
+        target_widget = QWidget()
+        target_widget.setLayout(target_row)
+        target_widget.layout().setContentsMargins(0, 0, 0, 0)
+        lang_form.addRow("Target:", target_widget)
 
         setup_grid.addLayout(lang_form)
 
@@ -316,23 +329,6 @@ class Phase3TranslatePage(PhasePage):
         setup_layout.setContentsMargins(8, 6, 8, 6)
         setup_layout.addLayout(setup_grid)
 
-        # Filter row (inside setup box, below output path)
-        filter_row = QHBoxLayout()
-        self._filter_btn = QPushButton("Filter Components...")
-        self._filter_btn.clicked.connect(self._on_filter_components)
-        filter_row.addWidget(self._filter_btn)
-        self._filter_summary_label = QLabel("All components")
-        self._filter_summary_label.setStyleSheet("color: #475569; font-size: 12px;")
-        filter_row.addWidget(self._filter_summary_label)
-        sep_label = QLabel("\u00b7")
-        sep_label.setStyleSheet("color: #94a3b8; font-size: 12px; margin: 0 6px;")
-        filter_row.addWidget(sep_label)
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 600; font-size: 12px;")
-        filter_row.addWidget(self._estimate_label)
-        filter_row.addStretch(1)
-        setup_layout.addLayout(filter_row)
-
         # Settings hint
         self._settings_summary = QLabel("")
         self._settings_summary.setWordWrap(True)
@@ -356,6 +352,7 @@ class Phase3TranslatePage(PhasePage):
         feed_box = QGroupBox("Live feed")
         self._feed_layout = QVBoxLayout(feed_box)
         self._feed_layout.setContentsMargins(4, 4, 4, 4)
+        self._feed_layout.setSpacing(2)
 
         self._popout_feed_btn = QPushButton("\u2197")
         self._popout_feed_btn.setFixedSize(20, 20)
@@ -363,7 +360,12 @@ class Phase3TranslatePage(PhasePage):
         self._popout_feed_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
         self._popout_feed_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_feed_btn.clicked.connect(self._on_popout_feed)
-        self._feed_layout.addWidget(self._popout_feed_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        # Inline header row: stretch pushes pop-out icon to far right
+        feed_header_row = QHBoxLayout()
+        feed_header_row.addStretch(1)
+        feed_header_row.addWidget(self._popout_feed_btn)
+        self._feed_layout.addLayout(feed_header_row)
 
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
@@ -463,7 +465,6 @@ class Phase3TranslatePage(PhasePage):
     def _update_estimate(self) -> None:
         if self._state.document is None:
             self._estimate_label.setText("Rows to translate: \u2014 (load a document first)")
-            self._filter_summary_label.setText("No document loaded")
             return
         scope = self._build_scope()
         if scope is None:
@@ -472,15 +473,6 @@ class Phase3TranslatePage(PhasePage):
         self._total_rows = count
         self._estimate_label.setText(f"Rows to translate: <b>{count:,}</b>")
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
-
-        # Update filter summary text
-        all_components = {e.component_type for e in self._state.document.entries}
-        if self._selected_components is None or self._selected_components == all_components:
-            self._filter_summary_label.setText("All components selected")
-        else:
-            n_selected = len(self._selected_components) if self._selected_components else 0
-            n_total = len(all_components)
-            self._filter_summary_label.setText(f"{n_selected} of {n_total} components selected")
 
     # ------------------------------------------------------------------ output path
 
