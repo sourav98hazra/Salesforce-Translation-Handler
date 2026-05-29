@@ -97,12 +97,12 @@ class MainWindow(QMainWindow):
         self._status_log = QPlainTextEdit()
         self._status_log.setReadOnly(True)
         self._status_log.setMaximumBlockCount(1000)
-        self._status_log.setMinimumHeight(80)
+        self._status_log.setMinimumHeight(50)
         self._status_dock = QDockWidget("Status log", self)
         self._status_dock.setWidget(self._status_log)
         self._status_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.TopDockWidgetArea)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._status_dock)
-        self._status_dock.setMinimumHeight(100)
+        self._status_dock.setMinimumHeight(70)
 
         # ---- status bar
         bar = QStatusBar()
