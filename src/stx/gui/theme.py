@@ -176,9 +176,9 @@ def build_stylesheet(palette: dict) -> str:
     QGroupBox {{
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
-        border-radius: 6px;
-        margin-top: 8px;
-        padding: 8px 8px 4px 8px;
+        border-radius: 10px;
+        margin-top: 10px;
+        padding: 12px 12px 8px 12px;
         font-weight: 600;
         font-size: 12px;
     }}
@@ -206,8 +206,8 @@ def build_stylesheet(palette: dict) -> str:
         background-color: {p["surface_raised"]};
         color: {p["text"]};
         border: 1px solid {p["border"]};
-        border-radius: 6px;
-        padding: 5px 12px;
+        border-radius: 8px;
+        padding: 6px 14px;
         min-height: 20px;
     }}
     QPushButton:hover {{
@@ -254,8 +254,8 @@ def build_stylesheet(palette: dict) -> str:
     QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
         background-color: {p["surface_raised"]};
         border: 1px solid {p["border"]};
-        border-radius: 6px;
-        padding: 3px 6px;
+        border-radius: 8px;
+        padding: 5px 8px;
         color: {p["text"]};
         selection-background-color: {p["accent"]};
         selection-color: white;
@@ -291,7 +291,7 @@ def build_stylesheet(palette: dict) -> str:
         alternate-background-color: {p["surface_raised"]};
         gridline-color: {p["border"]};
         border: 1px solid {p["border"]};
-        border-radius: 6px;
+        border-radius: 8px;
         selection-background-color: {p["accent"]};
         selection-color: white;
     }}
@@ -401,7 +401,7 @@ def build_stylesheet(palette: dict) -> str:
     /* ---------- Tabs ---------- */
     QTabWidget::pane {{
         border: 1px solid {p["border"]};
-        border-radius: 6px;
+        border-radius: 8px;
         background-color: {p["surface"]};
         top: -1px;
     }}
@@ -411,8 +411,8 @@ def build_stylesheet(palette: dict) -> str:
         padding: 8px 18px;
         border: 1px solid {p["border"]};
         border-bottom: 0;
-        border-top-left-radius: 6px;
-        border-top-right-radius: 6px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
         margin-right: 2px;
         font-weight: 600;
     }}
@@ -434,7 +434,7 @@ def build_stylesheet(palette: dict) -> str:
     QFrame[role="card"] {{
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
-        border-radius: 8px;
+        border-radius: 10px;
     }}
 
     /* ---------- Checkboxes / Radio ---------- */
