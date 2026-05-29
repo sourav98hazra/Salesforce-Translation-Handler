@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -103,14 +104,21 @@ class Phase1ImportPage(PhasePage):
 
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
-        preview_layout = QVBoxLayout(preview_box)
-        preview_layout.setContentsMargins(4, 4, 4, 4)
+        self._preview_layout = QVBoxLayout(preview_box)
+        self._preview_layout.setContentsMargins(4, 4, 4, 4)
+
+        self._popout_preview_btn = QPushButton("\u2197 Pop out")
+        self._popout_preview_btn.setMaximumWidth(80)
+        self._popout_preview_btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self._popout_preview_btn.clicked.connect(self._on_popout_preview)
+        self._preview_layout.addWidget(self._popout_preview_btn, 0, Qt.AlignmentFlag.AlignRight)
+
         self._preview = QTableWidget(0, 3)
         self._preview.setHorizontalHeaderLabels(["Key", "Label", "Translation"])
         self._preview.horizontalHeader().setStretchLastSection(True)
         self._preview.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._preview.setAlternatingRowColors(True)
-        preview_layout.addWidget(self._preview)
+        self._preview_layout.addWidget(self._preview)
         self.add_widget(preview_box, stretch=1)
 
         # ---------- Actions
@@ -240,3 +248,36 @@ class Phase1ImportPage(PhasePage):
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
         self.request_navigate.emit(1)
+
+    # ------------------------------------------------------------------ pop-out preview
+
+    def _on_popout_preview(self) -> None:
+        if hasattr(self, '_preview_dialog') and self._preview_dialog is not None:
+            self._preview_dialog.raise_()
+            return
+        self._preview_dialog = QDialog(self)
+        self._preview_dialog.setWindowTitle("Preview (first 100 rows)")
+        self._preview_dialog.resize(800, 500)
+        self._preview_dialog.setWindowFlags(
+            self._preview_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._preview_dialog)
+        self._preview.setParent(self._preview_dialog)
+        layout.addWidget(self._preview)
+        self._preview_dialog.finished.connect(self._on_preview_dialog_closed)
+        self._preview_dialog.show()
+        self._popout_preview_btn.setText("\u2199 Dock back")
+        self._popout_preview_btn.clicked.disconnect()
+        self._popout_preview_btn.clicked.connect(self._on_dock_preview_back)
+
+    def _on_dock_preview_back(self) -> None:
+        if hasattr(self, '_preview_dialog') and self._preview_dialog is not None:
+            self._preview_dialog.close()
+
+    def _on_preview_dialog_closed(self) -> None:
+        self._preview.setParent(self)
+        self._preview_layout.addWidget(self._preview)
+        self._preview_dialog = None
+        self._popout_preview_btn.setText("\u2197 Pop out")
+        self._popout_preview_btn.clicked.disconnect()
+        self._popout_preview_btn.clicked.connect(self._on_popout_preview)

@@ -238,11 +238,22 @@ class Phase3TranslatePage(PhasePage):
         self.add_widget(self._eta_label)
 
         # ----- Live feed log (takes all remaining space)
+        feed_box = QGroupBox("Live feed")
+        self._feed_layout = QVBoxLayout(feed_box)
+        self._feed_layout.setContentsMargins(4, 4, 4, 4)
+
+        self._popout_feed_btn = QPushButton("\u2197 Pop out")
+        self._popout_feed_btn.setMaximumWidth(80)
+        self._popout_feed_btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self._popout_feed_btn.clicked.connect(self._on_popout_feed)
+        self._feed_layout.addWidget(self._popout_feed_btn, 0, Qt.AlignmentFlag.AlignRight)
+
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
         self._log.setMaximumBlockCount(800)
         self._log.setPlaceholderText("Live feed -- each translated row appears here with inline counters")
-        self.add_widget(self._log, stretch=1)
+        self._feed_layout.addWidget(self._log)
+        self.add_widget(feed_box, stretch=1)
 
         # ----- Action buttons
         self._start_btn = primary(QPushButton("Start translation"))
@@ -646,3 +657,36 @@ class Phase3TranslatePage(PhasePage):
         self._target_combo.setEnabled(not running)
         self._source_combo.setEnabled(not running)
         self._filter_btn.setEnabled(not running)
+
+    # ------------------------------------------------------------------ pop-out feed
+
+    def _on_popout_feed(self) -> None:
+        if hasattr(self, '_feed_dialog') and self._feed_dialog is not None:
+            self._feed_dialog.raise_()
+            return
+        self._feed_dialog = QDialog(self)
+        self._feed_dialog.setWindowTitle("Live Translation Feed")
+        self._feed_dialog.resize(800, 500)
+        self._feed_dialog.setWindowFlags(
+            self._feed_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        layout = QVBoxLayout(self._feed_dialog)
+        self._log.setParent(self._feed_dialog)
+        layout.addWidget(self._log)
+        self._feed_dialog.finished.connect(self._on_feed_dialog_closed)
+        self._feed_dialog.show()
+        self._popout_feed_btn.setText("\u2199 Dock back")
+        self._popout_feed_btn.clicked.disconnect()
+        self._popout_feed_btn.clicked.connect(self._on_dock_feed_back)
+
+    def _on_dock_feed_back(self) -> None:
+        if hasattr(self, '_feed_dialog') and self._feed_dialog is not None:
+            self._feed_dialog.close()
+
+    def _on_feed_dialog_closed(self) -> None:
+        self._log.setParent(self)
+        self._feed_layout.addWidget(self._log)
+        self._feed_dialog = None
+        self._popout_feed_btn.setText("\u2197 Pop out")
+        self._popout_feed_btn.clicked.disconnect()
+        self._popout_feed_btn.clicked.connect(self._on_popout_feed)
