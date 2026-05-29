@@ -95,11 +95,13 @@ class MainWindow(QMainWindow):
         # ---- bottom status log dock
         self._status_log = QPlainTextEdit()
         self._status_log.setReadOnly(True)
-        self._status_log.setMaximumBlockCount(500)
+        self._status_log.setMaximumBlockCount(1000)
+        self._status_log.setMinimumHeight(150)
         dock = QDockWidget("Status log", self)
         dock.setWidget(self._status_log)
         dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.TopDockWidgetArea)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+        dock.setMinimumHeight(180)
 
         # ---- status bar
         bar = QStatusBar()

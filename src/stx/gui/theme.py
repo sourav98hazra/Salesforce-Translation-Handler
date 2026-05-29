@@ -92,8 +92,8 @@ def build_stylesheet(palette: dict) -> str:
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
         border-radius: 8px;
-        margin-top: 14px;
-        padding: 14px 12px 8px 12px;
+        margin-top: 10px;
+        padding: 10px 10px 6px 10px;
         font-weight: 600;
         font-size: 12px;
     }}
@@ -122,8 +122,8 @@ def build_stylesheet(palette: dict) -> str:
         color: {p["text"]};
         border: 1px solid {p["border"]};
         border-radius: 6px;
-        padding: 6px 14px;
-        min-height: 24px;
+        padding: 5px 12px;
+        min-height: 20px;
     }}
     QPushButton:hover {{
         background-color: {p["surface_alt"]};
@@ -170,7 +170,7 @@ def build_stylesheet(palette: dict) -> str:
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
         border-radius: 6px;
-        padding: 5px 8px;
+        padding: 3px 6px;
         color: {p["text"]};
         selection-background-color: {p["accent"]};
         selection-color: white;
@@ -219,7 +219,7 @@ def build_stylesheet(palette: dict) -> str:
         border: 0;
         border-right: 1px solid {p["border"]};
         border-bottom: 1px solid {p["border"]};
-        padding: 8px 10px;
+        padding: 6px 8px;
         font-weight: 600;
         font-size: 11px;
         text-transform: uppercase;
