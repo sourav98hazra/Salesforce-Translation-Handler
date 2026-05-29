@@ -1,17 +1,15 @@
 """Phase 4 -- Review and edit translations.
 
-The review page presents every entry in a single table.  The
-``Translation`` column is editable; everything else is read-only.  A
-filter row at the top lets the reviewer narrow by component type or
-translation status, which is essential at 36k+ rows.
+v1.2 additions over v1.1:
 
-A side-by-side editor pane appears below the table when a row is
-selected, showing the source label and the translation in larger,
-multi-line fields with explicit "Save row" / "Reset" buttons -- much
-nicer than editing long HTML strings in a single cell.
-
-Phase 4 also exposes a public :meth:`focus_key` method that Phase 5
-calls to "jump to issue" when the reviewer clicks a validation error.
+* **Load reviewed Excel** -- primary-style button for re-uploading an
+  externally edited Excel.  The uploaded document replaces the current
+  one and becomes the "latest" version going forward.
+* **Auto-validate on entry** -- when the user navigates to this phase,
+  validation runs automatically and a banner displays the issue count
+  (e.g. "3 errors, 2 warnings -- click Continue to fix").
+* **Navigation** now points to Phase 5 (Validate & Fix) instead of
+  directly to Export.
 """
 
 from __future__ import annotations
@@ -35,8 +33,9 @@ from PySide6.QtWidgets import (
 )
 
 from ...model import Document, Entry
+from ...validate import validate_document
 from ..state import AppState, PhaseStatus
-from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
+from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, make_action_row, primary
 
 _HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation"]
@@ -46,19 +45,19 @@ _TRANSLATION_COL = 5
 class _EntriesModel(QAbstractTableModel):
     """Table model backed directly by ``Document.entries``."""
 
-    edited = Signal(int)  # index of edited row
+    edited = Signal(int)
 
     def __init__(self, doc: Document, parent=None) -> None:
         super().__init__(parent)
         self._doc = doc
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: D401, N802
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self._doc.entries)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: D401, N802
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(_HEADERS)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):  # noqa: D401, N802
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if not index.isValid():
             return None
         entry = self._doc.entries[index.row()]
@@ -80,20 +79,20 @@ class _EntriesModel(QAbstractTableModel):
             return entry.label if col == 4 else entry.translation
         return None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):  # noqa: D401, N802
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
             return _HEADERS[section]
         return section + 1
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa: D401, N802
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa: N802
         base = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         if index.column() == _TRANSLATION_COL:
             return base | Qt.ItemFlag.ItemIsEditable
         return base
 
-    def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: D401, N802
+    def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if role != Qt.ItemDataRole.EditRole or index.column() != _TRANSLATION_COL:
             return False
         row = index.row()
@@ -108,8 +107,6 @@ class _EntriesModel(QAbstractTableModel):
 
 
 class _ComponentStatusFilter(QSortFilterProxyModel):
-    """Custom proxy filter (component + status + key/label search)."""
-
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._component = "All"
@@ -128,7 +125,7 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
         self._needle = needle.strip().lower()
         self.invalidateFilter()
 
-    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:  # noqa: D401, N802
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:  # noqa: N802
         model = self.sourceModel()
         if model is None:
             return True
@@ -136,7 +133,6 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
         status = model.index(source_row, 3, source_parent).data(Qt.ItemDataRole.DisplayRole) or ""
         key = (model.index(source_row, 1, source_parent).data(Qt.ItemDataRole.DisplayRole) or "").lower()
         label = (model.index(source_row, 4, source_parent).data(Qt.ItemDataRole.DisplayRole) or "").lower()
-
         if self._component != "All" and comp != self._component:
             return False
         if self._status != "All" and status != self._status:
@@ -147,17 +143,22 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
 
 
 class Phase4ReviewPage(PhasePage):
-    """In-app review and edit of translations."""
+    """In-app review and edit of translations.
+
+    v1.2: auto-validate on enter, prominent "Load Excel" for re-upload,
+    validation banner, navigation to Phase 5 (Validate & Fix).
+    """
 
     def __init__(self, state: AppState, parent=None) -> None:
         super().__init__(
             state,
             title="Phase 4 \u2014 Review",
             subtitle=(
-                "Inspect every translation and edit any cells that need "
-                "correction.  Filter by component type or status to focus "
-                "your review.  Phase 5's validation can also jump you "
-                "directly to a problematic row."
+                "Review translations and edit any that need correction.  "
+                "You can also re-upload an externally edited Excel here -- "
+                "it will replace the current document and become the latest "
+                "version.  Validation runs automatically on entry so you "
+                "can see issues before moving to the next phase."
             ),
             parent=parent,
         )
@@ -167,7 +168,35 @@ class Phase4ReviewPage(PhasePage):
         self._build()
 
     def _build(self) -> None:
-        # Filter row
+        # ---------- Validation banner (auto-populated on_enter)
+        self._validation_banner = QLabel("")
+        self._validation_banner.setWordWrap(True)
+        self._validation_banner.setStyleSheet(
+            "padding: 10px; border-radius: 6px; font-weight: 600;"
+        )
+        self._validation_banner.setVisible(False)
+        self.add_widget(self._validation_banner)
+
+        # ---------- Load Excel row (prominent)
+        load_box = QGroupBox("Load / re-upload reviewed Excel")
+        load_layout = QHBoxLayout(load_box)
+        self._load_btn = primary(QPushButton("Load reviewed Excel (.xlsx)..."))
+        self._load_btn.setToolTip(
+            "Replace the current document with an externally edited workbook.  "
+            "This becomes the latest version used by all subsequent phases."
+        )
+        self._load_btn.clicked.connect(self._on_load_excel)
+        load_layout.addWidget(self._load_btn)
+        load_layout.addWidget(
+            QLabel(
+                "Upload an Excel you edited outside the app.  "
+                "It replaces the current document and becomes the latest."
+            )
+        )
+        load_layout.addStretch(1)
+        self.add_widget(load_box)
+
+        # ---------- Filter row
         filter_box = QGroupBox("Filter")
         filter_layout = QHBoxLayout(filter_box)
         filter_layout.addWidget(QLabel("Component:"))
@@ -176,14 +205,12 @@ class Phase4ReviewPage(PhasePage):
         self._component_combo.currentTextChanged.connect(self._proxy.set_component)
         filter_layout.addWidget(self._component_combo)
         filter_layout.addSpacing(12)
-
         filter_layout.addWidget(QLabel("Status:"))
         self._status_combo = QComboBox()
         self._status_combo.addItems(["All", "Translated", "Untranslated"])
         self._status_combo.currentTextChanged.connect(self._proxy.set_status)
         filter_layout.addWidget(self._status_combo)
         filter_layout.addSpacing(12)
-
         filter_layout.addWidget(QLabel("Search:"))
         self._search = QLineEdit()
         self._search.setPlaceholderText("Filter by key or label substring ...")
@@ -191,7 +218,7 @@ class Phase4ReviewPage(PhasePage):
         filter_layout.addWidget(self._search, stretch=1)
         self.add_widget(filter_box)
 
-        # Splitter: table on top, side-by-side editor below
+        # ---------- Splitter: table + side-by-side editor
         splitter = QSplitter(Qt.Orientation.Vertical)
 
         self._table = QTableView()
@@ -203,10 +230,9 @@ class Phase4ReviewPage(PhasePage):
         self._table.setEditTriggers(
             QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.SelectedClicked
         )
-        self._table.selectionModel  # touch -- ensures it exists
         splitter.addWidget(self._table)
 
-        # Side-by-side editor pane
+        # Side-by-side editor
         editor_box = QGroupBox("Selected row -- side-by-side editor")
         editor_layout = QVBoxLayout(editor_box)
 
@@ -257,7 +283,8 @@ class Phase4ReviewPage(PhasePage):
         # Actions
         self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
         self._save_btn.clicked.connect(self._on_save)
-        self._next_btn = QPushButton("Continue to Phase 5 \u2192")
+        # Phase 5 is now "Validate & Fix" (index 5 in the new 7-phase layout)
+        self._next_btn = QPushButton("Continue to Phase 5 (Validate & Fix) \u2192")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(5))
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
 
@@ -267,6 +294,7 @@ class Phase4ReviewPage(PhasePage):
         if self._state.document is None:
             self._counters.setText("No document loaded yet.")
             self._save_btn.setEnabled(False)
+            self._validation_banner.setVisible(False)
             return
         self._save_btn.setEnabled(True)
 
@@ -277,7 +305,7 @@ class Phase4ReviewPage(PhasePage):
             self._table.selectionModel().currentChanged.connect(self._on_selection_changed)
         else:
             self._model.beginResetModel()
-            self._model._doc = self._state.document  # noqa: SLF001 (intentional)
+            self._model._doc = self._state.document  # noqa: SLF001
             self._model.endResetModel()
 
         components = sorted({e.component_type for e in self._state.document.entries})
@@ -297,6 +325,47 @@ class Phase4ReviewPage(PhasePage):
         self._table.setColumnWidth(5, 320)
         self._update_counters()
 
+        # --- Auto-validate on entry ---
+        self._run_auto_validation()
+
+    def _run_auto_validation(self) -> None:
+        """Run validation and show a summary banner."""
+        if self._state.document is None:
+            self._validation_banner.setVisible(False)
+            return
+        report = validate_document(self._state.document)
+        if not report.issues:
+            self._validation_banner.setText(
+                "\u2713  No validation issues found.  You may proceed to export."
+            )
+            self._validation_banner.setStyleSheet(
+                "padding: 10px; border-radius: 6px; font-weight: 600; "
+                "background-color: #dcfce7; color: #166534; border: 1px solid #86efac;"
+            )
+            self._validation_banner.setVisible(True)
+        else:
+            self._validation_banner.setText(
+                f"\u26a0  {len(report.errors)} error(s), {len(report.warnings)} warning(s) detected.  "
+                f"Click 'Continue to Phase 5 (Validate & Fix)' to review and auto-fix them, "
+                f"or fix here by editing cells directly."
+            )
+            style = (
+                "padding: 10px; border-radius: 6px; font-weight: 600; "
+                "background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24;"
+            )
+            if report.has_errors:
+                style = (
+                    "padding: 10px; border-radius: 6px; font-weight: 600; "
+                    "background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;"
+                )
+            self._validation_banner.setStyleSheet(style)
+            self._validation_banner.setVisible(True)
+        self.status_message.emit(
+            f"Auto-validation: {len(report.errors)} error(s), {len(report.warnings)} warning(s)."
+        )
+
+    # ------------------------------------------------------------------ counters
+
     def _update_counters(self) -> None:
         if self._state.document is None:
             return
@@ -305,6 +374,8 @@ class Phase4ReviewPage(PhasePage):
             f"Total: {stats['total']:,}   Translated: {stats['translated']:,}   "
             f"Untranslated: {stats['untranslated']:,}   Components: {stats['components']}"
         )
+
+    # ------------------------------------------------------------------ selection
 
     def _on_selection_changed(self, current: QModelIndex, _previous: QModelIndex) -> None:
         if not current.isValid():
@@ -336,14 +407,54 @@ class Phase4ReviewPage(PhasePage):
         self._model.setData(idx, entry.label, Qt.ItemDataRole.EditRole)
         self._translation_field.setPlainText(entry.label)
 
+    # ------------------------------------------------------------------ load Excel
+
+    def _on_load_excel(self) -> None:
+        """Re-upload an externally edited Excel as the new latest document."""
+        if self.is_busy:
+            return
+        path = self.pick_open_file(
+            "Load reviewed / edited Excel",
+            "Excel files (*.xlsx);;All files (*)",
+        )
+        if not path:
+            return
+        self.set_busy(True)
+        self.status_message.emit(f"Loading {path.name} as the latest version ...")
+        worker = ImportExcelWorker(
+            path,
+            language=self._state.target_language_name,
+            language_code=self._state.target_language_code,
+            parent=self,
+        )
+        worker.finished_ok.connect(lambda doc: self._on_excel_loaded(doc, path))
+        worker.failed.connect(lambda msg: self._on_load_failed(msg))
+        worker.start()
+
+    def _on_excel_loaded(self, doc: Document, path: Path) -> None:
+        self._state.document = doc
+        self._state.reviewed_xlsx_path = path
+        self._state.output_dir = path.parent
+        self.set_busy(False)
+        self.on_enter()  # refresh table + run auto-validate
+        self.status_message.emit(
+            f"Loaded {len(doc.entries):,} rows from {path.name}.  "
+            f"This is now the latest version."
+        )
+        try:
+            from .. import settings as gui_settings
+            gui_settings.add_recent_file(path)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_load_failed(self, msg: str) -> None:
+        self.set_busy(False)
+        self.error(msg, "Load failed")
+
     # ------------------------------------------------------------------ jump-to-issue
 
     def focus_key(self, key: str) -> None:
-        """Find ``key`` in the table and select it.
-
-        Called by Phase 5 (validation report) to "jump to issue".  Clears
-        any active filters so the row is guaranteed visible.
-        """
+        """Find ``key`` in the table and select it (called by Phase 5/6)."""
         if self._state.document is None or self._model is None:
             return
         for index, entry in enumerate(self._state.document.entries):

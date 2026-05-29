@@ -48,7 +48,8 @@ from .pages.phase1_import import Phase1ImportPage
 from .pages.phase2_excel import Phase2ExcelPage
 from .pages.phase3_translate import Phase3TranslatePage
 from .pages.phase4_review import Phase4ReviewPage
-from .pages.phase5_export import Phase5ExportPage
+from .pages.phase5_validate import Phase5ValidatePage
+from .pages.phase6_export import Phase6ExportPage
 from .pages.welcome import WelcomePage
 from .state import AppState, PhaseStatus
 from .workers import ImportExcelWorker, ParseStfWorker
@@ -58,8 +59,9 @@ _PHASES = [
     ("1. Import STF", "Pick the source .stf file"),
     ("2. STF \u2192 Excel", "Convert to organised workbook"),
     ("3. Translate", "Auto-translate untranslated rows"),
-    ("4. Review", "Inspect and edit translations"),
-    ("5. Export STF", "Validate and write final STF files"),
+    ("4. Review", "Inspect, edit, re-upload Excel"),
+    ("5. Validate & Fix", "Auto-fix errors, re-validate"),
+    ("6. Export STF", "Write final STF files"),
 ]
 
 _STATUS_ICONS = {
@@ -121,11 +123,15 @@ class MainWindow(QMainWindow):
             welcome.request_open_path.connect(self._handle_dropped_file)
             welcome.request_open_project.connect(self._open_project)
 
-        # Phase 5 -> Phase 4 jump-to-issue wiring.
+        # Phase 5 (Validate & Fix) -> Phase 4 jump-to-issue wiring.
         phase5 = self._pages[5]
-        phase4 = self._pages[4]
-        if hasattr(phase5, "request_jump_to_row") and hasattr(phase4, "focus_key"):
+        if hasattr(phase5, "request_jump_to_row"):
             phase5.request_jump_to_row.connect(self._jump_to_row)
+
+        # Phase 6 (Export) might also have jump-to-row in the future.
+        phase6 = self._pages[6]
+        if hasattr(phase6, "request_jump_to_row"):
+            phase6.request_jump_to_row.connect(self._jump_to_row)
 
         # ---- restore window geometry / theme from settings
         self._apply_remembered_theme()
@@ -185,12 +191,13 @@ class MainWindow(QMainWindow):
     def _build_pages(self) -> QWidget:
         self._stack = QStackedWidget()
         self._pages: List[PhasePage] = [
-            WelcomePage(self._state, self),
-            Phase1ImportPage(self._state, self),
-            Phase2ExcelPage(self._state, self),
-            Phase3TranslatePage(self._state, self),
-            Phase4ReviewPage(self._state, self),
-            Phase5ExportPage(self._state, self),
+            WelcomePage(self._state, self),           # 0
+            Phase1ImportPage(self._state, self),      # 1
+            Phase2ExcelPage(self._state, self),       # 2
+            Phase3TranslatePage(self._state, self),   # 3
+            Phase4ReviewPage(self._state, self),      # 4
+            Phase5ValidatePage(self._state, self),    # 5
+            Phase6ExportPage(self._state, self),      # 6
         ]
         for page in self._pages:
             self._stack.addWidget(page)
@@ -233,7 +240,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about)
 
     def _wire_shortcuts(self) -> None:
-        # Ctrl+0..5 to switch phases.
+        # Ctrl+0..6 to switch phases.
         for index in range(len(_PHASES)):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{index}"), self)
             shortcut.activated.connect(lambda i=index: self._goto(i))
@@ -454,10 +461,10 @@ class MainWindow(QMainWindow):
                 f"<p>Version {__version__}</p>"
                 f"<p>Professional desktop app for the Salesforce Translation "
                 f"Workbench workflow: STF \u2192 Excel \u2192 Translate \u2192 "
-                f"Review \u2192 STF.</p>"
-                f"<p>v1.1 features: translation memory, glossary, component "
-                f"scope selection, persistent key list, multi-language batch, "
-                f"DeepL / Azure / OpenAI backends, dark theme, drag-and-drop, "
-                f"keyboard shortcuts, side-by-side review, jump-to-issue.</p>"
+                f"Review \u2192 Validate & Fix \u2192 STF.</p>"
+                f"<p>v1.2 features: auto-validation on review entry, dedicated "
+                f"Validate & Fix phase with auto-fix, re-upload Excel in Review, "
+                f"direct Excel \u2192 STF in Export, plus all v1.1 features "
+                f"(TM, glossary, scope, backends, dark theme, drag-drop, etc.).</p>"
             ),
         )

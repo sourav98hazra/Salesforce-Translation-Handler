@@ -94,7 +94,7 @@ class AppState:
     memory_path: Optional[Path] = None
 
     phase_status: List[PhaseStatus] = field(
-        default_factory=lambda: [PhaseStatus.IDLE for _ in range(6)]
+        default_factory=lambda: [PhaseStatus.IDLE for _ in range(7)]
     )
     project_path: Optional[Path] = None
 
