@@ -176,9 +176,9 @@ def build_stylesheet(palette: dict) -> str:
     QGroupBox {{
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
-        border-radius: 8px;
-        margin-top: 10px;
-        padding: 10px 10px 6px 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+        padding: 8px 8px 4px 8px;
         font-weight: 600;
         font-size: 12px;
     }}
@@ -458,23 +458,22 @@ def build_stylesheet(palette: dict) -> str:
     }}
 
     /* ---------- Splitters ----------
-       NOTE: Qt's QSS overrides setHandleWidth() when width/height is set
-       here, so this is the *single source of truth* for handle size.
-       Keep handles thick enough to grab reliably (6px) and visible
-       (border_strong, plus accent on hover).  No margins -- they create
-       dead zones at the edges of the handle area.
+       Qt's QSS overrides setHandleWidth() when width/height is set here,
+       so this is the *single source of truth* for handle size.  Keep
+       handles slim (4px) and quiet by default -- soft "border" colour --
+       and only highlight on hover so they don't read as heavy bars.
     */
     QSplitter::handle {{
-        background-color: {p["border_strong"]};
+        background-color: {p["border"]};
     }}
     QSplitter::handle:hover {{
         background-color: {p["accent"]};
     }}
     QSplitter::handle:horizontal {{
-        width: 6px;
+        width: 4px;
     }}
     QSplitter::handle:vertical {{
-        height: 6px;
+        height: 4px;
     }}
 
     /* ---------- Scrollbars ---------- */

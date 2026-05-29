@@ -52,17 +52,17 @@ class PhasePage(QWidget):
         self._busy = False
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 12, 16, 12)
-        outer.setSpacing(16)
+        outer.setContentsMargins(14, 10, 14, 10)
+        outer.setSpacing(10)
 
         heading = QVBoxLayout()
         heading.setSpacing(2)
         title_label = QLabel(title)
         title_label.setProperty("class", "phase-title")
-        title_label.setStyleSheet("font-size: 18px; font-weight: 700;")
+        title_label.setStyleSheet("font-size: 17px; font-weight: 700;")
         heading.addWidget(title_label)
         subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: #4a5568;")
+        subtitle_label.setStyleSheet("color: #4a5568; font-size: 12px;")
         subtitle_label.setWordWrap(True)
         heading.addWidget(subtitle_label)
 

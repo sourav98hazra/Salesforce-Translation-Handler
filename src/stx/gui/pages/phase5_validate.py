@@ -56,13 +56,7 @@ class Phase5ValidatePage(PhasePage):
         super().__init__(
             state,
             title="Phase 5 \u2014 Validate & Fix",
-            subtitle=(
-                "Only rows with validation issues are shown below.  Use "
-                "'Auto-fix all' to let the app repair what it can "
-                "(placeholder restoration, length trimming, deduplication), "
-                "then re-validate to confirm.  You can also inline-edit any "
-                "row or double-click to jump back to Phase 4 for full context."
-            ),
+            subtitle="Only rows with issues. Auto-fix all, edit inline, or double-click a row to jump to Phase 4.",
             parent=parent,
         )
         self._issues: List[ValidationIssue] = []
@@ -123,7 +117,7 @@ class Phase5ValidatePage(PhasePage):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
-        splitter.setHandleWidth(6)              # matches the global QSS height
+        splitter.setHandleWidth(4)              # matches the global QSS height
         splitter.setChildrenCollapsible(False)  # prevent accidental collapse
         splitter.setOpaqueResize(True)          # ensure live drag feedback
         # Handle styling comes from the global theme stylesheet -- do NOT set
@@ -165,7 +159,10 @@ class Phase5ValidatePage(PhasePage):
         src_widget = QWidget()
         src_col = QVBoxLayout(src_widget)
         src_col.setContentsMargins(0, 0, 0, 0)
-        src_col.addWidget(QLabel("Source label (read-only)"))
+        src_col.setSpacing(2)
+        src_label = QLabel("Source label (read-only)")
+        src_label.setStyleSheet("padding-left: 6px; padding-bottom: 2px; color: #475569; font-weight: 500;")
+        src_col.addWidget(src_label)
         self._src_field = QPlainTextEdit()
         self._src_field.setReadOnly(True)
         self._src_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -176,7 +173,10 @@ class Phase5ValidatePage(PhasePage):
         tgt_widget = QWidget()
         tgt_col = QVBoxLayout(tgt_widget)
         tgt_col.setContentsMargins(0, 0, 0, 0)
-        tgt_col.addWidget(QLabel("Translation (editable)"))
+        tgt_col.setSpacing(2)
+        tgt_label = QLabel("Translation (editable)")
+        tgt_label.setStyleSheet("padding-left: 6px; padding-bottom: 2px; color: #475569; font-weight: 500;")
+        tgt_col.addWidget(tgt_label)
         self._tgt_field = QPlainTextEdit()
         self._tgt_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._tgt_field.setMinimumHeight(60)

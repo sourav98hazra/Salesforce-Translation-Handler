@@ -51,13 +51,7 @@ class Phase6ExportPage(PhasePage):
         super().__init__(
             state,
             title="Phase 6 \u2014 Export STF",
-            subtitle=(
-                "Emit the three STF files Salesforce expects (full / "
-                "translated-only / untranslated-only).  If you have a "
-                "translated Excel from an external source, you can load "
-                "it directly here and convert -- the app trusts that you "
-                "have validated it yourself."
-            ),
+            subtitle="Emit the three STF files Salesforce expects, or load a translated Excel and convert directly.",
             parent=parent,
         )
         self._build()
