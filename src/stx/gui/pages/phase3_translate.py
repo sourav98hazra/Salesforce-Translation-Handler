@@ -842,7 +842,8 @@ class Phase3TranslatePage(PhasePage):
             return
         self._feed_dialog = QDialog(self)
         self._feed_dialog.setWindowTitle("Live Translation Feed")
-        self._feed_dialog.resize(800, 500)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._feed_dialog, 800, 500)
         self._feed_dialog.setWindowFlags(
             self._feed_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )

@@ -281,7 +281,8 @@ class Phase1ImportPage(PhasePage):
             return
         self._preview_dialog = QDialog(self)
         self._preview_dialog.setWindowTitle("Preview (first 100 rows)")
-        self._preview_dialog.resize(800, 500)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._preview_dialog, 800, 500)
         self._preview_dialog.setWindowFlags(
             self._preview_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )

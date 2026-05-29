@@ -302,7 +302,8 @@ class Phase6ExportPage(PhasePage):
             return
         self._results_dialog = QDialog(self)
         self._results_dialog.setWindowTitle("Export Results")
-        self._results_dialog.resize(700, 300)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._results_dialog, 700, 300)
         self._results_dialog.setWindowFlags(
             self._results_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )

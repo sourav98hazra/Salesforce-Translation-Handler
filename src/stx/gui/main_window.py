@@ -86,7 +86,14 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Salesforce Translation Manager")
-        self.resize(1400, 900)
+        # Reasonable minimum so users on small / windowed displays can
+        # actually shrink the window.  Was being held hostage by a fixed
+        # 260px sidebar plus large content minimums.
+        self.setMinimumSize(900, 600)
+        # Clamp the initial size to whatever fits on the user's screen
+        # (avoids the window starting wider than the display).
+        from .pages.base import clamp_to_screen
+        clamp_to_screen(self, 1400, 900)
         self.setAcceptDrops(True)
         self._state = AppState()
 
@@ -148,7 +155,10 @@ class MainWindow(QMainWindow):
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
-        sidebar.setFixedWidth(260)
+        # Resizable instead of fixed, so the user can shrink the window
+        # past the previous 260px floor.  Range keeps it readable.
+        sidebar.setMinimumWidth(220)
+        sidebar.setMaximumWidth(280)
         sidebar.setObjectName("sidebar")
         # Force the dark sidebar background regardless of QSS inheritance
         # issues on some platforms (Windows native style ignores parent bg).
@@ -296,8 +306,13 @@ class MainWindow(QMainWindow):
             self._footer_progress.setValue(translated_count)
 
     def _build_separator(self) -> QFrame:
+        # 1px soft vertical line.  The default QFrame.VLine renders as a
+        # bevelled native frame on Windows that looks bold/thick, so we
+        # paint it explicitly with the soft theme border colour.
         line = QFrame()
-        line.setFrameShape(QFrame.Shape.VLine)
+        line.setFrameShape(QFrame.Shape.NoFrame)
+        line.setFixedWidth(1)
+        line.setStyleSheet("background-color: rgba(148, 163, 184, 0.35);")
         return line
 
     def _build_pages(self) -> QWidget:

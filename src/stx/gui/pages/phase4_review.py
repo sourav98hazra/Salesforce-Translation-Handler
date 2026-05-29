@@ -640,7 +640,8 @@ class Phase4ReviewPage(PhasePage):
             return
         self._review_dialog = QDialog(self)
         self._review_dialog.setWindowTitle("Phase 4 \u2014 Browse & Review")
-        self._review_dialog.resize(1100, 700)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._review_dialog, 1100, 700)
         self._review_dialog.setWindowFlags(
             self._review_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )

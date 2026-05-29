@@ -604,7 +604,8 @@ class Phase5ValidatePage(PhasePage):
             return
         self._issues_dialog = QDialog(self)
         self._issues_dialog.setWindowTitle("Phase 5 \u2014 Validate & Fix")
-        self._issues_dialog.resize(1100, 700)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._issues_dialog, 1100, 700)
         self._issues_dialog.setWindowFlags(
             self._issues_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )

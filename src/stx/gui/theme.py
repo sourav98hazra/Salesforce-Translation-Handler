@@ -27,8 +27,8 @@ LIGHT_PALETTE = {
     "surface":           "#f8fafc",       # slate-50 -- cards / group boxes
     "surface_alt":       "#eef2f7",       # between bg and surface
     "surface_raised":    "#ffffff",       # inputs / tooltips only
-    "border":            "#94a3b8",       # slate-400 -- visible, not faint
-    "border_strong":     "#64748b",       # slate-500
+    "border":            "#e2e8f0",       # slate-200 -- soft, professional (used everywhere)
+    "border_strong":     "#94a3b8",       # slate-400 -- only for splitter handles, focus, scrollbars
     "text":              "#1e293b",       # slate-800
     "text_muted":        "#475569",       # slate-600
     "text_subtle":       "#64748b",       # slate-500
@@ -54,8 +54,8 @@ DARK_PALETTE = {
     "surface":           "#283449",       # raised surface for cards
     "surface_alt":       "#334155",       # slate-700
     "surface_raised":    "#3f4b5f",       # inputs / tooltips slightly raised
-    "border":            "#475569",       # slate-600 -- visible against the bg
-    "border_strong":     "#64748b",       # slate-500
+    "border":            "#334155",       # slate-700 -- subtle on dark bg
+    "border_strong":     "#64748b",       # slate-500 -- handles, focus, scrollbars
     "text":              "#f1f5f9",       # slate-100
     "text_muted":        "#cbd5e1",       # slate-300
     "text_subtle":       "#94a3b8",       # slate-400
@@ -83,8 +83,8 @@ OCEAN_PALETTE = {
     "surface":           "#f0f9ff",       # sky-50  -- cards / group boxes
     "surface_alt":       "#e0f2fe",       # between bg and surface
     "surface_raised":    "#ffffff",       # inputs / tooltips only
-    "border":            "#7dd3fc",       # sky-300 -- visible
-    "border_strong":     "#38bdf8",       # sky-400
+    "border":            "#bae6fd",       # sky-200 -- soft
+    "border_strong":     "#7dd3fc",       # sky-300 -- handles / focus
     "text":              "#0c4a6e",       # sky-900
     "text_muted":        "#075985",       # sky-800
     "text_subtle":       "#0369a1",       # sky-700
@@ -112,8 +112,8 @@ FOREST_PALETTE = {
     "surface":           "#ffffff",       # cards / group boxes
     "surface_alt":       "#dcfce7",       # green-100
     "surface_raised":    "#ffffff",       # inputs / tooltips
-    "border":            "#86efac",       # green-300
-    "border_strong":     "#4ade80",       # green-400
+    "border":            "#bbf7d0",       # green-200 -- soft
+    "border_strong":     "#86efac",       # green-300 -- handles / focus
     "text":              "#14532d",       # green-900
     "text_muted":        "#166534",       # green-800
     "text_subtle":       "#15803d",       # green-700
@@ -141,8 +141,8 @@ SUNSET_PALETTE = {
     "surface":           "#ffffff",       # cards / group boxes
     "surface_alt":       "#fef3c7",       # amber-100
     "surface_raised":    "#ffffff",       # inputs / tooltips
-    "border":            "#fcd34d",       # amber-300
-    "border_strong":     "#f59e0b",       # amber-500
+    "border":            "#fde68a",       # amber-200 -- soft
+    "border_strong":     "#fcd34d",       # amber-300 -- handles / focus
     "text":              "#78350f",       # amber-900
     "text_muted":        "#92400e",       # amber-800
     "text_subtle":       "#b45309",       # amber-700

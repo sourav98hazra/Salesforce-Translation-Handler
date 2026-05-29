@@ -69,7 +69,8 @@ class UserGuideDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("User Guide -- Salesforce Translation Manager")
-        self.resize(820, 640)
+        from .pages.base import clamp_to_screen
+        clamp_to_screen(self, 820, 640)
         self.setModal(True)
 
         layout = QVBoxLayout(self)
@@ -134,7 +135,8 @@ class AboutDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("About -- Salesforce Translation Manager")
         self.setMinimumSize(QSize(600, 500))
-        self.resize(640, 540)
+        from .pages.base import clamp_to_screen
+        clamp_to_screen(self, 640, 540)
         self.setModal(True)
 
         outer = QVBoxLayout(self)

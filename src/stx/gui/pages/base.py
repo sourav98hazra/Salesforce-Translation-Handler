@@ -212,8 +212,30 @@ class PhasePage(QWidget):
 
 
 # ---------------------------------------------------------------------------
-# Re-usable widgets
+# Re-usable widgets / sizing helpers
 # ---------------------------------------------------------------------------
+
+def clamp_to_screen(widget: QWidget, w: int, h: int, h_margin: int = 80, v_margin: int = 120) -> None:
+    """Resize *widget* to ``(w, h)``, but never larger than the screen.
+
+    Many of our pop-out dialogs and the main window were calling
+    ``resize(1400, 900)`` / ``resize(1100, 700)`` unconditionally, which
+    overflows the screen on smaller laptops (1366x768, 13" displays,
+    multi-monitor secondary screens, etc.).  This helper clamps the
+    request to the available screen geometry, leaving margins so the
+    title bar and OS taskbar stay visible.
+    """
+    from PySide6.QtGui import QGuiApplication
+
+    screen = widget.screen() if hasattr(widget, "screen") else None
+    if screen is None:
+        screen = QGuiApplication.primaryScreen()
+    if screen is not None:
+        avail = screen.availableGeometry()
+        w = min(w, max(640, avail.width() - h_margin))
+        h = min(h, max(480, avail.height() - v_margin))
+    widget.resize(w, h)
+
 
 def make_action_row(*buttons: QPushButton) -> QHBoxLayout:
     """Lay out a row of action buttons, left-aligned with spacer pushing right."""

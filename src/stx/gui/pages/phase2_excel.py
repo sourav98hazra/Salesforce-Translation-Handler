@@ -236,7 +236,8 @@ class Phase2ExcelPage(PhasePage):
             return
         self._details_dialog = QDialog(self)
         self._details_dialog.setWindowTitle("Content Details")
-        self._details_dialog.resize(800, 500)
+        from .base import clamp_to_screen
+        clamp_to_screen(self._details_dialog, 800, 500)
         self._details_dialog.setWindowFlags(
             self._details_dialog.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
         )
