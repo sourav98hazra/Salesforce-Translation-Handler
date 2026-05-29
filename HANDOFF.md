@@ -14,6 +14,106 @@
 
 ---
 
+## What this repository is (read this first)
+
+**Salesforce Translation Manager** is a professional cross-platform
+desktop application (with a CLI and an importable Python library) that
+unifies the Salesforce Translation Workbench (STF) round-trip workflow:
+
+```
+Salesforce STF  ->  Organised Excel  ->  Auto-Translate  ->
+Browse & Review  ->  Validate & Fix  ->  STF
+```
+
+It replaces a previous patchwork of PowerShell + Python scripts with a
+single Python codebase under `src/stx/`, exposed three ways:
+
+| Surface | Audience |
+|---|---|
+| Desktop GUI (`stx-app`)  -- PySide6 | Translators / reviewers |
+| CLI (`stx`)              -- Typer    | Developers / CI scripts |
+| Library (`import stx`)               | Other Python tools that embed the pipeline |
+
+### What the application does (in one paragraph)
+
+A user opens an `.stf` file exported from Salesforce Translation
+Workbench.  The app parses it, groups the rows by component type into
+an organised Excel workbook, machine-translates the untranslated rows
+(while sentinel-protecting Salesforce IDs, `{!Placeholders}`, MessageFormat
+tokens, URLs, emails, ALL-CAPS acronyms, escape sequences, and HTML
+markup so the translator never mangles them), lets the user browse +
+edit translations side-by-side, runs a validation pass with
+deterministic auto-fixes (length trimming, placeholder restoration,
+deduplication, HTML tag-mismatch repair), and finally exports the
+three STF files Salesforce expects (full / translated-only /
+untranslated-only), byte-compatible with the legacy scripts the app
+replaces.
+
+### Why it exists
+
+- The previous flow needed two scripting languages (PowerShell +
+  Python), manual file shuffling between phases, no validation before
+  Salesforce import, and no protection against translators corrupting
+  Salesforce IDs / placeholders / HTML.
+- This unified app gives translators a guided wizard, gives developers
+  scriptable CLI commands, and gives integrators a Python library --
+  all reading and writing the same on-disk artifacts so any phase can
+  be re-entered from a saved file.
+
+### Notable features (what makes it more than a glorified CLI)
+
+- **6-phase pipeline.**  Each phase is independent (you can drop in at
+  any phase with your own input file) *or* part of the end-to-end flow.
+- **4 translator backends.**  Google free (default, no key), DeepL,
+  Microsoft Azure Translator, OpenAI -- selectable in
+  `Edit -> Settings -> Translation`.
+- **Translation Memory** (SQLite, with WAL) -- caches every translation
+  across runs.  Re-runs of the same file finish in seconds.
+- **Glossary CSV** with do-not-translate flags + forced translations.
+- **Component scope filter** persisted to a `.stxscope.json` sidecar
+  (allow / deny lists with glob patterns).
+- **Adaptive rate limiting** (token bucket that self-tunes to whatever
+  the backend tolerates today).
+- **Multi-language batch** -- translate to ja/fr/de/es in one run.
+- **Wake-lock** (`caffeinate` / `SetThreadExecutionState` /
+  `systemd-inhibit`) prevents idle sleep during long runs; lid-close
+  still suspends -- documented honestly.
+- **5 themes** (light, dark, ocean, forest, sunset) plus auto.
+- **Drag-and-drop** anywhere in the window auto-routes by extension.
+- **65 tests** covering STF parse / write round-trip, every category of
+  token protection, validation rules, formula-injection safety, scope
+  filtering, translation memory, glossary, and runner integration.
+
+### Use-cases the user cares about
+
+- **Fresh STF -> STF round trip.**  Walk all six phases.
+- **Validate someone else's translated workbook before Salesforce
+  import.**  Open Phase 5 directly with a Load-Excel button.
+- **Convert an externally-translated workbook straight to STF.**  Open
+  Phase 6 directly with a Load-Excel button -- no earlier phases.
+- **Batch translate one STF into multiple languages.**  CLI:
+  `stx run input.stf ./out --target ja --targets fr,de,es`.
+
+### One-paragraph blurb for other agents / non-technical sharing
+
+Copy-paste this when you're explaining the project to a fresh agent
+or a colleague:
+
+> Salesforce Translation Manager is a Python desktop + CLI + library
+> that takes a Salesforce STF translation export, runs it through a
+> 6-phase pipeline (parse / Excel / auto-translate with TM + glossary
+> / browse / validate + auto-fix / export), and emits byte-compatible
+> STF files ready for Salesforce import -- sentinel-protecting
+> Salesforce IDs, placeholders, URLs, and HTML so the translator
+> never mangles them.  Cross-platform PySide6 GUI with five themes
+> and a Typer CLI; supports Google (free), DeepL, Azure, and OpenAI
+> backends; ships persistent translation memory, a glossary mechanism,
+> per-component scope filtering, multi-language batch runs, and a
+> deterministic auto-fixer for the most common Salesforce import
+> errors.
+
+---
+
 ## How to fill in the handoff
 
 Before starting a new session, run these locally and paste the output into
@@ -83,6 +183,14 @@ These are stable across sessions and worth carrying into the new one:
 
 ```text
 Continue work on Salesforce Translation Manager.
+
+Project context (one-line version):
+Python desktop + CLI + library that runs Salesforce STF translation
+files through a 6-phase pipeline (parse / Excel / auto-translate with
+TM + glossary / browse / validate + auto-fix / export).  Sentinel-
+protects Salesforce IDs, placeholders, URLs, and HTML so the
+translator never mangles them.  Built on PySide6 + Typer.  See the
+"What this repository is" section of HANDOFF.md for full context.
 
 Repository: sourav98hazra/Salesforce-Translation-Handler
 Active branch: <branch-name>           # e.g. feat/v1.1-improvements
