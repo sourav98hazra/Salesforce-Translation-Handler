@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Generate platform icon files from SVG, update build_exe.py to use .ico, create Windows shortcut script, and update .desktop file for Linux icon integration",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Create scripts/generate_icons.py that uses cairosvg and Pillow to convert src/stx/gui/assets/logo.svg into: (a) src/stx/gui/assets/logo.ico (multi-resolution: 16, 32, 48, 64, 128, 256px), (b) src/stx/gui/assets/logo.png (256x256 for Linux .desktop use). The script should be runnable standalone and should handle missing dependencies gracefully with a clear error message.",
     "Step 2: Run generate_icons.py to produce the .ico and .png files, then commit them so they are always available without needing cairosvg at build time.",
@@ -28,5 +28,5 @@
     "pytest tests/ -q passes all tests"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 65 tests pass. Used python3 (not python) since pyenv does not have a bare python alias configured. cairosvg and Pillow installed successfully. The .ico contains all 6 resolutions (16-256px). The user wants a double-clickable desktop launcher experience similar to GitHub Desktop - this feature provides that via create_shortcut.py (Windows .lnk) and the .desktop file (Linux)."
 }
