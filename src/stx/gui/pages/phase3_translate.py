@@ -250,7 +250,11 @@ class Phase3TranslatePage(PhasePage):
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.clicked.connect(self._on_cancel)
-        self._load_btn = QPushButton("Load translated .xlsx ...")
+        self._load_btn = QPushButton("Load .xlsx ...")
+        self._load_btn.setToolTip(
+            "Load any Excel (organised or translated) directly into this phase.\n"
+            "Use this when you want to work independently without going through earlier phases."
+        )
         self._load_btn.clicked.connect(self._on_load_existing)
         self._next_btn = QPushButton("Continue to Phase 4 \u2192")
         self._next_btn.setEnabled(False)
@@ -301,7 +305,12 @@ class Phase3TranslatePage(PhasePage):
 
     def _on_filter_components(self) -> None:
         if self._state.document is None:
-            self.warn("Load a document first (Phase 1).")
+            self.warn(
+                "No document loaded yet.\n\n"
+                "Either:\n"
+                "  - Complete Phase 1 (Import STF) first, or\n"
+                "  - Click 'Load .xlsx ...' below to load an Excel directly into this phase."
+            )
             return
         dlg = _ComponentFilterDialog(
             self._state.document,
@@ -359,7 +368,11 @@ class Phase3TranslatePage(PhasePage):
             return
 
         if self._state.document is None:
-            self.warn("Load a document first (Phase 1 or load an organised .xlsx).")
+            self.warn(
+                "No document loaded yet.\n\n"
+                "Click 'Load .xlsx ...' to load an Excel directly into this phase,\n"
+                "or complete Phase 1 (Import STF) first."
+            )
             return
 
         scope = self._build_scope()
@@ -578,13 +591,22 @@ class Phase3TranslatePage(PhasePage):
             self.status_message.emit("Already cancelling -- please wait.")
 
     def _on_load_existing(self) -> None:
+        """Load any Excel into this phase -- makes Phase 3 fully independent.
+
+        The loaded document becomes the active document for translation.
+        Component filter and estimate update automatically after loading.
+        """
         if self.is_busy:
             return
         from ..workers import ImportExcelWorker
 
-        path = self.pick_open_file("Select translated workbook", "Excel files (*.xlsx)")
+        path = self.pick_open_file(
+            "Load Excel for translation (organised or translated)",
+            "Excel files (*.xlsx);;All files (*)",
+        )
         if not path:
             return
+        self.status_message.emit(f"Loading {path.name} ...")
         worker = ImportExcelWorker(
             path,
             language=self._state.target_language_name,
@@ -594,13 +616,20 @@ class Phase3TranslatePage(PhasePage):
 
         def _loaded(doc):
             self._state.document = doc
-            self._state.translated_xlsx_path = path
+            self._state.organized_xlsx_path = path
             self._state.output_dir = path.parent
             gui_settings.add_recent_file(path)
-            self._path_field.setText(str(path))
+            # Reset component selection so Filter Components picks up the new doc.
+            self._selected_components = {e.component_type for e in doc.entries}
+            # Suggest output path based on loaded file.
+            if not self._path_field.text() or "translated" not in self._path_field.text().lower():
+                self._path_field.setText(str(Path(path).with_suffix("")) + "_translated.xlsx")
             self._next_btn.setEnabled(True)
             self.on_enter()
-            self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
+            self.status_message.emit(
+                f"Loaded {len(doc.entries):,} rows from {path.name}.  "
+                f"Click 'Filter Components...' to select which to translate, then Start."
+            )
 
         worker.finished_ok.connect(_loaded)
         worker.failed.connect(lambda msg: self.error(msg, "Load failed"))
