@@ -82,6 +82,7 @@ class MainWindow(QMainWindow):
 
         # ---- central layout
         central = QWidget(self)
+        central.setAutoFillBackground(True)
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -137,6 +138,12 @@ class MainWindow(QMainWindow):
         sidebar = QWidget()
         sidebar.setFixedWidth(260)
         sidebar.setObjectName("sidebar")
+        # Force the dark sidebar background regardless of QSS inheritance
+        # issues on some platforms (Windows native style ignores parent bg).
+        sidebar.setAutoFillBackground(True)
+        sidebar.setStyleSheet(
+            "#sidebar { background-color: #1e293b; }"
+        )
         v = QVBoxLayout(sidebar)
         v.setContentsMargins(16, 24, 16, 16)
         v.setSpacing(12)

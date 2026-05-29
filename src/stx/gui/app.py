@@ -39,7 +39,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     app.setApplicationName("Salesforce Translation Handler")
     app.setOrganizationName("Salesforce Translation Handler")
 
-    # Apply theme before showing the main window so the splash flash is minimal.
+    # Force the Fusion style engine -- it fully honours QSS on every platform
+    # (Windows / macOS / Linux).  Without this, the native Windows style
+    # ignores most background-color rules and renders everything white.
+    app.setStyle("Fusion")
+
+    # Apply our custom theme (colors, borders, typography) on top of Fusion.
     theme.apply_theme(gui_settings.get_theme())
 
     window = MainWindow()
