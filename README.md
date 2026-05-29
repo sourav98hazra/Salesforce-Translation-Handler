@@ -160,40 +160,6 @@ This produces:
 
 The artifact is fully self-contained (~65MB on Linux): it bundles Python, all dependencies, and the application. End users just **double-click and go** — no installation, no Python, no terminal. PyInstaller does not cross-compile, so build on the OS you intend to ship to.
 
-### Desktop shortcut / launcher
-
-After building the standalone executable (or if you prefer to use `launch.bat`), you can create a proper desktop shortcut so the app launches with a double-click, just like any installed application.
-
-#### Windows
-
-```bash
-python scripts/create_shortcut.py
-```
-
-This places a shortcut on your Desktop that points to `dist/SalesforceTranslationHandler.exe` (if built) or `launch.bat` as a fallback, with the project icon. You can also force the target:
-
-```bash
-python scripts/create_shortcut.py --target exe   # always use the .exe
-python scripts/create_shortcut.py --target bat   # always use launch.bat
-```
-
-#### Linux
-
-1. Copy the desktop entry to your applications folder:
-
-   ```bash
-   cp SalesforceTranslationHandler.desktop ~/.local/share/applications/
-   ```
-
-2. Edit `~/.local/share/applications/SalesforceTranslationHandler.desktop` and update `Exec=` and `Icon=` to absolute paths:
-
-   ```ini
-   Exec=bash -c 'cd "/path/to/Salesforce-Translation-Handler" && exec ./launch.sh'
-   Icon=/path/to/Salesforce-Translation-Handler/src/stx/gui/assets/logo.png
-   ```
-
-3. The app will now appear in your application launcher with its icon.
-
 ### Option 3: Terminal command
 
 ```bash
