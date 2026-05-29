@@ -457,15 +457,24 @@ def build_stylesheet(palette: dict) -> str:
         border-radius: 3px;
     }}
 
-    /* ---------- Splitters ---------- */
+    /* ---------- Splitters ----------
+       NOTE: Qt's QSS overrides setHandleWidth() when width/height is set
+       here, so this is the *single source of truth* for handle size.
+       Keep handles thick enough to grab reliably (6px) and visible
+       (border_strong, plus accent on hover).  No margins -- they create
+       dead zones at the edges of the handle area.
+    */
     QSplitter::handle {{
-        background-color: {p["border"]};
+        background-color: {p["border_strong"]};
+    }}
+    QSplitter::handle:hover {{
+        background-color: {p["accent"]};
     }}
     QSplitter::handle:horizontal {{
-        width: 1px;
+        width: 6px;
     }}
     QSplitter::handle:vertical {{
-        height: 1px;
+        height: 6px;
     }}
 
     /* ---------- Scrollbars ---------- */

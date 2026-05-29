@@ -123,12 +123,12 @@ class Phase5ValidatePage(PhasePage):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
-        splitter.setHandleWidth(8)              # make handle thick enough to grab
+        splitter.setHandleWidth(6)              # matches the global QSS height
         splitter.setChildrenCollapsible(False)  # prevent accidental collapse
-        splitter.setStyleSheet(
-            "QSplitter::handle:vertical { background: #94a3b8; height: 4px; margin: 2px 0; border-radius: 2px; }"
-            "QSplitter::handle:vertical:hover { background: #4338ca; }"
-        )
+        splitter.setOpaqueResize(True)          # ensure live drag feedback
+        # Handle styling comes from the global theme stylesheet -- do NOT set
+        # a per-splitter ::handle:vertical rule here.  See phase4_review.py
+        # for why (Qt QSS sub-control cascading is unreliable).
 
         # Issues table
         self._table = QTableWidget(0, 6)
@@ -185,7 +185,10 @@ class Phase5ValidatePage(PhasePage):
 
         fields_row.setSizes([400, 400])  # equal halves horizontally
 
-        editor_layout.addWidget(fields_row)
+        # stretch=1 so that any extra vertical space in the editor pane
+        # (when the user drags the outer vertical splitter) flows directly
+        # into the source/translation text areas instead of into padding.
+        editor_layout.addWidget(fields_row, stretch=1)
 
         edit_actions = QHBoxLayout()
         self._apply_btn = primary(QPushButton("Apply edit"))

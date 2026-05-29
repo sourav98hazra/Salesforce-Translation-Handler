@@ -265,12 +265,13 @@ class Phase4ReviewPage(PhasePage):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
-        splitter.setHandleWidth(8)              # make handle thick enough to grab
+        splitter.setHandleWidth(6)              # matches the global QSS height
         splitter.setChildrenCollapsible(False)  # prevent accidental collapse
-        splitter.setStyleSheet(
-            "QSplitter::handle:vertical { background: #94a3b8; height: 4px; margin: 2px 0; border-radius: 2px; }"
-            "QSplitter::handle:vertical:hover { background: #4338ca; }"
-        )
+        splitter.setOpaqueResize(True)          # ensure live drag feedback
+        # Handle styling comes from the global theme stylesheet -- do NOT set
+        # a per-splitter ::handle:vertical rule here.  Per-widget QSS for QSS
+        # sub-controls is unreliable when a global rule with the same selector
+        # is already in scope, and that's what was making the handle un-draggable.
 
         self._table = QTableView()
         self._table.setModel(self._proxy)
@@ -283,9 +284,10 @@ class Phase4ReviewPage(PhasePage):
         )
         splitter.addWidget(self._table)
 
-        # Slim editor pane (smaller than v1.2's giant box)
-        editor = QFrame()
-        editor.setProperty("role", "card")
+        # Slim editor pane (no "card" role -- a card-styled QFrame inside an
+        # already-bordered QGroupBox creates a visible double border (the
+        # "dark hue" reported by the user).  Plain QWidget = no extra frame.
+        editor = QWidget()
         self._editor_layout = QVBoxLayout(editor)
         self._editor_layout.setContentsMargins(12, 10, 12, 10)
         self._editor_layout.setSpacing(6)
@@ -337,7 +339,10 @@ class Phase4ReviewPage(PhasePage):
         side_by_side.addWidget(tgt_widget)
 
         side_by_side.setSizes([400, 400])  # equal halves horizontally
-        self._editor_layout.addWidget(side_by_side)
+        # stretch=1 so that any extra vertical space in the editor pane
+        # (when the user drags the outer vertical splitter) flows directly
+        # into the source/translation text areas instead of into padding.
+        self._editor_layout.addWidget(side_by_side, stretch=1)
 
         splitter.addWidget(editor)
         self._editor_widget = editor
