@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from ..state import AppState
 from ..workers import ExportExcelWorker, ImportExcelWorker
-from .base import PhasePage, make_action_row
+from .base import PhasePage, make_action_row, primary
 
 
 class Phase2ExcelPage(PhasePage):
@@ -66,18 +66,31 @@ class Phase2ExcelPage(PhasePage):
         self.add_widget(details_box, stretch=1)
 
         # Actions
-        self._convert_btn = QPushButton("Convert and save .xlsx")
+        self._convert_btn = primary(QPushButton("Convert and save .xlsx"))
         self._convert_btn.clicked.connect(self._on_convert)
-        self._convert_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
+        self._convert_btn.setToolTip(
+            "Save the organised workbook to the path above (the default).\n"
+            "This is the path used by later phases."
+        )
+
+        self._save_copy_btn = QPushButton("Save copy to...")
+        self._save_copy_btn.clicked.connect(self._on_save_copy)
+        self._save_copy_btn.setEnabled(False)
+        self._save_copy_btn.setToolTip(
+            "Write an additional copy of the organised workbook to a "
+            "different location (handy for backups or sharing)."
+        )
 
         self._load_btn = QPushButton("Load existing organised .xlsx ...")
         self._load_btn.clicked.connect(self._on_load_existing)
 
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
+        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
 
-        self.add_layout(make_action_row(self._convert_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(
+            self._convert_btn, self._save_copy_btn, self._load_btn, self._next_btn
+        ))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -137,13 +150,41 @@ class Phase2ExcelPage(PhasePage):
 
             gui_settings.add_recent_file(result.path)
             gui_settings.remember_output_dir(result.path.parent)
-            self._state.set_phase(2, PhaseStatus.DONE)
+            self._state.set_phase(1, PhaseStatus.DONE)
         except Exception:  # noqa: BLE001
             pass
         self.status_message.emit(
             f"Wrote {len(result.sheets_written)} sheets to {result.path}"
         )
         self._next_btn.setEnabled(True)
+        self._save_copy_btn.setEnabled(True)
+
+    def _on_save_copy(self) -> None:
+        """Write an additional copy of the organised workbook elsewhere.
+
+        Useful for keeping a backup or sharing without disturbing the
+        ``organized_xlsx_path`` that subsequent phases rely on.
+        """
+        if self._state.document is None:
+            self.warn("Convert the document first before saving a copy.")
+            return
+        suggested_name = "organized_copy.xlsx"
+        if self._state.organized_xlsx_path is not None:
+            suggested_name = self._state.organized_xlsx_path.name
+        path = self.pick_save_file(
+            "Save additional copy as", "Excel files (*.xlsx)", suggested_name
+        )
+        if not path:
+            return
+        if path.suffix.lower() != ".xlsx":
+            path = path.with_suffix(".xlsx")
+        self.status_message.emit(f"Saving copy to {path} ...")
+        worker = ExportExcelWorker(self._state.document, path, self)
+        worker.finished_ok.connect(
+            lambda _result: self.status_message.emit(f"Copy saved: {path}")
+        )
+        worker.failed.connect(lambda msg: self.error(msg, "Save copy failed"))
+        worker.start()
 
     def _populate_details(self, result) -> None:
         # Re-derive Content Details from the in-memory document so we don't

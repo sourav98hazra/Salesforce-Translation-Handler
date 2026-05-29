@@ -622,3 +622,44 @@ Export already worked from earlier-phase output.  v1.2 adds a **Load translated 
 | `Ctrl+O` | Open file |
 | `Ctrl+S` | Save current phase artifact |
 | `Ctrl+Q` | Quit |
+
+
+
+---
+
+# v1.3 -- UI simplification + every phase is independent
+
+This release is about **less, not more**.
+
+## What changed
+
+* **Welcome page is gone.**  The app now opens directly on Phase 1.  Recent files live under `File -> Recent files` only.
+* **`.stxproject` files are gone.**  The translation memory + `Recent files` menu cover the same "resume where I left off" need without an extra concept.
+* **Six phases instead of seven.**  Numbered 1-6 in the sidebar:
+  1. Import STF
+  2. STF -> Excel
+  3. Translate
+  4. Review
+  5. Validate & Fix
+  6. Export STF
+* **Every phase works independently.**  Each one has both:
+  * A **"Continue to Phase N+1 ->"** button at the bottom for the end-to-end flow.
+  * A **"Load ..."** button so a user can jump straight to that phase with their own file (e.g. open Phase 6 directly with a translated Excel and just convert to STF).
+* **Phase 3 (Translate) is dramatically slimmer.**  It now asks only what a translator actually needs to answer: target language, which components, where to save, start.  Backend / API key / workers / rate limit / wake-lock / glossary path / TM path / batch targets all moved into the **Settings dialog** (`Edit -> Settings...` or `Ctrl+,`).
+* **Phase 4 (Review) is a translation browser.**  Compact toolbar at the top (status pill + counters + Load Excel), filter row, big table, slim inline editor.  Auto-validates on entry.
+* **Phase 5 (Validate & Fix) trimmed to 4 action buttons** (Load Excel / Re-validate / Auto-fix all / Save).  Per-row auto-fix is in the inline editor where it belongs.
+* **Phase 2 (STF -> Excel) gained a "Save copy to..."** secondary button so you can write an additional copy elsewhere without disturbing the path the rest of the pipeline uses.
+* **New theme.**  Soft cool-grey background with a polished indigo accent -- no more stark white.  Light / dark / auto via `View -> ... theme`, persisted across sessions.
+* **`Help -> User guide` (F1)** opens [`USER_GUIDE.md`](./USER_GUIDE.md) with the full walkthrough.
+
+## End-to-end vs independent flow
+
+You can use the app two ways and they're equally first-class:
+
+| Path | When to use it | How |
+|---|---|---|
+| End-to-end | Fresh STF, want to walk through everything | Click **Continue to Phase N ->** at the bottom of each phase |
+| Independent per phase | Already have a workbook from a colleague / external source / earlier run | Click the phase in the sidebar, then **Load ...** |
+
+The `USER_GUIDE.md` documents every common workflow.
+

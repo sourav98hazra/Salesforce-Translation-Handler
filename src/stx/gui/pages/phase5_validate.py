@@ -74,20 +74,28 @@ class Phase5ValidatePage(PhasePage):
         )
         self.add_widget(self._banner)
 
-        # ---------- Action buttons row
+        # ---------- Action buttons row (kept compact: 4 buttons max)
+        self._load_btn = QPushButton("Load Excel...")
+        self._load_btn.setToolTip(
+            "Load any organised / translated / reviewed Excel directly into "
+            "this phase.  Validation runs automatically after the load."
+        )
+        self._load_btn.clicked.connect(self._on_load_excel)
         self._validate_btn = QPushButton("Re-validate")
         self._validate_btn.clicked.connect(self._on_validate)
         self._fix_all_btn = primary(QPushButton("Auto-fix all"))
+        self._fix_all_btn.setToolTip(
+            "Apply every safe fixer to every issue.  Use 'Auto-fix this row' "
+            "in the editor below for finer control."
+        )
         self._fix_all_btn.clicked.connect(self._on_fix_all)
-        self._fix_selected_btn = QPushButton("Auto-fix selected")
-        self._fix_selected_btn.clicked.connect(self._on_fix_selected)
-        self._save_btn = QPushButton("Save fixed workbook (.xlsx)")
+        self._save_btn = QPushButton("Save (.xlsx)")
         self._save_btn.clicked.connect(self._on_save)
 
         actions = make_action_row(
+            self._load_btn,
             self._validate_btn,
             self._fix_all_btn,
-            self._fix_selected_btn,
             self._save_btn,
         )
         self.add_layout(actions)
@@ -160,7 +168,7 @@ class Phase5ValidatePage(PhasePage):
 
         # ---------- Bottom: next phase
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(6))
+        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(5))
         self.add_layout(make_action_row(self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
@@ -184,6 +192,52 @@ class Phase5ValidatePage(PhasePage):
         self._on_validate()
 
     # ------------------------------------------------------------------ validate
+
+    def _on_load_excel(self) -> None:
+        """Load any Excel for validation -- makes Phase 5 self-contained.
+
+        The user can land here from the sidebar without going through
+        earlier phases (e.g. they just want to validate a hand-edited
+        workbook from a colleague).  Validation runs automatically after
+        the load.
+        """
+        if self.is_busy:
+            return
+        path = self.pick_open_file(
+            "Load Excel for validation",
+            "Excel files (*.xlsx);;All files (*)",
+        )
+        if not path:
+            return
+        from ..workers import ImportExcelWorker
+
+        self.set_busy(True)
+        self.status_message.emit(f"Loading {path.name} for validation ...")
+        worker = ImportExcelWorker(
+            path,
+            language=self._state.target_language_name,
+            language_code=self._state.target_language_code,
+            parent=self,
+        )
+
+        def _loaded(doc):
+            self._state.document = doc
+            self._state.reviewed_xlsx_path = path
+            self._state.output_dir = path.parent
+            self.set_busy(False)
+            self.on_enter()
+            self.status_message.emit(
+                f"Loaded {len(doc.entries):,} rows from {path.name}; running validation."
+            )
+            try:
+                from .. import settings as gui_settings
+                gui_settings.add_recent_file(path)
+            except Exception:  # noqa: BLE001
+                pass
+
+        worker.finished_ok.connect(_loaded)
+        worker.failed.connect(lambda msg: (self.set_busy(False), self.error(msg, "Load failed")))
+        worker.start()
 
     def _on_validate(self) -> None:
         if self._state.document is None:
@@ -453,7 +507,7 @@ class Phase5ValidatePage(PhasePage):
     def _on_saved(self, path: Path) -> None:
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
-        self._state.set_phase(5, PhaseStatus.DONE)
+        self._state.set_phase(4, PhaseStatus.DONE)
         self.set_busy(False)
         self.status_message.emit(f"Fixed workbook saved: {path}")
         try:
@@ -464,5 +518,5 @@ class Phase5ValidatePage(PhasePage):
 
     def _on_save_failed(self, message: str) -> None:
         self.set_busy(False)
-        self._state.set_phase(5, PhaseStatus.ERROR)
+        self._state.set_phase(4, PhaseStatus.ERROR)
         self.error(message, "Save failed")

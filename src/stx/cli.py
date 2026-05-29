@@ -11,7 +11,6 @@ performs the full pipeline.  v1.1 adds:
 * ``--workers`` and ``--rate-limit`` for performance tuning.
 * ``--targets`` for multi-language batch runs.
 * ``stx scope`` subcommand to inspect / build scope files.
-* ``stx project`` subcommand to inspect ``.stxproject`` files.
 
 Examples
 --------
@@ -68,7 +67,6 @@ from .excel import (
 from .glossary import Glossary
 from .languages import code_for_language, language_for_code, to_google_code
 from .memory import TranslationMemory
-from .project import StxProject
 from .scope import Scope, StatusFilter
 from .stf import parse_stf, write_stf_files
 from .translate import (
@@ -91,13 +89,7 @@ scope_app = typer.Typer(
     help="Inspect / build translation scope files (.stxscope.json).",
     no_args_is_help=True,
 )
-project_app = typer.Typer(
-    name="project",
-    help="Inspect / save .stxproject files.",
-    no_args_is_help=True,
-)
 app.add_typer(scope_app)
-app.add_typer(project_app)
 
 console = Console()
 
@@ -531,28 +523,6 @@ def scope_new(
         f"[green]OK[/green] Scope saved to [bold]{output}[/bold] "
         f"(matches {estimate:,} of {len(doc.entries):,} rows)"
     )
-
-
-# ---------------------------------------------------------------------------
-# Project subcommands
-# ---------------------------------------------------------------------------
-
-@project_app.command("show")
-def project_show(
-    path: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
-) -> None:
-    """Pretty-print a .stxproject file."""
-    project = StxProject.load(path)
-    data = project.to_dict()
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Field")
-    table.add_column("Value")
-    for key in sorted(data):
-        value = data[key]
-        if isinstance(value, list):
-            value = ", ".join(str(v) for v in value) if value else "(none)"
-        table.add_row(key, str(value) if value is not None else "(unset)")
-    console.print(table)
 
 
 # ---------------------------------------------------------------------------

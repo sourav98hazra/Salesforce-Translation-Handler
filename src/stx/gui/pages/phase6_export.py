@@ -248,7 +248,7 @@ class Phase6ExportPage(PhasePage):
         lang_code = self._code_field.text().strip() or code_for_language(lang_name) or "xx"
 
         self.set_busy(True)
-        self._state.set_phase(6, PhaseStatus.RUNNING)
+        self._state.set_phase(5, PhaseStatus.RUNNING)
         self.status_message.emit(f"Writing STF files to {out_dir} ...")
         worker = WriteStfWorker(self._state.document, out_dir, lang_name, lang_code, self)
         worker.finished_ok.connect(self._on_exported)
@@ -263,7 +263,7 @@ class Phase6ExportPage(PhasePage):
             self._result_table.setItem(r, 1, QTableWidgetItem(f"{path.stat().st_size:,} B"))
         self._result_table.resizeColumnsToContents()
         self._state.output_dir = res.full.parent
-        self._state.set_phase(6, PhaseStatus.DONE)
+        self._state.set_phase(5, PhaseStatus.DONE)
         self.set_busy(False)
         self.status_message.emit(f"STF files written to {res.full.parent}")
         self.info(
@@ -282,5 +282,5 @@ class Phase6ExportPage(PhasePage):
 
     def _on_export_failed(self, message: str) -> None:
         self.set_busy(False)
-        self._state.set_phase(6, PhaseStatus.ERROR)
+        self._state.set_phase(5, PhaseStatus.ERROR)
         self.error(message, "Export failed")

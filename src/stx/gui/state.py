@@ -62,7 +62,7 @@ class AppState:
     phase_status:
         Per-phase status flags driving the sidebar badges.
     project_path:
-        On-disk path of the active ``.stxproject`` file (if any).
+        On-disk path of the active project file (reserved for future use).
     """
 
     document: Optional[Document] = None
@@ -94,9 +94,8 @@ class AppState:
     memory_path: Optional[Path] = None
 
     phase_status: List[PhaseStatus] = field(
-        default_factory=lambda: [PhaseStatus.IDLE for _ in range(7)]
+        default_factory=lambda: [PhaseStatus.IDLE for _ in range(6)]
     )
-    project_path: Optional[Path] = None
 
     def reset_translation_audit(self) -> None:
         self.translation_summaries = []

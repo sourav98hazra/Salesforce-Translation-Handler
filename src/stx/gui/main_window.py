@@ -50,12 +50,10 @@ from .pages.phase3_translate import Phase3TranslatePage
 from .pages.phase4_review import Phase4ReviewPage
 from .pages.phase5_validate import Phase5ValidatePage
 from .pages.phase6_export import Phase6ExportPage
-from .pages.welcome import WelcomePage
 from .state import AppState, PhaseStatus
 from .workers import ImportExcelWorker, ParseStfWorker
 
 _PHASES = [
-    ("0. Welcome", "Recent files and quick actions"),
     ("1. Import STF", "Pick the source .stf file"),
     ("2. STF \u2192 Excel", "Convert to organised workbook"),
     ("3. Translate", "Auto-translate untranslated rows"),
@@ -118,20 +116,14 @@ class MainWindow(QMainWindow):
             page.busy_changed.connect(lambda _busy: self._refresh_phase_badges())
             page.file_dropped.connect(self._handle_dropped_file)
 
-        welcome = self._pages[0]
-        if isinstance(welcome, WelcomePage):
-            welcome.request_open_path.connect(self._handle_dropped_file)
-            welcome.request_open_project.connect(self._open_project)
-
-        # Phase 5 (Validate & Fix) -> Phase 4 jump-to-issue wiring.
-        phase5 = self._pages[5]
-        if hasattr(phase5, "request_jump_to_row"):
-            phase5.request_jump_to_row.connect(self._jump_to_row)
-
-        # Phase 6 (Export) might also have jump-to-row in the future.
-        phase6 = self._pages[6]
-        if hasattr(phase6, "request_jump_to_row"):
-            phase6.request_jump_to_row.connect(self._jump_to_row)
+        # Any page exposing request_jump_to_row jumps to the Review phase
+        # (currently index 3) focused on the matching row.
+        for page in self._pages:
+            if hasattr(page, "request_jump_to_row"):
+                try:
+                    page.request_jump_to_row.connect(self._jump_to_row)
+                except Exception:  # noqa: BLE001 -- defensive
+                    pass
 
         # ---- restore window geometry / theme from settings
         self._apply_remembered_theme()
@@ -191,13 +183,12 @@ class MainWindow(QMainWindow):
     def _build_pages(self) -> QWidget:
         self._stack = QStackedWidget()
         self._pages: List[PhasePage] = [
-            WelcomePage(self._state, self),           # 0
-            Phase1ImportPage(self._state, self),      # 1
-            Phase2ExcelPage(self._state, self),       # 2
-            Phase3TranslatePage(self._state, self),   # 3
-            Phase4ReviewPage(self._state, self),      # 4
-            Phase5ValidatePage(self._state, self),    # 5
-            Phase6ExportPage(self._state, self),      # 6
+            Phase1ImportPage(self._state, self),       # 0  -- Import STF
+            Phase2ExcelPage(self._state, self),        # 1  -- STF -> Excel
+            Phase3TranslatePage(self._state, self),    # 2  -- Translate
+            Phase4ReviewPage(self._state, self),       # 3  -- Review
+            Phase5ValidatePage(self._state, self),     # 4  -- Validate & Fix
+            Phase6ExportPage(self._state, self),       # 5  -- Export STF
         ]
         for page in self._pages:
             self._stack.addWidget(page)
@@ -228,6 +219,13 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
+        # Edit menu: only Settings for now -- everything advanced lives there.
+        edit_menu = bar.addMenu("&Edit")
+        settings_action = QAction("&Settings...", self)
+        settings_action.setShortcut("Ctrl+,")
+        settings_action.triggered.connect(self._action_open_settings)
+        edit_menu.addAction(settings_action)
+
         view_menu = bar.addMenu("&View")
         for name, label in (("light", "&Light theme"), ("dark", "&Dark theme"), ("auto", "&Auto theme")):
             act = QAction(label, self)
@@ -235,6 +233,10 @@ class MainWindow(QMainWindow):
             view_menu.addAction(act)
 
         help_menu = bar.addMenu("&Help")
+        guide_action = QAction("&User guide", self)
+        guide_action.setShortcut("F1")
+        guide_action.triggered.connect(self._show_user_guide)
+        help_menu.addAction(guide_action)
         about = QAction("&About", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
@@ -258,10 +260,11 @@ class MainWindow(QMainWindow):
         self._refresh_phase_badges()
 
     def _jump_to_row(self, key: str) -> None:
-        self._goto(4)
-        page4 = self._pages[4]
-        if hasattr(page4, "focus_key"):
-            page4.focus_key(key)
+        # Phase 4 (Review) is now at index 3 in the simplified flow.
+        self._goto(3)
+        review = self._pages[3]
+        if hasattr(review, "focus_key"):
+            review.focus_key(key)
 
     def _log(self, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -277,7 +280,7 @@ class MainWindow(QMainWindow):
             self,
             "Open file",
             "",
-            "All supported (*.stf *.xlsx *.stxproject);;STF (*.stf);;Excel (*.xlsx);;Project (*.stxproject)",
+            "All supported (*.stf *.xlsx);;STF (*.stf);;Excel (*.xlsx)",
         )
         if path_str:
             self._handle_dropped_file(path_str)
@@ -347,14 +350,12 @@ class MainWindow(QMainWindow):
             self._load_stf(path_obj)
         elif suffix == ".xlsx":
             self._load_xlsx(path_obj)
-        elif suffix == ".stxproject":
-            self._open_project(str(path_obj))
         else:
             QMessageBox.warning(
                 self,
                 "Unsupported file type",
                 f"Don't know how to open {suffix} files.  "
-                "Supported: .stf, .xlsx, .stxproject",
+                "Supported: .stf, .xlsx",
             )
 
     def _load_stf(self, path: Path) -> None:
@@ -371,7 +372,8 @@ class MainWindow(QMainWindow):
             self._state.target_language_name = doc.language
         if doc.language_code:
             self._state.target_language_code = doc.language_code
-        self._state.set_phase(1, PhaseStatus.DONE)
+        # Phase 0 (Import STF) is now complete -- jump to Phase 1 (STF -> Excel).
+        self._state.set_phase(0, PhaseStatus.DONE)
         self._goto(1)
         self._log(f"Loaded {len(doc.entries):,} rows from {path.name}")
 
@@ -386,18 +388,20 @@ class MainWindow(QMainWindow):
 
         def _loaded(doc):
             self._state.document = doc
-            # Heuristically route based on file name.
-            target_phase = 4  # default review
+            # Heuristically route based on file name.  Indices reflect the
+            # 6-phase layout: 0=Import, 1=Excel, 2=Translate, 3=Review,
+            # 4=Validate, 5=Export.
+            target_phase = 3  # default to Review
             stem = path.stem.lower()
             if "translated" in stem:
                 self._state.translated_xlsx_path = path
-                target_phase = 4
+                target_phase = 3
             elif "organized" in stem or "organised" in stem:
                 self._state.organized_xlsx_path = path
-                target_phase = 3
-            elif "reviewed" in stem:
+                target_phase = 2
+            elif "reviewed" in stem or "fixed" in stem:
                 self._state.reviewed_xlsx_path = path
-                target_phase = 5
+                target_phase = 4
             self._state.set_phase(target_phase, PhaseStatus.DONE)
             self._goto(target_phase)
             self._log(f"Loaded {len(doc.entries):,} rows from {path.name}")
@@ -406,33 +410,47 @@ class MainWindow(QMainWindow):
         worker.failed.connect(lambda msg: QMessageBox.critical(self, "Load failed", msg))
         worker.start()
 
-    def _open_project(self, path: str) -> None:
-        from ..project import StxProject
-
-        try:
-            project = StxProject.load(path)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Open project", f"Failed to open project: {exc}")
-            return
-
-        self._state.project_path = Path(path)
-        if project.target_language_code:
-            self._state.target_language_code = project.target_language_code
-        if project.target_language_name:
-            self._state.target_language_name = project.target_language_name
-        if project.source_stf_path:
-            stf = Path(project.source_stf_path)
-            if stf.exists():
-                self._load_stf(stf)
-                return
-        QMessageBox.information(self, "Project", f"Opened project: {project.name}")
-
     # ------------------------------------------------------------------ theme + geometry
 
     def _switch_theme(self, name: str) -> None:
         gui_settings.set_theme(name)
         theme.apply_theme(name)
         self._log(f"Theme switched to {name}.")
+
+    def _action_open_settings(self) -> None:
+        """Open the Settings dialog (Edit -> Settings... or Ctrl+,).
+
+        On accept, refresh the active phase so it picks up any changed
+        values immediately (e.g. Phase 3's settings summary line).
+        """
+        from .settings_dialog import open_settings
+
+        if open_settings(self):
+            self._log("Settings updated.")
+            current = self._stack.currentIndex()
+            if 0 <= current < len(self._pages):
+                self._pages[current].on_enter()
+
+    def _show_user_guide(self) -> None:
+        """Open the bundled user guide in the default browser, if available.
+
+        The guide is the ``USER_GUIDE.md`` shipped alongside the source
+        tree.  When the file isn't packaged (e.g. PyInstaller frozen
+        builds with default config), we fall back to a short summary.
+        """
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        guide = Path(__file__).resolve().parent.parent.parent.parent / "USER_GUIDE.md"
+        if guide.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(guide)))
+            return
+        QMessageBox.information(
+            self,
+            "User guide",
+            "The user guide is shipped as USER_GUIDE.md alongside the "
+            "application source.  Visit the project repository to read it.",
+        )
 
     def _apply_remembered_theme(self) -> None:
         theme.apply_theme(gui_settings.get_theme())

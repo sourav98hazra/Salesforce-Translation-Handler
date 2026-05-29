@@ -1,0 +1,267 @@
+# Salesforce Translation Handler — User Guide
+
+A practical, end-to-end walkthrough of the desktop application.
+
+---
+
+## 1. Install + launch
+
+### Install
+
+You only need this once.  Pick the option that fits how you'll run the app.
+
+| You are... | Best option |
+|---|---|
+| A developer with Python on the machine | `pip install -e ".[gui]"` from the repo root |
+| A non-developer on Windows / macOS / Linux | Double-click `launch.bat` / `launch.command` / `launch.sh` (auto-creates a venv on first run) |
+| Distributing to people without Python | Build a standalone executable: `python build_exe.py` produces `dist/SalesforceTranslationHandler{.exe,.app,}` — ship that single file |
+
+Full instructions and prerequisites are in [`README.md`](./README.md).
+
+### Launch
+
+After install, three equivalent ways to start:
+
+* **Double-click** the launcher (`launch.bat` / `launch.command` / `launch.sh`).
+* From a terminal: `stx-app`.
+* From a terminal: `stx gui`.
+
+The Window opens on **Phase 1 — Import STF**.
+
+---
+
+## 2. Two ways to use the app
+
+You can use the app either as a **guided pipeline** (Phase 1 → Phase 2 → ... → Phase 6) or as **six independent tools** (jump to any phase via the sidebar and load whatever input you have).
+
+| Path | When to use it | How |
+|---|---|---|
+| **Pipeline (e2e)** | You start from a fresh STF and want to walk through every phase | Click **"Continue to Phase N →"** at the bottom of each phase |
+| **Independent** | You already have a partially translated workbook from a colleague, or you only want to validate, or you want to convert a hand-translated Excel directly to STF | Click the phase in the sidebar, then use the **"Load ..."** button to drop your file into that phase |
+
+The sidebar status badges show which phases have been completed (`✓`), are running (`▶`), or hit an error (`⚠`) so you always know where you are.
+
+Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and the app routes to the right phase.
+
+---
+
+## 3. The six phases
+
+### Phase 1 — Import STF
+
+**What it does:** parses the source `.stf` file from Salesforce Translation Workbench into an in-memory document.
+
+**How to use:**
+
+1. Click **"Browse STF..."** and pick the `.stf` you exported from Salesforce.
+2. Verify the parsed metadata (language, language code, total rows, untranslated count, component types).
+3. (Optional) Edit the language fields if Salesforce's preamble was missing or wrong.
+4. (Optional) Click **"Save copy as STF..."** to write a clean copy to disk.
+5. Click **"Continue to Phase 2 →"**.
+
+**Independent path:** drop an `.stf` directly here and parse it; no need to do anything else.
+
+### Phase 2 — STF → Organised Excel
+
+**What it does:** groups the parsed rows by component type (`CustomLabel`, `ButtonOrLink`, etc.) into a structured workbook with one sheet per group plus a `Content Details` index sheet.
+
+**How to use:**
+
+1. The output path defaults to `<source>_organized.xlsx`.  Click **Browse...** to change it.
+2. Click **"Convert and save .xlsx"** (the primary button) to write the file.
+3. (Optional) Click **"Save copy to..."** to write an additional copy elsewhere — handy for backups or sharing without disturbing the file the rest of the pipeline uses.
+4. Inspect the **Content Details** preview to confirm the row counts.
+5. Click **"Continue to Phase 3 →"**.
+
+**Independent path:** click **"Load existing organised .xlsx..."** to start from a previously generated workbook.
+
+### Phase 3 — Translate
+
+**What it does:** auto-translates every untranslated row using the configured backend, with Salesforce IDs / placeholders / URLs / emails / HTML protected from modification.
+
+**How to use:**
+
+1. Pick the **Source** language (default English) and **Target** language.
+2. Tick the **components to translate** (default: all).  Use Select all / none / Invert as shortcuts.  The estimate at the bottom shows how many rows will be translated.
+3. Choose the **Output file** for the translated `.xlsx`.
+4. Click **"Start translation"**.
+5. Watch the live feed — you'll see `EN: <source>` / `JA: <translation>` for each row plus running counters for Translated / TM hits / Deduped / Skipped.
+6. Click **"Continue to Phase 4 →"** when it's done.
+
+**Independent path:** click **"Load translated .xlsx..."** to skip translation and continue with a workbook you already translated.
+
+**Advanced options live in `Edit → Settings`** (Ctrl+,):
+
+* **Backend** (Google free / DeepL / Azure / OpenAI) and API key.
+* **Workers** (concurrent translation threads, default 4).
+* **Rate limit** (auto-tunes; defaults to 8 req/s).
+* **Wake-lock** to prevent system sleep during long runs.
+* **Glossary** CSV path (do-not-translate terms + forced translations).
+* **Translation memory** SQLite path (caches translations across runs).
+* **Batch targets** for multi-language runs.
+
+### Phase 4 — Review
+
+**What it does:** browse and (optionally) edit the translations, with auto-validation on entry so issues stand out immediately.
+
+**How to use:**
+
+1. The **status pill** at the top tells you whether the document is clean (green), has warnings (amber), or has errors (red).
+2. The **counters** show translated / untranslated / issue counts.
+3. **Filter** the table by component, status, or substring search.
+4. Click any row to populate the **side-by-side editor** at the bottom (source on the left, translation on the right).  Edit the translation and click **Apply** to save the change.  Click **Reset to source** to revert.
+5. **"Save reviewed workbook (.xlsx)"** writes the current state to disk.
+6. Click **"Continue to Phase 5 (Validate & Fix) →"**.
+
+**Re-upload externally edited Excel:** Click **"Load reviewed Excel..."** at the top right.  The uploaded workbook *replaces* the in-memory document and becomes the latest version for all subsequent phases.
+
+**Independent path:** identical — load any workbook into Review and start editing.
+
+### Phase 5 — Validate & Fix
+
+**What it does:** dedicated phase that shows *only* the rows with validation issues (no noise from clean rows) and offers automatic + manual fixes.
+
+**How to use:**
+
+1. Validation runs automatically on entry.
+2. The banner shows total errors / warnings.
+3. Click **"Auto-fix all"** to let the deterministic fixers resolve what they can:
+   * Restore missing placeholders / `{0}` MessageFormat tokens
+   * Trim translations that exceed Salesforce length limits (truncated at word boundary)
+   * Clear whitespace-only translations
+   * Remove duplicate keys (keeps last occurrence)
+   * Restore missing HTML tag pairs
+4. Or click **"Auto-fix selected"** / **"Auto-fix this row"** for finer control.
+5. Use the **inline editor** below the table to manually correct rows the auto-fixer can't handle.
+6. Click **"Re-validate"** to confirm everything is now clean.
+7. Click **"Save fixed workbook (.xlsx)"** at any point.
+8. Click **"Continue to Phase 6 (Export STF) →"**.
+
+**Independent path:** click **"Load Excel for validation..."** to land here directly with any workbook — useful when you only want to check / fix issues, not run the full pipeline.
+
+**Jump to context:** double-click any issue row (or click "Jump to Phase 4 for context") to navigate back to Phase 4 with that row selected, full editor visible, all filters cleared.
+
+### Phase 6 — Export STF
+
+**What it does:** writes the three STF files Salesforce expects.
+
+**How to use:**
+
+1. Pick the **Language** + **Code** (auto-filled from earlier phases).
+2. Pick the **Output directory**.
+3. (Optional) Click **"Run validation"** for a last-minute check.
+4. Click **"Export 3 STF files"**.
+
+You get three files:
+
+| File | Contents |
+|---|---|
+| `Super_STF_<code>.stf` | Bilingual full file with both translated and untranslated sections |
+| `TranslatedOnly_STF_<code>.stf` | Only the translated rows |
+| `UntranslatedOnly_STF_<code>.stf` | Only the untranslated rows |
+
+All three are UTF-8 with LF line endings (no BOM), byte-compatible with Salesforce's import format.
+
+**Independent path:** click **"Load translated Excel..."** for the most common drop-in scenario — you have a translated workbook from somewhere else and just want STF files out.  No earlier phases required.
+
+---
+
+## 4. Common workflows
+
+### "I have an STF, give me STF" (full pipeline)
+
+`Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6`
+
+Just click "Continue" at the bottom of each phase.
+
+### "I already translated externally, just convert to STF"
+
+Open the app → click **Phase 6** in the sidebar → **Load translated Excel...** → pick file → set language → Export.
+
+### "I want to check my translations before submitting"
+
+Open the app → click **Phase 5** in the sidebar → **Load Excel for validation...** → pick file → review issues → Auto-fix all → Save.
+
+### "A colleague edited the Excel, integrate their changes"
+
+Open the app → click **Phase 4** → **Load reviewed Excel...** → pick the colleague's file → review → Save → continue to Phase 5 / 6.
+
+### "I want to reuse translations across runs"
+
+Open `Edit → Settings → Resources` and set the **Translation memory** path.  Translations from previous runs are now reused automatically — same source string is never translated twice.
+
+### "Don't translate brand names"
+
+Create a CSV with columns `source,target,do_not_translate`:
+
+```csv
+source,target,do_not_translate
+Bayer,,true
+ATLS,,true
+case,ケース,
+```
+
+Open `Edit → Settings → Resources` and set the **Glossary** path.  Brand terms are now protected; the `case → ケース` row enforces a forced translation.
+
+---
+
+## 5. Output formats
+
+### Excel workbook layout
+
+| Sheet | Contents |
+|---|---|
+| `<ComponentType>_<Status>` | One per group; columns: `Key`, `Label`, `Translation` |
+| `Content Details` | Index of every component sheet |
+| `Translation_Summary` | Per-sheet counts (after Phase 3) |
+| `Translation_Status_Log` | Per-row status (after Phase 3) |
+
+Every cell is forced to text type so Salesforce IDs (`001D000000IqhSL`), times (`10:30`), and zero-prefixed numbers (`007`) are preserved without Excel re-typing them as numbers / dates.  Labels starting with `=` / `+` / `-` / `@` are guarded against formula injection.
+
+### STF files (Phase 6)
+
+UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLATED-------------------`) are reproduced character-for-character to keep downstream tooling happy.
+
+---
+
+## 6. Troubleshooting
+
+| Symptom | Cause / Fix |
+|---|---|
+| "libGL.so.1: cannot open shared object" on Linux | Install Qt's runtime libs.  Debian/Ubuntu: `sudo apt install libgl1 libegl1 libxkbcommon0 libdbus-1-3`.  Fedora/RHEL/Amazon Linux: `sudo dnf install mesa-libGL mesa-libEGL libxkbcommon`. |
+| Translation hangs or 429-errors | Free Google tier rate-limits aggressively.  The adaptive limiter backs off automatically; for production volume, switch to DeepL via `Edit → Settings`. |
+| Lid-close interrupts a run | The wake-lock prevents *idle* sleep, not lid-close.  Keep the lid open during long runs.  TM caching ensures re-runs after interrupt are nearly instant. |
+| Salesforce import says "duplicate key" | Run **Phase 5** with **Auto-fix all** — the deduplicator keeps the last occurrence (Salesforce's own behaviour) and removes earlier duplicates. |
+| Translation lost a placeholder | Phase 5 flags it under `token_drift`.  **Auto-fix this row** restores the placeholder.  Check the source label for unusual quoting if the auto-fixer can't help. |
+| Excel reformatted my Salesforce IDs | The app forces text type on every column on export, so this only happens if a third party re-saved the workbook.  Keep edits inside the app's Phase 4 editor when possible. |
+
+---
+
+## 7. Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+0..5` | Switch to phase N |
+| `Ctrl+O` | Open file (auto-routes by extension) |
+| `Ctrl+S` | Save current phase artifact |
+| `Ctrl+,` | Open Settings |
+| `F1` | This user guide |
+| `Ctrl+Q` | Quit |
+
+---
+
+## 8. Where settings are stored
+
+User preferences (window geometry, theme, last target language, recent files, translator backend, API keys, glossary path, TM path) live in your platform's standard QSettings location:
+
+| OS | Path |
+|---|---|
+| macOS | `~/Library/Preferences/com.salesforce-translation-handler.plist` |
+| Windows | `HKEY_CURRENT_USER\Software\SalesforceTranslationHandler` |
+| Linux | `~/.config/SalesforceTranslationHandler/SalesforceTranslationHandler.conf` |
+
+The default translation memory database lives at `~/.cache/salesforce-translation-handler/tm.sqlite` unless you override it in Settings → Resources.
+
+---
+
+That's it.  The CLI (`stx --help`) mirrors every phase for scripting / CI use; see [`README.md`](./README.md) for command-line examples.

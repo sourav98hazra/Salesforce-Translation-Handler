@@ -157,7 +157,7 @@ class Phase1ImportPage(PhasePage):
 
             if self._state.source_stf_path:
                 gui_settings.add_recent_file(self._state.source_stf_path)
-            self._state.set_phase(1, PhaseStatus.DONE)
+            self._state.set_phase(0, PhaseStatus.DONE)
         except Exception:  # noqa: BLE001
             pass
 
@@ -208,4 +208,4 @@ class Phase1ImportPage(PhasePage):
             self._state.target_language_name = self._language_field.text().strip()
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
-        self.request_navigate.emit(2)
+        self.request_navigate.emit(1)

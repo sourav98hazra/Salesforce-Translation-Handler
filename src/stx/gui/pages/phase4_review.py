@@ -1,15 +1,18 @@
-"""Phase 4 -- Review and edit translations.
+"""Phase 4 (index 3) -- Review.
 
-v1.2 additions over v1.1:
+v1.3 simplification: this page now reads as a translation browser
+rather than an editor.  Layout (top to bottom):
 
-* **Load reviewed Excel** -- primary-style button for re-uploading an
-  externally edited Excel.  The uploaded document replaces the current
-  one and becomes the "latest" version going forward.
-* **Auto-validate on entry** -- when the user navigates to this phase,
-  validation runs automatically and a banner displays the issue count
-  (e.g. "3 errors, 2 warnings -- click Continue to fix").
-* **Navigation** now points to Phase 5 (Validate & Fix) instead of
-  directly to Export.
+* **Compact toolbar**: validation status pill, big counters
+  (translated / untranslated / issues), Load Excel button, filter
+  fields.
+* **Big table** showing every row.
+* **Slim inline editor** at the bottom for the selected row.
+* **Save** + **Continue** action buttons.
+
+Auto-validation still runs on entry; the result colours the status
+pill.  Re-uploading an externally edited Excel keeps the convenience
+of editing outside the app.
 """
 
 from __future__ import annotations
@@ -17,7 +20,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt, Signal
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QSortFilterProxyModel,
+    Qt,
+    Signal,
+)
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -27,11 +36,11 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QProgressBar,
     QPushButton,
     QSplitter,
     QTableView,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...model import Document, Entry
@@ -44,9 +53,11 @@ _HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation"]
 _TRANSLATION_COL = 5
 
 
-class _EntriesModel(QAbstractTableModel):
-    """Table model backed directly by ``Document.entries``."""
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
 
+class _EntriesModel(QAbstractTableModel):
     edited = Signal(int)
 
     def __init__(self, doc: Document, parent=None) -> None:
@@ -144,24 +155,22 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
         return True
 
 
-class Phase4ReviewPage(PhasePage):
-    """In-app review and edit of translations.
+# ---------------------------------------------------------------------------
+# Page
+# ---------------------------------------------------------------------------
 
-    v1.2: auto-validate on enter, prominent "Load Excel" for re-upload,
-    validation banner, navigation to Phase 5 (Validate & Fix).
-    """
+class Phase4ReviewPage(PhasePage):
+    """In-app translation browser with on-demand editing."""
 
     def __init__(self, state: AppState, parent=None) -> None:
         super().__init__(
             state,
             title="Phase 4 \u2014 Review",
             subtitle=(
-                "Browse every translation side-by-side with the source, filter "
-                "by component or status, and edit on demand.  You can also "
-                "re-upload an externally edited Excel here \u2014 it replaces "
-                "the current document and becomes the latest version.  "
-                "Validation runs automatically on entry so you can spot issues "
-                "at a glance before moving on."
+                "Browse the translations, filter to focus on what matters, "
+                "edit on demand, and re-upload an externally edited Excel "
+                "if you prefer to review there.  Validation runs on entry "
+                "so you can spot issues at a glance."
             ),
             parent=parent,
         )
@@ -170,84 +179,66 @@ class Phase4ReviewPage(PhasePage):
         self._current_row: Optional[int] = None
         self._build()
 
+    # ------------------------------------------------------------------ build
+
     def _build(self) -> None:
-        # ---------- Validation banner (auto-populated on_enter)
-        self._validation_banner = QLabel("")
-        self._validation_banner.setWordWrap(True)
-        self._validation_banner.setStyleSheet(
-            "padding: 10px; border-radius: 6px; font-weight: 600;"
+        # ---------- Compact toolbar (status pill + counters + actions)
+        toolbar = QFrame()
+        toolbar.setProperty("role", "card")
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(12, 10, 12, 10)
+        tb_layout.setSpacing(14)
+
+        self._status_pill = QLabel("\u2022  No document loaded")
+        self._status_pill.setStyleSheet(
+            "padding: 4px 10px; border-radius: 12px; "
+            "background: #f1f5f9; color: #475569; font-weight: 600;"
         )
-        self._validation_banner.setVisible(False)
-        self.add_widget(self._validation_banner)
+        tb_layout.addWidget(self._status_pill)
 
-        # ---------- Translation summary card (the "browse translations" view)
-        summary_box = QGroupBox("Translation summary")
-        summary_layout = QVBoxLayout(summary_box)
+        self._stat_translated = self._make_inline_stat("Translated", "0", "#16a34a")
+        self._stat_untranslated = self._make_inline_stat("Untranslated", "0", "#d97706")
+        self._stat_issues = self._make_inline_stat("Issues", "0", "#dc2626")
+        tb_layout.addWidget(self._stat_translated["frame"])
+        tb_layout.addWidget(self._stat_untranslated["frame"])
+        tb_layout.addWidget(self._stat_issues["frame"])
 
-        # Three big counter cards in a row.
-        cards_row = QHBoxLayout()
-        cards_row.setSpacing(12)
-        self._total_card = self._make_stat_card("Total rows", "0", "#1e293b")
-        self._translated_card = self._make_stat_card("Translated", "0", "#16a34a")
-        self._untranslated_card = self._make_stat_card("Untranslated", "0", "#d97706")
-        self._issues_card = self._make_stat_card("Issues", "0", "#dc2626")
-        cards_row.addWidget(self._total_card["frame"])
-        cards_row.addWidget(self._translated_card["frame"])
-        cards_row.addWidget(self._untranslated_card["frame"])
-        cards_row.addWidget(self._issues_card["frame"])
-        summary_layout.addLayout(cards_row)
+        tb_layout.addStretch(1)
 
-        # Visual progress bar showing translation completion %.
-        self._progress = QProgressBar()
-        self._progress.setRange(0, 100)
-        self._progress.setValue(0)
-        self._progress.setTextVisible(True)
-        self._progress.setFormat("Translation completeness: %p%")
-        summary_layout.addWidget(self._progress)
-        self.add_widget(summary_box)
-
-        # ---------- Load Excel row (prominent)
-        load_box = QGroupBox("Load / re-upload reviewed Excel")
-        load_layout = QHBoxLayout(load_box)
-        self._load_btn = primary(QPushButton("Load reviewed Excel (.xlsx)..."))
+        self._load_btn = QPushButton("Load reviewed Excel...")
         self._load_btn.setToolTip(
             "Replace the current document with an externally edited workbook.  "
-            "This becomes the latest version used by all subsequent phases."
+            "It becomes the latest version used by all subsequent phases."
         )
         self._load_btn.clicked.connect(self._on_load_excel)
-        load_layout.addWidget(self._load_btn)
-        load_layout.addWidget(
-            QLabel(
-                "Upload an Excel you edited outside the app.  "
-                "It replaces the current document and becomes the latest."
-            )
-        )
-        load_layout.addStretch(1)
-        self.add_widget(load_box)
+        tb_layout.addWidget(self._load_btn)
+        self.add_widget(toolbar)
 
-        # ---------- Filter row
-        filter_box = QGroupBox("Filter")
-        filter_layout = QHBoxLayout(filter_box)
-        filter_layout.addWidget(QLabel("Component:"))
+        # ---------- Filter row (slim)
+        filter_row = QFrame()
+        fr_layout = QHBoxLayout(filter_row)
+        fr_layout.setContentsMargins(2, 0, 2, 0)
+        fr_layout.setSpacing(8)
+
+        fr_layout.addWidget(QLabel("Component:"))
         self._component_combo = QComboBox()
         self._component_combo.addItem("All")
         self._component_combo.currentTextChanged.connect(self._proxy.set_component)
-        filter_layout.addWidget(self._component_combo)
-        filter_layout.addSpacing(12)
-        filter_layout.addWidget(QLabel("Status:"))
+        fr_layout.addWidget(self._component_combo)
+
+        fr_layout.addWidget(QLabel("Status:"))
         self._status_combo = QComboBox()
         self._status_combo.addItems(["All", "Translated", "Untranslated"])
         self._status_combo.currentTextChanged.connect(self._proxy.set_status)
-        filter_layout.addWidget(self._status_combo)
-        filter_layout.addSpacing(12)
-        filter_layout.addWidget(QLabel("Search:"))
-        self._search = QLineEdit()
-        self._search.setPlaceholderText("Filter by key or label substring ...")
-        self._search.textChanged.connect(self._proxy.set_search)
-        filter_layout.addWidget(self._search, stretch=1)
-        self.add_widget(filter_box)
+        fr_layout.addWidget(self._status_combo)
 
-        # ---------- Splitter: table + side-by-side editor
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Search by key or label...")
+        self._search.textChanged.connect(self._proxy.set_search)
+        fr_layout.addWidget(self._search, stretch=1)
+        self.add_widget(filter_row)
+
+        # ---------- Splitter: table on top, slim inline editor below
         splitter = QSplitter(Qt.Orientation.Vertical)
 
         self._table = QTableView()
@@ -261,69 +252,84 @@ class Phase4ReviewPage(PhasePage):
         )
         splitter.addWidget(self._table)
 
-        # Side-by-side editor
-        editor_box = QGroupBox("Selected row -- side-by-side editor")
-        editor_layout = QVBoxLayout(editor_box)
+        # Slim editor pane (smaller than v1.2's giant box)
+        editor = QFrame()
+        editor.setProperty("role", "card")
+        ed_layout = QVBoxLayout(editor)
+        ed_layout.setContentsMargins(12, 10, 12, 10)
+        ed_layout.setSpacing(6)
 
-        meta_row = QHBoxLayout()
+        meta = QHBoxLayout()
+        meta.setSpacing(8)
+        meta.addWidget(QLabel("Key:"))
         self._key_field = QLineEdit()
         self._key_field.setReadOnly(True)
-        self._key_field.setStyleSheet("font-family: 'JetBrains Mono', 'Consolas', 'Menlo', monospace;")
-        meta_row.addWidget(QLabel("Key:"))
-        meta_row.addWidget(self._key_field, stretch=1)
-        editor_layout.addLayout(meta_row)
+        self._key_field.setStyleSheet("font-family: monospace;")
+        meta.addWidget(self._key_field, stretch=1)
+        self._apply_btn = primary(QPushButton("Apply"))
+        self._apply_btn.clicked.connect(self._apply_editor_to_row)
+        self._reset_btn = QPushButton("Reset to source")
+        self._reset_btn.clicked.connect(self._reset_row)
+        meta.addWidget(self._apply_btn)
+        meta.addWidget(self._reset_btn)
+        ed_layout.addLayout(meta)
 
         side_by_side = QHBoxLayout()
-        src_box = QVBoxLayout()
-        src_box.addWidget(QLabel("Source label"))
+        side_by_side.setSpacing(8)
+        src_col = QVBoxLayout()
+        src_col.setSpacing(2)
+        src_col.addWidget(QLabel("Source"))
         self._source_field = QPlainTextEdit()
         self._source_field.setReadOnly(True)
-        src_box.addWidget(self._source_field)
-        side_by_side.addLayout(src_box, stretch=1)
-
-        tgt_box = QVBoxLayout()
-        tgt_box.addWidget(QLabel("Translation (editable)"))
+        self._source_field.setMaximumHeight(110)
+        src_col.addWidget(self._source_field)
+        tgt_col = QVBoxLayout()
+        tgt_col.setSpacing(2)
+        tgt_col.addWidget(QLabel("Translation (editable)"))
         self._translation_field = QPlainTextEdit()
-        tgt_box.addWidget(self._translation_field)
-        side_by_side.addLayout(tgt_box, stretch=1)
+        self._translation_field.setMaximumHeight(110)
+        tgt_col.addWidget(self._translation_field)
+        side_by_side.addLayout(src_col, stretch=1)
+        side_by_side.addLayout(tgt_col, stretch=1)
+        ed_layout.addLayout(side_by_side)
 
-        editor_layout.addLayout(side_by_side)
-
-        editor_actions = QHBoxLayout()
-        self._save_row_btn = primary(QPushButton("Apply to row"))
-        self._save_row_btn.clicked.connect(self._apply_editor_to_row)
-        self._reset_row_btn = QPushButton("Reset row to source")
-        self._reset_row_btn.clicked.connect(self._reset_row)
-        editor_actions.addWidget(self._save_row_btn)
-        editor_actions.addWidget(self._reset_row_btn)
-        editor_actions.addStretch(1)
-        editor_layout.addLayout(editor_actions)
-
-        splitter.addWidget(editor_box)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        splitter.addWidget(editor)
+        splitter.setStretchFactor(0, 4)
+        splitter.setStretchFactor(1, 1)
         self.add_widget(splitter, stretch=1)
 
-        # Counters
-        self._counters = QLabel("")
-        self._counters.setStyleSheet("color: #4a5568;")
-        self.add_widget(self._counters)
-
-        # Actions
+        # ---------- Bottom action buttons
         self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
         self._save_btn.clicked.connect(self._on_save)
-        # Phase 5 is now "Validate & Fix" (index 5 in the new 7-phase layout)
         self._next_btn = QPushButton("Continue to Phase 5 (Validate & Fix) \u2192")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(5))
+        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(4))
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
+
+    def _make_inline_stat(self, label: str, value: str, accent: str) -> dict:
+        frame = QFrame()
+        layout = QHBoxLayout(frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        title = QLabel(label.upper())
+        title.setStyleSheet(
+            "color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: 0.6px;"
+        )
+        val = QLabel(value)
+        val.setStyleSheet(f"color: {accent}; font-size: 16px; font-weight: 700;")
+        layout.addWidget(title)
+        layout.addWidget(val)
+        return {"frame": frame, "value": val}
 
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
         if self._state.document is None:
-            self._counters.setText("No document loaded yet.")
+            self._status_pill.setText("\u2022  No document loaded")
+            self._status_pill.setStyleSheet(
+                "padding: 4px 10px; border-radius: 12px; "
+                "background: #f1f5f9; color: #475569; font-weight: 600;"
+            )
             self._save_btn.setEnabled(False)
-            self._validation_banner.setVisible(False)
             return
         self._save_btn.setEnabled(True)
 
@@ -349,118 +355,57 @@ class Phase4ReviewPage(PhasePage):
         self._table.setColumnWidth(0, 60)
         self._table.setColumnWidth(1, 320)
         self._table.setColumnWidth(2, 120)
-        self._table.setColumnWidth(3, 120)
+        self._table.setColumnWidth(3, 110)
         self._table.setColumnWidth(4, 320)
         self._table.setColumnWidth(5, 320)
         self._update_counters()
-
-        # --- Auto-validate on entry ---
         self._run_auto_validation()
-
-    def _run_auto_validation(self) -> None:
-        """Run validation and show a summary banner."""
-        if self._state.document is None:
-            self._validation_banner.setVisible(False)
-            return
-        report = validate_document(self._state.document)
-
-        # Update the "Issues" stat card to reflect what we just saw.
-        issue_count = len(report.issues)
-        self._issues_card["value"].setText(f"{issue_count:,}")
-        if issue_count == 0:
-            self._issues_card["value"].setStyleSheet(
-                "color: #16a34a; font-size: 26px; font-weight: 700;"
-            )
-        elif report.has_errors:
-            self._issues_card["value"].setStyleSheet(
-                "color: #dc2626; font-size: 26px; font-weight: 700;"
-            )
-        else:
-            self._issues_card["value"].setStyleSheet(
-                "color: #d97706; font-size: 26px; font-weight: 700;"
-            )
-
-        if not report.issues:
-            self._validation_banner.setText(
-                "\u2713  No validation issues found.  You may proceed to export."
-            )
-            self._validation_banner.setStyleSheet(
-                "padding: 10px; border-radius: 6px; font-weight: 600; "
-                "background-color: #dcfce7; color: #166534; border: 1px solid #86efac;"
-            )
-            self._validation_banner.setVisible(True)
-        else:
-            self._validation_banner.setText(
-                f"\u26a0  {len(report.errors)} error(s), {len(report.warnings)} warning(s) detected.  "
-                f"Click 'Continue to Phase 5 (Validate & Fix)' to review and auto-fix them, "
-                f"or fix here by editing cells directly."
-            )
-            style = (
-                "padding: 10px; border-radius: 6px; font-weight: 600; "
-                "background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24;"
-            )
-            if report.has_errors:
-                style = (
-                    "padding: 10px; border-radius: 6px; font-weight: 600; "
-                    "background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;"
-                )
-            self._validation_banner.setStyleSheet(style)
-            self._validation_banner.setVisible(True)
-        self.status_message.emit(
-            f"Auto-validation: {len(report.errors)} error(s), {len(report.warnings)} warning(s)."
-        )
-
-    # ------------------------------------------------------------------ counters
-
-    def _make_stat_card(self, label: str, initial_value: str, accent: str) -> dict:
-        """Build a small summary card with a label, a big number, and an accent bar.
-
-        Returns a dict with the frame plus references to the value
-        :class:`QLabel` so :meth:`_update_counters` can update it cheaply.
-        """
-        frame = QFrame()
-        frame.setFrameShape(QFrame.Shape.StyledPanel)
-        frame.setStyleSheet(
-            "QFrame { background: palette(base); border: 1px solid palette(mid); "
-            f"border-top: 4px solid {accent}; border-radius: 6px; padding: 10px; }}"
-        )
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(2)
-
-        title = QLabel(label)
-        title.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 600; "
-                            "text-transform: uppercase; letter-spacing: 1px;")
-        layout.addWidget(title)
-
-        value = QLabel(initial_value)
-        value.setStyleSheet(f"color: {accent}; font-size: 26px; font-weight: 700;")
-        layout.addWidget(value)
-
-        return {"frame": frame, "value": value}
 
     def _update_counters(self) -> None:
         if self._state.document is None:
-            self._counters.setText("No document loaded.")
             return
         stats = self._state.document.stats()
-        self._counters.setText(
-            f"Components: {stats['components']}   "
-            f"Source: {self._state.target_language_name or '?'} "
-            f"({self._state.target_language_code or '?'})"
-        )
+        self._stat_translated["value"].setText(f"{stats['translated']:,}")
+        self._stat_untranslated["value"].setText(f"{stats['untranslated']:,}")
 
-        # Update the big stat cards.
-        self._total_card["value"].setText(f"{stats['total']:,}")
-        self._translated_card["value"].setText(f"{stats['translated']:,}")
-        self._untranslated_card["value"].setText(f"{stats['untranslated']:,}")
-
-        # Translation completeness percentage.
-        if stats["total"] > 0:
-            pct = int(stats["translated"] * 100 / stats["total"])
-            self._progress.setValue(pct)
+    def _run_auto_validation(self) -> None:
+        if self._state.document is None:
+            return
+        report = validate_document(self._state.document)
+        issue_count = len(report.issues)
+        self._stat_issues["value"].setText(f"{issue_count:,}")
+        if issue_count == 0:
+            self._stat_issues["value"].setStyleSheet(
+                "color: #16a34a; font-size: 16px; font-weight: 700;"
+            )
+            self._status_pill.setText("\u2713  All clear")
+            self._status_pill.setStyleSheet(
+                "padding: 4px 10px; border-radius: 12px; "
+                "background: #dcfce7; color: #166534; font-weight: 600;"
+            )
+        elif report.has_errors:
+            self._stat_issues["value"].setStyleSheet(
+                "color: #dc2626; font-size: 16px; font-weight: 700;"
+            )
+            self._status_pill.setText(
+                f"\u26a0  {len(report.errors)} error(s)  \u2192  Phase 5 to fix"
+            )
+            self._status_pill.setStyleSheet(
+                "padding: 4px 10px; border-radius: 12px; "
+                "background: #fee2e2; color: #991b1b; font-weight: 600;"
+            )
         else:
-            self._progress.setValue(0)
+            self._stat_issues["value"].setStyleSheet(
+                "color: #d97706; font-size: 16px; font-weight: 700;"
+            )
+            self._status_pill.setText(f"\u26a0  {len(report.warnings)} warning(s)")
+            self._status_pill.setStyleSheet(
+                "padding: 4px 10px; border-radius: 12px; "
+                "background: #fef3c7; color: #92400e; font-weight: 600;"
+            )
+        self.status_message.emit(
+            f"Validation: {len(report.errors)} error(s), {len(report.warnings)} warning(s)."
+        )
 
     # ------------------------------------------------------------------ selection
 
@@ -497,7 +442,6 @@ class Phase4ReviewPage(PhasePage):
     # ------------------------------------------------------------------ load Excel
 
     def _on_load_excel(self) -> None:
-        """Re-upload an externally edited Excel as the new latest document."""
         if self.is_busy:
             return
         path = self.pick_open_file(
@@ -523,10 +467,10 @@ class Phase4ReviewPage(PhasePage):
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
         self.set_busy(False)
-        self.on_enter()  # refresh table + run auto-validate
+        self.on_enter()
         self.status_message.emit(
             f"Loaded {len(doc.entries):,} rows from {path.name}.  "
-            f"This is now the latest version."
+            "This is now the latest version."
         )
         try:
             from .. import settings as gui_settings
@@ -538,10 +482,9 @@ class Phase4ReviewPage(PhasePage):
         self.set_busy(False)
         self.error(msg, "Load failed")
 
-    # ------------------------------------------------------------------ jump-to-issue
+    # ------------------------------------------------------------------ jump-to-issue (Phase 5 -> Phase 4)
 
     def focus_key(self, key: str) -> None:
-        """Find ``key`` in the table and select it (called by Phase 5/6)."""
         if self._state.document is None or self._model is None:
             return
         for index, entry in enumerate(self._state.document.entries):
@@ -562,7 +505,9 @@ class Phase4ReviewPage(PhasePage):
     def _on_save(self) -> None:
         if self._state.document is None or self.is_busy:
             return
-        path = self.pick_save_file("Save reviewed workbook as", "Excel files (*.xlsx)", "reviewed.xlsx")
+        path = self.pick_save_file(
+            "Save reviewed workbook as", "Excel files (*.xlsx)", "reviewed.xlsx"
+        )
         if not path:
             return
         if path.suffix.lower() != ".xlsx":
@@ -593,11 +538,11 @@ class Phase4ReviewPage(PhasePage):
     def _on_saved(self, path: Path) -> None:
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
-        self._state.set_phase(4, PhaseStatus.DONE)
+        self._state.set_phase(3, PhaseStatus.DONE)
         self.set_busy(False)
         self.status_message.emit(f"Reviewed workbook saved: {path}")
 
     def _on_save_failed(self, message: str) -> None:
         self.set_busy(False)
-        self._state.set_phase(4, PhaseStatus.ERROR)
+        self._state.set_phase(3, PhaseStatus.ERROR)
         self.error(message, "Save failed")
