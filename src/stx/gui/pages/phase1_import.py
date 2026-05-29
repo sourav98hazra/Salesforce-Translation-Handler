@@ -107,9 +107,11 @@ class Phase1ImportPage(PhasePage):
         self._preview_layout = QVBoxLayout(preview_box)
         self._preview_layout.setContentsMargins(4, 4, 4, 4)
 
-        self._popout_preview_btn = QPushButton("\u2197 Pop out")
-        self._popout_preview_btn.setMaximumWidth(80)
-        self._popout_preview_btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self._popout_preview_btn = QPushButton("\u2197")
+        self._popout_preview_btn.setFixedSize(20, 20)
+        self._popout_preview_btn.setToolTip("Pop out preview into a separate window")
+        self._popout_preview_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_preview_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_preview_btn.clicked.connect(self._on_popout_preview)
         self._preview_layout.addWidget(self._popout_preview_btn, 0, Qt.AlignmentFlag.AlignRight)
 
@@ -266,7 +268,8 @@ class Phase1ImportPage(PhasePage):
         layout.addWidget(self._preview)
         self._preview_dialog.finished.connect(self._on_preview_dialog_closed)
         self._preview_dialog.show()
-        self._popout_preview_btn.setText("\u2199 Dock back")
+        self._popout_preview_btn.setText("\u2199")
+        self._popout_preview_btn.setToolTip("Dock back into the page")
         self._popout_preview_btn.clicked.disconnect()
         self._popout_preview_btn.clicked.connect(self._on_dock_preview_back)
 
@@ -278,6 +281,7 @@ class Phase1ImportPage(PhasePage):
         self._preview.setParent(self)
         self._preview_layout.addWidget(self._preview)
         self._preview_dialog = None
-        self._popout_preview_btn.setText("\u2197 Pop out")
+        self._popout_preview_btn.setText("\u2197")
+        self._popout_preview_btn.setToolTip("Pop out preview into a separate window")
         self._popout_preview_btn.clicked.disconnect()
         self._popout_preview_btn.clicked.connect(self._on_popout_preview)

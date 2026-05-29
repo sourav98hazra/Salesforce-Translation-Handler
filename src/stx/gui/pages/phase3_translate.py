@@ -357,9 +357,11 @@ class Phase3TranslatePage(PhasePage):
         self._feed_layout = QVBoxLayout(feed_box)
         self._feed_layout.setContentsMargins(4, 4, 4, 4)
 
-        self._popout_feed_btn = QPushButton("\u2197 Pop out")
-        self._popout_feed_btn.setMaximumWidth(80)
-        self._popout_feed_btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self._popout_feed_btn = QPushButton("\u2197")
+        self._popout_feed_btn.setFixedSize(20, 20)
+        self._popout_feed_btn.setToolTip("Pop out live feed into a separate window")
+        self._popout_feed_btn.setStyleSheet("font-size: 12px; padding: 0; border: none; background: transparent; color: #64748b;")
+        self._popout_feed_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._popout_feed_btn.clicked.connect(self._on_popout_feed)
         self._feed_layout.addWidget(self._popout_feed_btn, 0, Qt.AlignmentFlag.AlignRight)
 
@@ -800,7 +802,8 @@ class Phase3TranslatePage(PhasePage):
         layout.addWidget(self._log)
         self._feed_dialog.finished.connect(self._on_feed_dialog_closed)
         self._feed_dialog.show()
-        self._popout_feed_btn.setText("\u2199 Dock back")
+        self._popout_feed_btn.setText("\u2199")
+        self._popout_feed_btn.setToolTip("Dock back into the page")
         self._popout_feed_btn.clicked.disconnect()
         self._popout_feed_btn.clicked.connect(self._on_dock_feed_back)
 
@@ -812,6 +815,7 @@ class Phase3TranslatePage(PhasePage):
         self._log.setParent(self)
         self._feed_layout.addWidget(self._log)
         self._feed_dialog = None
-        self._popout_feed_btn.setText("\u2197 Pop out")
+        self._popout_feed_btn.setText("\u2197")
+        self._popout_feed_btn.setToolTip("Pop out live feed into a separate window")
         self._popout_feed_btn.clicked.disconnect()
         self._popout_feed_btn.clicked.connect(self._on_popout_feed)
