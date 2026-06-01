@@ -170,3 +170,26 @@ def test_glossary_protects_dnt_term_through_translation() -> None:
     translated = doc.entries[0].translation
     assert "Bayer" in translated
     assert "BAYER" not in translated
+
+
+def test_zero_scope_no_division_error() -> None:
+    """When scope excludes all rows, no ZeroDivisionError occurs."""
+    doc = Document(
+        language="Japanese", language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello"),
+            Entry(key="CustomLabel.B", label="World"),
+        ]
+    )
+    # Scope that includes no components
+    scope = Scope(components={"NonexistentComponent"})
+    translator = CountingTranslator()
+    result = translate_document(
+        doc, translator,
+        source_lang="en", target_lang="ja",
+        workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+        scope=scope,
+    )
+    assert result.translated_count == 0
+    assert result.skipped_count == 2
+    assert len(translator.calls) == 0

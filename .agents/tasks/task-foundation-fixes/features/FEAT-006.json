@@ -2,7 +2,7 @@
   "id": "FEAT-006",
   "type": "fix",
   "description": "Fix progress denominator and zero-scope divisions: align progress reporting with the number of rows actually processed (including skipped rows) and guard against divide-by-zero when scope excludes all rows.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "In src/stx/translate/runner.py TranslationProgress.percent property, the guard 'if self.total else 0' already exists - verify it handles total=0",
     "In _emit_progress(), guard the 'rate = completed / elapsed' calculation: if elapsed <= 0, set rate to None",

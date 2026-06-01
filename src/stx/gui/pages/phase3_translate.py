@@ -646,9 +646,10 @@ class Phase3TranslatePage(PhasePage):
             rate = self._current_row / elapsed if elapsed > 0 else 0
             remaining = self._total_rows - self._current_row
             eta = remaining / rate if rate > 0 else 0
+            pct = (self._current_row * 100 // self._total_rows) if self._total_rows > 0 else 100
             self._log.appendPlainText(
                 f"  --- {self._current_row}/{self._total_rows} "
-                f"({self._current_row * 100 // self._total_rows}%) | "
+                f"({pct}%) | "
                 f"{rate:.1f} rows/s | ETA: {eta:.0f}s ---"
             )
 
