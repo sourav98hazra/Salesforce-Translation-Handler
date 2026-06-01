@@ -447,7 +447,7 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn = QPushButton("Continue to Phase 4 \u2192")
         self._next_btn.setEnabled(False)
         self._next_btn.setToolTip("Move to the next phase (Browse & Review).")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
+        self._next_btn.clicked.connect(self._on_continue_to_phase4)
 
         self.add_layout(make_action_row(
             self._start_btn,
@@ -982,6 +982,12 @@ class Phase3TranslatePage(PhasePage):
         worker.finished_ok.connect(_loaded)
         worker.failed.connect(lambda msg: self.error(msg, "Load failed"))
         worker.start()
+
+    # ------------------------------------------------------------------ continue to Phase 4
+
+    def _on_continue_to_phase4(self) -> None:
+        self._state.set_phase(2, PhaseStatus.DONE)
+        self.request_navigate.emit(3)
 
     # ------------------------------------------------------------------ helpers
 

@@ -1015,6 +1015,7 @@ class Phase4ReviewPage(PhasePage):
                 f"Document carried forward to Phase 5 "
                 f"({stats['total']:,} rows, {stats['translated']:,} translated)."
             )
+        self._state.set_phase(3, PhaseStatus.DONE)
         self.request_navigate.emit(4)
 
     # ------------------------------------------------------------------ pop-out (entire splitter: table + editor)

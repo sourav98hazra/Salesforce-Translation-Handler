@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..state import AppState
+from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, ImportExcelWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
@@ -94,7 +94,7 @@ class Phase2ExcelPage(PhasePage):
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
         self._next_btn.setToolTip("Move to the next phase (Translate).")
-        self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
+        self._next_btn.clicked.connect(self._on_continue_to_phase3)
 
         self.add_layout(make_action_row(
             self._convert_btn, self._save_copy_btn, self._load_btn, self._next_btn
@@ -274,6 +274,12 @@ class Phase2ExcelPage(PhasePage):
                 self._summary_label.text()
                 + f" | Source: {lang_name} ({confidence * 100:.0f}%)"
             )
+
+    # ------------------------------------------------------------------ continue to Phase 3
+
+    def _on_continue_to_phase3(self) -> None:
+        self._state.set_phase(1, PhaseStatus.DONE)
+        self.request_navigate.emit(2)
 
     # ------------------------------------------------------------------ pop-out details
 

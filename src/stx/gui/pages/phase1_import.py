@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...stf import write_stf_files
-from ..state import AppState
+from ..state import AppState, PhaseStatus
 from ..workers import ParseStfWorker, WriteStfWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row
 
@@ -337,6 +337,7 @@ class Phase1ImportPage(PhasePage):
             self._state.target_language_name = self._language_field.text().strip()
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
+        self._state.set_phase(0, PhaseStatus.DONE)
         self.request_navigate.emit(1)
 
     # ------------------------------------------------------------------ pop-out preview
