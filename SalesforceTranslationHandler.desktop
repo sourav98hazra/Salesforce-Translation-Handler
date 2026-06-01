@@ -2,7 +2,7 @@
 Type=Application
 Name=Salesforce Translation Manager
 Comment=STF -> Excel -> Translate -> Review -> STF workflow
-Exec=bash -c 'cd "$(dirname %k)" && exec ./launch.sh'
+Exec=bash -c 'cd "$(dirname "$1")" && exec ./launch.sh' bash %k
 # --- Icon installation ---
 # The Icon field below uses a placeholder path. After cloning the repository,
 # run this command from the repo root to set the correct absolute path:
