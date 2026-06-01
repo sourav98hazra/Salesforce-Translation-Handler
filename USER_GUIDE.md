@@ -164,7 +164,7 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 The filter row at the top of Phase 4 lets you focus on a subset of translations:
 
 - **Component dropdown**: Show only rows belonging to one component type (e.g. `CustomLabel`). Choose "All" to show everything.
-- **Status dropdown**: Show only "Translated" or "Untranslated" rows, or "All".
+- **Status dropdown**: Show only "Translated" or "Untranslated" rows, "Approved" (only approved entries), or "All".
 - **Search field**: Substring search across the Key and Source label columns. Useful for finding specific labels (e.g. type "Account" to find all account-related fields).
 
 The three filters combine: e.g. setting Component=CustomLabel + Status=Untranslated + Search="error" shows only untranslated CustomLabel rows whose key or label contains "error".
@@ -377,6 +377,60 @@ stx validate input.stf --export-report report.html
 | HTML | Standalone page with embedded CSS, summary header, and issues table grouped by category.  Open in any browser. |
 
 The report is written regardless of whether validation passes or fails.  The command still exits with code 1 when errors are present (useful for CI pipelines).
+
+---
+
+## 11. CLI: Approve and unapprove translations
+
+The `stx approve` and `stx unapprove` commands let you batch-mark translations as approved (or clear that mark) directly from the command line.
+
+### Approve
+
+```bash
+# Approve specific entries by key
+stx approve input.stf --keys CustomLabel.A,CustomLabel.B
+
+# Approve all entries that have a non-empty translation
+stx approve translated.xlsx --all-translated
+```
+
+### Unapprove
+
+```bash
+# Unapprove specific entries by key
+stx unapprove input.stf --keys CustomLabel.A
+
+# Clear approval on all entries
+stx unapprove translated.xlsx --all
+```
+
+Both commands detect the file format by extension (`.stf` or `.xlsx`) and write the result back to the same file.
+
+---
+
+## 12. Approved status
+
+The **Approved** status marks individual translations as reviewed and accepted. It affects several parts of the workflow:
+
+### Phase 4 (Browse & Review)
+
+- A new **Approved** column (rightmost) shows a checkbox for every row.
+- Toggle the checkbox to mark/unmark an entry as approved.
+- Use the **Status** dropdown filter (set to "Approved") to show only approved rows.
+- Approved entries display "Approved" in the Status column.
+
+### Phase 5 (Validate & Fix)
+
+- Entries marked as approved are **skipped** during per-entry validation checks (length limits, token drift, HTML mismatch, empty translation).
+- An informational note reports how many approved entries were skipped.
+- Document-level checks (duplicate keys) still run on all entries regardless of approval status.
+
+### Persistence
+
+| Format | How approval is stored |
+|---|---|
+| Excel (`.xlsx`) | An **"Approved"** column with value `Yes` or empty. Old workbooks without this column import fine (all entries default to not approved). |
+| STF (`.stf`) | A trailing `# APPROVED` marker after the out-of-date column: `key\tlabel\ttranslation\t-\t# APPROVED`. Lines without the marker are treated as not approved. |
 
 ---
 

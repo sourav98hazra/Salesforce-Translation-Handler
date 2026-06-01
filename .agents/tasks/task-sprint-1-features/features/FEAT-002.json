@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Row-level Approved Status: extend the Entry model with an 'approved' boolean, add an 'Approved' column to Phase 4 table with checkbox and filter, treat approved rows as implicitly valid in Phase 5, persist the flag in Excel (new column), add CLI commands 'stx approve' and 'stx unapprove' for batch marking.",
+  "status": "in_progress",
+  "steps": [
+    "1. In src/stx/model.py, change Entry from frozen dataclass to a non-frozen one (or add approved as a mutable field). Add 'approved: bool = False' field. Update the status property to return 'Approved' when approved=True and translation is non-empty (as a third status alongside Translated/Untranslated). Update logical_sheet_name if needed (approved rows should still group by component + translated status, not by approved).",
+    "2. In src/stx/excel/exporter.py, add 'Approved' as a 4th column in ENTRY_COLUMNS. Update _write_entry_sheet to write the approved boolean as 'Yes'/'No' (or empty). Update CONTENT_DETAILS_COLUMNS documentation if needed.",
+    "3. In src/stx/excel/importer.py, read the 'Approved' column if present (graceful fallback to False if column missing for backward compatibility). Update _read_entries_from_sheet to check for an 'Approved' header and parse Yes/True/1 as True.",
+    "4. In src/stx/stf/writer.py, add a comment marker for approved entries in the full STF output. Use a trailing comment '# APPROVED' appended after the translation column so STF remains parseable by Salesforce (comments on data lines are allowed). Update render_full_stf.",
+    "5. In src/stx/stf/parser.py, detect the '# APPROVED' trailing comment when parsing data lines and set approved=True on the resulting Entry.",
+    "6. In src/stx/validate.py, update validate_document (or _check_entry) to skip validation checks for entries where entry.approved is True (treat them as implicitly valid). Add an 'info' level issue noting that N approved rows were skipped.",
+    "7. In src/stx/gui/pages/phase4_review.py, add 'Approved' as a 7th column in _HEADERS. Update _EntriesModel.data() to return a checkmark or empty for col 6. Update _EntriesModel.flags() to make the Approved column checkable. Update _EntriesModel.setData() to toggle approved. Add 'Approved' option to the status filter dropdown (_ComponentStatusFilter).",
+    "8. In src/stx/cli.py, add two new commands: 'stx approve <source> --keys key1,key2 --all-translated' that marks entries as approved (loads from STF or xlsx, marks, saves back), and 'stx unapprove <source> --keys key1,key2 --all' that clears approvals. Both write back to the source file (xlsx or stf).",
+    "9. Create tests/test_approved.py with tests: Entry approved field defaults to False, approved entry has status 'Approved', Excel round-trip preserves approved flag, STF round-trip preserves approved flag via comment marker, validator skips approved rows, CLI approve/unapprove commands work.",
+    "10. Update USER_GUIDE.md: document the Approved column in Phase 4, how it interacts with Phase 5 validation, the CLI commands (stx approve / stx unapprove), and the persistence format (Excel column + STF comment)."
+  ],
+  "acceptance_criteria": [
+    "Entry model has an 'approved' boolean field defaulting to False",
+    "Excel export includes an 'Approved' column; import reads it back (backward compatible with old workbooks missing the column)",
+    "STF writer encodes approved as a trailing '# APPROVED' marker; parser reads it back",
+    "Phase 4 table shows an 'Approved' column with checkbox toggling",
+    "Phase 4 status filter includes 'Approved' option",
+    "Phase 5 validator skips entries marked as approved",
+    "CLI 'stx approve' and 'stx unapprove' commands work for marking/unmarking entries",
+    "All new tests pass",
+    "All existing tests continue to pass (backward compatibility maintained)"
+  ],
+  "verification": [
+    "pytest -q (all tests pass including new test_approved.py)",
+    "pytest tests/test_approved.py -v (specific new tests pass)",
+    "QT_QPA_PLATFORM=offscreen pytest tests/gui/ (GUI tests still pass)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -101,8 +101,22 @@ def validate_document(doc: Document) -> ValidationReport:
 
     report = ValidationReport()
     _check_duplicate_keys(doc, report)
+    approved_count = 0
     for entry in doc.entries:
+        if entry.approved:
+            approved_count += 1
+            continue
         _check_entry(entry, report)
+    if approved_count > 0:
+        report.issues.append(
+            ValidationIssue(
+                category="approved_skipped",
+                severity="info",
+                key="",
+                message=f"{approved_count} approved entry(ies) skipped during validation.",
+                component="",
+            )
+        )
     return report
 
 

@@ -88,7 +88,7 @@ def fix_restore_placeholders(entry: Entry) -> Optional[FixResult]:
     new_translation = f"{entry.translation.rstrip()} {appended}"
     return FixResult(
         fixed=True,
-        entry=Entry(key=entry.key, label=entry.label, translation=new_translation),
+        entry=Entry(key=entry.key, label=entry.label, translation=new_translation, approved=entry.approved),
         description=f"Restored {len(missing)} placeholder(s): {', '.join(sorted(missing))}",
     )
 
@@ -106,7 +106,7 @@ def fix_restore_message_format(entry: Entry) -> Optional[FixResult]:
     new_translation = f"{entry.translation.rstrip()} {appended}"
     return FixResult(
         fixed=True,
-        entry=Entry(key=entry.key, label=entry.label, translation=new_translation),
+        entry=Entry(key=entry.key, label=entry.label, translation=new_translation, approved=entry.approved),
         description=f"Restored {len(missing)} MessageFormat token(s): {', '.join(sorted(missing))}",
     )
 
@@ -125,10 +125,10 @@ def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
     last_space = truncated.rfind(" ")
     if last_space > target_len * 0.6:
         truncated = truncated[:last_space]
-    truncated = truncated.rstrip() + "…"
+    truncated = truncated.rstrip() + "\u2026"
     return FixResult(
         fixed=True,
-        entry=Entry(key=entry.key, label=entry.label, translation=truncated),
+        entry=Entry(key=entry.key, label=entry.label, translation=truncated, approved=entry.approved),
         description=f"Trimmed from {len(entry.translation)} to {len(truncated)} chars (limit {limit}).",
     )
 
@@ -138,7 +138,7 @@ def fix_strip_whitespace_translation(entry: Entry) -> Optional[FixResult]:
     if entry.translation and not entry.translation.strip():
         return FixResult(
             fixed=True,
-            entry=Entry(key=entry.key, label=entry.label, translation=""),
+            entry=Entry(key=entry.key, label=entry.label, translation="", approved=entry.approved),
             description="Cleared whitespace-only translation.",
         )
     return None
@@ -163,7 +163,7 @@ def fix_restore_html_tags(entry: Entry) -> Optional[FixResult]:
         new_translation = f"<{tag}>{entry.translation}</{tag}>"
         return FixResult(
             fixed=True,
-            entry=Entry(key=entry.key, label=entry.label, translation=new_translation),
+            entry=Entry(key=entry.key, label=entry.label, translation=new_translation, approved=entry.approved),
             description=f"Wrapped translation in <{tag}>...</{tag}> to match source HTML structure.",
         )
     return None

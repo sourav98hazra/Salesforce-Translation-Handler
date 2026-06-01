@@ -112,19 +112,25 @@ def _read_entries_from_sheet(ws) -> Iterable[Entry]:
     key_idx = headers.index("Key")
     label_idx = headers.index("Label")
     trans_idx = headers.index("Translation") if "Translation" in headers else None
+    approved_idx = headers.index("Approved") if "Approved" in headers else None
 
     entries: list[Entry] = []
     for row in rows:
         if row is None:
             continue
         # Pad row to expected width to avoid IndexError on short/empty trailing cells.
-        cells = list(row) + [None] * (max(key_idx, label_idx, trans_idx or 0) + 1 - len(row))
+        max_idx = max(key_idx, label_idx, trans_idx or 0, approved_idx or 0)
+        cells = list(row) + [None] * (max_idx + 1 - len(row))
         key = _stringify(cells[key_idx])
         label = _stringify(cells[label_idx])
         translation = _stringify(cells[trans_idx]) if trans_idx is not None else ""
         if not key and not label:
             continue
-        entries.append(Entry(key=key, label=label, translation=translation))
+        approved = False
+        if approved_idx is not None:
+            raw_approved = _stringify(cells[approved_idx]).strip().lower()
+            approved = raw_approved in {"yes", "true", "1"}
+        entries.append(Entry(key=key, label=label, translation=translation, approved=approved))
     return entries
 
 

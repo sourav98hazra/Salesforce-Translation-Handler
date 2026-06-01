@@ -68,7 +68,10 @@ def render_full_stf(doc: Document) -> str:
 
     for entry in doc.entries:
         if entry.translation.strip():
-            lines.append(f"{entry.key}\t{entry.label}\t{entry.translation.strip()}\t-")
+            line = f"{entry.key}\t{entry.label}\t{entry.translation.strip()}\t-"
+            if entry.approved:
+                line += "\t# APPROVED"
+            lines.append(line)
         else:
             lines.append(f"{entry.key}\t{entry.label}")
 

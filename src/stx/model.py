@@ -30,6 +30,7 @@ class Entry:
     key: str
     label: str
     translation: str = ""
+    approved: bool = False
 
     @property
     def component_type(self) -> str:
@@ -44,13 +45,25 @@ class Entry:
 
     @property
     def status(self) -> str:
-        """``"Translated"`` if a non-blank translation exists, else ``"Untranslated"``."""
+        """Return the translation status.
+
+        * ``"Approved"`` if approved *and* a non-blank translation exists.
+        * ``"Translated"`` if a non-blank translation exists (but not approved).
+        * ``"Untranslated"`` otherwise.
+        """
+        if self.approved and self.translation.strip():
+            return "Approved"
         return "Translated" if self.translation.strip() else "Untranslated"
 
     @property
     def logical_sheet_name(self) -> str:
-        """Logical worksheet name used by the Excel exporter (``<Component>_<Status>``)."""
-        return f"{self.component_type}_{self.status}"
+        """Logical worksheet name used by the Excel exporter (``<Component>_<Status>``).
+
+        Approved entries group as ``Translated`` (not ``Approved``) so the
+        Excel layout stays stable regardless of approval state.
+        """
+        base_status = "Translated" if self.translation.strip() else "Untranslated"
+        return f"{self.component_type}_{base_status}"
 
 
 @dataclass

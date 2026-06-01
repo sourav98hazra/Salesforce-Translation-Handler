@@ -52,8 +52,9 @@ from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
-_HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation"]
+_HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation", "Approved"]
 _TRANSLATION_COL = 5
+_APPROVED_COL = 6
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +79,8 @@ class _EntriesModel(QAbstractTableModel):
             return None
         entry = self._doc.entries[index.row()]
         col = index.column()
+        if role == Qt.ItemDataRole.CheckStateRole and col == _APPROVED_COL:
+            return Qt.CheckState.Checked if entry.approved else Qt.CheckState.Unchecked
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if col == 0:
                 return index.row() + 1
@@ -91,6 +94,8 @@ class _EntriesModel(QAbstractTableModel):
                 return entry.label
             if col == 5:
                 return entry.translation
+            if col == _APPROVED_COL:
+                return "\u2713" if entry.approved else ""
         if role == Qt.ItemDataRole.ToolTipRole and col in (4, 5):
             return entry.label if col == 4 else entry.translation
         return None
@@ -106,15 +111,29 @@ class _EntriesModel(QAbstractTableModel):
         base = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         if index.column() == _TRANSLATION_COL:
             return base | Qt.ItemFlag.ItemIsEditable
+        if index.column() == _APPROVED_COL:
+            return base | Qt.ItemFlag.ItemIsUserCheckable
         return base
 
     def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
+        if index.column() == _APPROVED_COL and role == Qt.ItemDataRole.CheckStateRole:
+            row = index.row()
+            old = self._doc.entries[row]
+            new_approved = value == Qt.CheckState.Checked.value if isinstance(value, int) else value == Qt.CheckState.Checked
+            self._doc.entries[row] = Entry(
+                key=old.key, label=old.label, translation=old.translation, approved=new_approved,
+            )
+            self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole, Qt.ItemDataRole.DisplayRole])
+            status_idx = self.index(row, 3)
+            self.dataChanged.emit(status_idx, status_idx, [Qt.ItemDataRole.DisplayRole])
+            self.edited.emit(row)
+            return True
         if role != Qt.ItemDataRole.EditRole or index.column() != _TRANSLATION_COL:
             return False
         row = index.row()
         old = self._doc.entries[row]
         text = "" if value is None else str(value)
-        self._doc.entries[row] = Entry(key=old.key, label=old.label, translation=text)
+        self._doc.entries[row] = Entry(key=old.key, label=old.label, translation=text, approved=old.approved)
         self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
         status_idx = self.index(row, 3)
         self.dataChanged.emit(status_idx, status_idx, [Qt.ItemDataRole.DisplayRole])
@@ -235,7 +254,7 @@ class Phase4ReviewPage(PhasePage):
 
         fr_layout.addWidget(QLabel("Status:"))
         self._status_combo = QComboBox()
-        self._status_combo.addItems(["All", "Translated", "Untranslated"])
+        self._status_combo.addItems(["All", "Translated", "Untranslated", "Approved"])
         self._status_combo.setToolTip(
             "Filter the table by translation status. Use 'Untranslated' to "
             "focus on rows that still need work."
@@ -439,11 +458,12 @@ class Phase4ReviewPage(PhasePage):
         self._component_combo.blockSignals(False)
 
         self._table.setColumnWidth(0, 60)
-        self._table.setColumnWidth(1, 320)
+        self._table.setColumnWidth(1, 280)
         self._table.setColumnWidth(2, 120)
         self._table.setColumnWidth(3, 110)
-        self._table.setColumnWidth(4, 320)
-        self._table.setColumnWidth(5, 320)
+        self._table.setColumnWidth(4, 280)
+        self._table.setColumnWidth(5, 280)
+        self._table.setColumnWidth(6, 80)
         self._update_counters()
         self._run_auto_validation()
 

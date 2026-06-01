@@ -68,6 +68,7 @@ from .excel import (
 from .glossary import Glossary
 from .languages import code_for_language, language_for_code, to_google_code
 from .memory import TranslationMemory
+from .model import Entry
 from .scope import Scope, StatusFilter
 from .stf import parse_stf, write_stf_files
 from .translate import (
@@ -548,6 +549,92 @@ def scope_new(
         f"[green]OK[/green] Scope saved to [bold]{output}[/bold] "
         f"(matches {estimate:,} of {len(doc.entries):,} rows)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Approve / Unapprove
+# ---------------------------------------------------------------------------
+
+@app.command("approve")
+def approve(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    keys: Optional[str] = typer.Option(None, "--keys", help="Comma-separated list of exact keys to approve."),
+    all_translated: bool = typer.Option(False, "--all-translated", help="Approve all translated entries."),
+) -> None:
+    """Mark entries as approved (by key list or all translated)."""
+
+    if not keys and not all_translated:
+        console.print("[red]Error:[/red] provide --keys or --all-translated.")
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    key_set = {k.strip() for k in keys.split(",") if k.strip()} if keys else set()
+
+    count = 0
+    for i, entry in enumerate(doc.entries):
+        should_approve = False
+        if all_translated and entry.translation.strip():
+            should_approve = True
+        if key_set and entry.key in key_set:
+            should_approve = True
+        if should_approve and not entry.approved:
+            doc.entries[i] = Entry(
+                key=entry.key, label=entry.label, translation=entry.translation, approved=True,
+            )
+            count += 1
+
+    _save_source(doc, source)
+    console.print(f"[green]OK[/green] Approved {count} entry(ies) in [bold]{source}[/bold].")
+
+
+@app.command("unapprove")
+def unapprove(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    keys: Optional[str] = typer.Option(None, "--keys", help="Comma-separated list of exact keys to unapprove."),
+    all_entries: bool = typer.Option(False, "--all", help="Clear approved flag on all entries."),
+) -> None:
+    """Clear the approved flag on entries (by key list or all)."""
+
+    if not keys and not all_entries:
+        console.print("[red]Error:[/red] provide --keys or --all.")
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    key_set = {k.strip() for k in keys.split(",") if k.strip()} if keys else set()
+
+    count = 0
+    for i, entry in enumerate(doc.entries):
+        should_unapprove = False
+        if all_entries:
+            should_unapprove = True
+        if key_set and entry.key in key_set:
+            should_unapprove = True
+        if should_unapprove and entry.approved:
+            doc.entries[i] = Entry(
+                key=entry.key, label=entry.label, translation=entry.translation, approved=False,
+            )
+            count += 1
+
+    _save_source(doc, source)
+    console.print(f"[green]OK[/green] Unapproved {count} entry(ies) in [bold]{source}[/bold].")
+
+
+def _load_source(source: Path) -> Document:
+    """Load a document from STF or Excel based on file extension."""
+    ext = source.suffix.lower()
+    if ext == ".xlsx":
+        return import_document_from_excel(source)
+    return parse_stf(source)
+
+
+def _save_source(doc: Document, source: Path) -> None:
+    """Save a document back to disk in the same format as the source."""
+    ext = source.suffix.lower()
+    if ext == ".xlsx":
+        export_document_to_excel(doc, source)
+    else:
+        from .stf.writer import render_full_stf as _render_full, _write_lf_utf8
+        _write_lf_utf8(source, _render_full(doc))
 
 
 # ---------------------------------------------------------------------------

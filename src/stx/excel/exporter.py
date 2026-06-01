@@ -33,7 +33,7 @@ _MAX_SHEET_NAME = 31
 # Truncation budget that leaves room for a "_NN" disambiguation suffix.
 _BASE_SHEET_NAME_BUDGET = 28
 
-ENTRY_COLUMNS = ["Key", "Label", "Translation"]
+ENTRY_COLUMNS = ["Key", "Label", "Translation", "Approved"]
 CONTENT_DETAILS_COLUMNS = [
     "SheetName",
     "SavedAs",
@@ -205,6 +205,7 @@ def _write_entry_sheet(ws: Worksheet, entries: List[Entry]) -> None:
             _safe_excel_text(entry.key),
             _safe_excel_text(entry.label),
             _safe_excel_text(entry.translation),
+            "Yes" if entry.approved else "",
         ])
     _force_string_columns(ws, len(ENTRY_COLUMNS))
     _style_header(ws, len(ENTRY_COLUMNS))

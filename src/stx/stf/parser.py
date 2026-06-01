@@ -103,7 +103,14 @@ def _parse_lines(lines: Iterable[str]) -> Document:
 
         # The 4th column is "OUT OF DATE" (typically "-"), which we drop --
         # the writer regenerates it deterministically from translation status.
-        doc.entries.append(Entry(key=key, label=label, translation=translation))
+
+        # The 5th column, if present and equal to "# APPROVED", marks the
+        # entry as approved.
+        approved = False
+        if len(parts) >= 5 and parts[4].strip() == "# APPROVED":
+            approved = True
+
+        doc.entries.append(Entry(key=key, label=label, translation=translation, approved=approved))
 
     return doc
 
