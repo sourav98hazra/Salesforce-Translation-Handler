@@ -95,6 +95,16 @@ class FindReplaceDialog(QDialog):
         options_row.addStretch(1)
         layout.addLayout(options_row)
 
+        # Scope clarity banner -- spells out exactly what will be searched
+        # and changed so users are never surprised by what Replace All hits.
+        self._scope_label = QLabel("Scope: Translations only (labels and keys are never modified).")
+        self._scope_label.setWordWrap(True)
+        self._scope_label.setStyleSheet(
+            "color: #3730a3; background: #e0e7ff; padding: 6px 8px; "
+            "border-radius: 4px; font-size: 11px; font-weight: 600;"
+        )
+        layout.addWidget(self._scope_label)
+
         # Preview count
         self._preview_label = QLabel("0 matches")
         self._preview_label.setStyleSheet("color: #475569; font-weight: 600;")
@@ -103,6 +113,15 @@ class FindReplaceDialog(QDialog):
         # Buttons
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
+        # "Find" counts and reports matches WITHOUT changing anything.
+        self._find_btn = QPushButton("Find")
+        self._find_btn.setToolTip(
+            "Count how many matches exist for the search text, without "
+            "replacing anything."
+        )
+        self._find_btn.clicked.connect(self._on_find)
+        btn_row.addWidget(self._find_btn)
+
         self._replace_btn = QPushButton("Replace All")
         self._replace_btn.setDefault(True)
         self._replace_btn.clicked.connect(self._on_replace_all)
@@ -149,6 +168,27 @@ class FindReplaceDialog(QDialog):
             scope=self._get_scope(),
         )
         self._preview_label.setText(f"{count} match{'es' if count != 1 else ''}")
+        self._replace_btn.setEnabled(count > 0)
+
+    def _on_find(self) -> None:
+        """Count and report matches without performing any replacement."""
+        find_text = self._find_edit.text()
+        if not find_text:
+            self._preview_label.setText("Enter text in the Find field to search.")
+            self._replace_btn.setEnabled(False)
+            return
+        count = find_matches(
+            self._doc,
+            find_text,
+            case_sensitive=self._case_check.isChecked(),
+            use_regex=self._regex_check.isChecked(),
+            scope=self._get_scope(),
+        )
+        scope_text = self._scope_combo.currentText().lower()
+        noun = "match" if count == 1 else "matches"
+        self._preview_label.setText(
+            f"Found {count} {noun} in {scope_text} (nothing changed yet)."
+        )
         self._replace_btn.setEnabled(count > 0)
 
     def _on_replace_all(self) -> None:

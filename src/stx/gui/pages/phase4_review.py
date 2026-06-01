@@ -342,13 +342,13 @@ class Phase4ReviewPage(PhasePage):
 
         # Undo / Redo toolbar buttons
         self._undo_btn = QPushButton("Undo")
-        self._undo_btn.setToolTip("Undo the last edit (Ctrl+Z)")
+        self._undo_btn.setToolTip("Undo last translation edit (Ctrl+Z)")
         self._undo_btn.setEnabled(False)
         self._undo_btn.clicked.connect(self._on_undo)
         tb_layout.addWidget(self._undo_btn)
 
         self._redo_btn = QPushButton("Redo")
-        self._redo_btn.setToolTip("Redo the last undone edit (Ctrl+Y)")
+        self._redo_btn.setToolTip("Redo last undone edit (Ctrl+Y)")
         self._redo_btn.setEnabled(False)
         self._redo_btn.clicked.connect(self._on_redo)
         tb_layout.addWidget(self._redo_btn)

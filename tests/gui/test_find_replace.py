@@ -81,6 +81,42 @@ class TestFindReplaceDialogConstruction:
         assert dialog._scope_combo.count() == 1
         assert dialog._scope_combo.itemText(0) == "Translations Only"
 
+    def test_dialog_has_find_button(self, qtbot, doc):
+        """A dedicated Find button reports matches without replacing (Issue 9)."""
+        dialog = FindReplaceDialog(doc)
+        qtbot.addWidget(dialog)
+        assert dialog._find_btn is not None
+        assert dialog._find_btn.text() == "Find"
+
+    def test_dialog_has_scope_label(self, qtbot, doc):
+        """A visible scope banner states what will be searched (Issue 9)."""
+        dialog = FindReplaceDialog(doc)
+        qtbot.addWidget(dialog)
+        assert dialog._scope_label is not None
+        assert "Scope:" in dialog._scope_label.text()
+        assert "Translations only" in dialog._scope_label.text()
+
+    def test_find_button_counts_without_replacing(self, qtbot, doc):
+        """Clicking Find reports a count and leaves all translations intact."""
+        dialog = FindReplaceDialog(doc)
+        qtbot.addWidget(dialog)
+        before = [e.translation for e in doc.entries]
+        dialog._find_edit.setText("World")
+        dialog._on_find()
+        text = dialog._preview_label.text()
+        assert "Found 2 matches" in text
+        # Nothing was replaced.
+        assert [e.translation for e in doc.entries] == before
+        assert not dialog.replacements
+
+    def test_find_button_empty_query(self, qtbot, doc):
+        """Find with an empty query prompts the user and does not crash."""
+        dialog = FindReplaceDialog(doc)
+        qtbot.addWidget(dialog)
+        dialog._find_edit.setText("")
+        dialog._on_find()
+        assert "Find field" in dialog._preview_label.text()
+
 
 # ---------------------------------------------------------------------------
 # Core replacement logic (plain text)
