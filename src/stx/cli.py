@@ -259,6 +259,10 @@ def translate(
         True, "--detect-source/--no-detect-source",
         help="Auto-detect source language from labels (overridden by explicit --source).",
     ),
+    retranslate_existing: bool = typer.Option(
+        False, "--retranslate-existing",
+        help="Retranslate rows that already have translations instead of skipping them.",
+    ),
 ) -> None:
     """Phase 3: translate every untranslated row in an organised Excel workbook."""
 
@@ -354,6 +358,7 @@ def translate(
         fuzzy_max_results=fuzzy_max_results,
         fuzzy_auto_accept_threshold=fuzzy_auto_accept,
         imported_translations=imported_trans,
+        retranslate_existing=retranslate_existing,
     )
 
     export_document_to_excel(doc, xlsx_out)
@@ -365,10 +370,11 @@ def translate(
 
     resumed_info = f", resumed {result.resumed_count:,}" if result.resumed_count else ""
     imported_info = f", imported {result.imported_reuse_count:,}" if result.imported_reuse_count else ""
+    retranslated_info = f", retranslated {result.retranslated_count:,}" if result.retranslated_count else ""
     console.print(
         f"[green]OK[/green] Translated {result.translated_count:,} "
         f"(TM hits {result.cached_count:,}, fuzzy {result.fuzzy_accepted_count:,}, "
-        f"dedup {result.deduped_count:,}{imported_info}{resumed_info}); "
+        f"dedup {result.deduped_count:,}{imported_info}{retranslated_info}{resumed_info}); "
         f"skipped {result.skipped_count:,}; "
         f"elapsed {result.elapsed_seconds:.1f}s; output: [bold]{xlsx_out}[/bold]"
     )
@@ -444,6 +450,10 @@ def run_pipeline(
     detect_source: bool = typer.Option(
         True, "--detect-source/--no-detect-source",
         help="Auto-detect source language from labels (overridden by explicit --source).",
+    ),
+    retranslate_existing: bool = typer.Option(
+        False, "--retranslate-existing",
+        help="Retranslate rows that already have translations instead of skipping them.",
     ),
 ) -> None:
     """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF."""
@@ -551,6 +561,7 @@ def run_pipeline(
                 fuzzy_max_results=fuzzy_max_results,
                 fuzzy_auto_accept_threshold=fuzzy_auto_accept,
                 imported_translations=imported_trans,
+                retranslate_existing=retranslate_existing,
             )
             export_document_to_excel(per_lang_doc, translated_xlsx)
             write_translation_audit_sheets(
@@ -970,6 +981,7 @@ def _run_translation_with_progress(
     fuzzy_threshold=None, fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
     imported_translations=None,
+    retranslate_existing: bool = False,
 ):
     with Progress(
         SpinnerColumn(),
@@ -1003,6 +1015,7 @@ def _run_translation_with_progress(
             fuzzy_max_results=fuzzy_max_results,
             fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
             imported_translations=imported_translations,
+            retranslate_existing=retranslate_existing,
         )
 
 

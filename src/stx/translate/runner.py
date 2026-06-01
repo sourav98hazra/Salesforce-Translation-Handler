@@ -147,6 +147,7 @@ class TranslationResult:
     fuzzy_accepted_count: int = 0  # from fuzzy TM matching
     resumed_count: int = 0  # from checkpoint resume
     imported_reuse_count: int = 0  # from imported translations file
+    retranslated_count: int = 0  # rows that had existing translations and were retranslated
     target_lang: str = ""
     elapsed_seconds: float = 0.0
 
@@ -189,6 +190,7 @@ def translate_document(
     fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
     imported_translations: Optional[Dict[str, str]] = None,
+    retranslate_existing: bool = False,
 ) -> TranslationResult:
     """Translate every untranslated entry in ``doc`` in place.
 
@@ -228,6 +230,10 @@ def translate_document(
         duration of the run so a long translation isn't interrupted by
         idle system sleep.  Has no effect when the laptop lid is
         closed -- closing the lid forces sleep on most systems.
+    retranslate_existing:
+        If ``True``, rows that already have a translation are
+        retranslated instead of skipped.  Imported translations still
+        take highest priority regardless of this flag.
     """
     started = time.monotonic()
     runner = _Runner(
@@ -247,6 +253,7 @@ def translate_document(
         fuzzy_max_results=fuzzy_max_results,
         fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
         imported_translations=imported_translations,
+        retranslate_existing=retranslate_existing,
     )
     if prevent_system_sleep:
         from ..wakelock import prevent_sleep
@@ -276,6 +283,7 @@ def translate_document_multi(
     fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
     imported_translations: Optional[Dict[str, str]] = None,
+    retranslate_existing: bool = False,
 ) -> MultiTargetResult:
     """Translate ``doc`` to multiple target languages in sequence.
 
@@ -319,6 +327,7 @@ def translate_document_multi(
             fuzzy_max_results=fuzzy_max_results,
             fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
             imported_translations=imported_translations,
+            retranslate_existing=retranslate_existing,
         )
         multi.by_target[target] = result
 
@@ -356,6 +365,7 @@ class _Runner:
         fuzzy_max_results: int = 5,
         fuzzy_auto_accept_threshold: float = 90.0,
         imported_translations: Optional[Dict[str, str]] = None,
+        retranslate_existing: bool = False,
     ) -> None:
         self.doc = doc
         self.translator = translator
@@ -372,6 +382,7 @@ class _Runner:
         self.fuzzy_max_results = fuzzy_max_results
         self.fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
         self.imported_translations = imported_translations or {}
+        self.retranslate_existing = retranslate_existing
         self.limiter: Optional[AdaptiveLimiter] = (
             AdaptiveLimiter(max_capacity=rate_limit_per_second)
             if rate_limit_per_second and rate_limit_per_second > 0
@@ -394,6 +405,7 @@ class _Runner:
         self._fuzzy_accepted = 0
         self._resumed = 0
         self._imported_reuse = 0
+        self._retranslated = 0
         self._completed_for_eta = 0
         self._started = time.monotonic()
 
@@ -487,6 +499,7 @@ class _Runner:
             fuzzy_accepted_count=self._fuzzy_accepted,
             resumed_count=self._resumed,
             imported_reuse_count=self._imported_reuse,
+            retranslated_count=self._retranslated,
             target_lang=self.target_lang,
         )
 
@@ -540,6 +553,11 @@ class _Runner:
             return "done"
 
         if entry.translation.strip():
+            if self.retranslate_existing:
+                # Row has an existing translation but user requested retranslation.
+                # Let it proceed to _translate_one() where imported_translations
+                # can still take priority.
+                return "translate"
             self._fill(index, entry, sheet, "Skipped (already translated)", summary)
             summary.skipped_rows += 1
             self._skipped += 1
@@ -811,6 +829,11 @@ class _Runner:
                 self._fuzzy_accepted += 1
             if from_imported:
                 self._imported_reuse += 1
+            # Track retranslated rows: the entry originally had a non-empty
+            # translation and retranslate_existing mode caused it to be
+            # re-translated (or served from imported/TM/dedup).
+            if self.retranslate_existing and entry.translation.strip():
+                self._retranslated += 1
         # Persist to checkpoint after filling the slot.
         if self.checkpoint is not None:
             try:

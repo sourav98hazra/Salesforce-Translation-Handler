@@ -13,6 +13,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -336,6 +337,17 @@ class Phase3TranslatePage(PhasePage):
         filter_row.addWidget(self._import_trans_label)
         filter_row.addSpacing(8)
 
+        # Retranslation checkbox
+        self._retranslate_check = QCheckBox("Retranslate existing translations")
+        self._retranslate_check.setToolTip(
+            "When checked, rows that already have translations will be "
+            "retranslated. When unchecked (default), only untranslated "
+            "rows are sent to the backend."
+        )
+        self._retranslate_check.setChecked(False)
+        self._retranslate_check.setVisible(False)  # shown only when doc has translated entries
+        filter_row.addWidget(self._retranslate_check)
+
         # Vertical divider for visual separation between the action and the metric
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.VLine)
@@ -490,6 +502,13 @@ class Phase3TranslatePage(PhasePage):
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
 
+        # Show retranslation checkbox only if document has any translated entries
+        if self._state.document is not None:
+            has_translated = any(e.translation.strip() for e in self._state.document.entries)
+            self._retranslate_check.setVisible(has_translated)
+        else:
+            self._retranslate_check.setVisible(False)
+
     def _refresh_settings_summary(self) -> None:
         backend = gui_settings.get_str(gui_settings.KEYS.backend, "google")
         workers = gui_settings.get_int(gui_settings.KEYS.workers, 4)
@@ -619,6 +638,7 @@ class Phase3TranslatePage(PhasePage):
         self._state.scope = scope
         self._state.target_language_code = code_for_language(self._target_combo.currentText()) or "ja"
         self._state.target_language_name = self._target_combo.currentText()
+        self._state.retranslate_existing = self._retranslate_check.isChecked()
         gui_settings.remember_target_language(self._state.target_language_name, self._state.target_language_code)
 
         # ---- Read advanced options from the Settings dialog values.
@@ -704,6 +724,7 @@ class Phase3TranslatePage(PhasePage):
                 if self._state.imported_translations_enabled
                 else None
             ),
+            retranslate_existing=self._state.retranslate_existing,
             parent=self,
         )
         self._worker.progress.connect(self._on_progress)

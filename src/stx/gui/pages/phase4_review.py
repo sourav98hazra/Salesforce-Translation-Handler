@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
@@ -401,6 +402,8 @@ class Phase4ReviewPage(PhasePage):
         self._table.setEditTriggers(
             QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.SelectedClicked
         )
+        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._on_table_context_menu)
         splitter.addWidget(self._table)
 
         # Slim editor pane (no "card" role -- a card-styled QFrame inside an
@@ -713,6 +716,43 @@ class Phase4ReviewPage(PhasePage):
         idx = self._model.index(self._current_row, _TRANSLATION_COL)
         self._model.setData(idx, entry.label, Qt.ItemDataRole.EditRole)
         self._translation_field.setPlainText(entry.label)
+
+    # ------------------------------------------------------------------ clear for retranslation (context menu)
+
+    def _on_clear_for_retranslation(self) -> None:
+        """Clear the selected row's translation so it becomes untranslated.
+
+        On the next translation run (with or without retranslate_existing),
+        this row will be retranslated because its translation is empty.
+        """
+        if self._current_row is None or self._model is None:
+            return
+        idx = self._model.index(self._current_row, _TRANSLATION_COL)
+        self._model.setData(idx, "", Qt.ItemDataRole.EditRole)
+        self._translation_field.setPlainText("")
+        self._update_counters()
+        self.status_message.emit(
+            f"Cleared translation for row {self._current_row + 1} "
+            "(will be retranslated on next run)."
+        )
+
+    def _on_table_context_menu(self, pos) -> None:
+        """Show a context menu with a 'Clear for retranslation' action."""
+        index = self._table.indexAt(pos)
+        if not index.isValid():
+            return
+        source_index = self._proxy.mapToSource(index)
+        row = source_index.row()
+        self._current_row = row
+        if self._state.document is None:
+            return
+        entry = self._state.document.entries[row]
+
+        menu = QMenu(self._table)
+        if entry.translation.strip():
+            clear_action = menu.addAction("Clear for retranslation")
+            clear_action.triggered.connect(self._on_clear_for_retranslation)
+        menu.exec(self._table.viewport().mapToGlobal(pos))
 
     # ------------------------------------------------------------------ load Excel
 

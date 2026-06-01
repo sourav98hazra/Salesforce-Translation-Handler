@@ -98,6 +98,8 @@ class AppState:
     imported_translations_path: Optional[Path] = None
     imported_translations_enabled: bool = False
 
+    retranslate_existing: bool = False
+
     phase_status: List[PhaseStatus] = field(
         default_factory=lambda: [PhaseStatus.IDLE for _ in range(6)]
     )
