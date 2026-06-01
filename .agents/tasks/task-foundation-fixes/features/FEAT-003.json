@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Correct whitespace-only detection in validate.py: move the whitespace check before the early return so that empty or spaces-only translations are reported as empty_translation warnings. Also adjust CLI validate command to return non-zero exit codes when blocking validation errors exist.",
+  "status": "pending",
+  "steps": [
+    "In src/stx/validate.py _check_entry(), move the empty_translation check (currently dead code after the early return) to BEFORE the 'if not entry.translation.strip(): return' line. The logic should be: if entry.translation is truthy (non-empty string) but .strip() is empty (whitespace-only), emit the empty_translation warning, then return.",
+    "Restructure the function: first check if entry.translation is empty string '' -> return (untranslated, no issue). Then check if entry.translation.strip() is empty (whitespace-only) -> emit empty_translation warning and return. Then proceed with remaining checks for entries that have real translations.",
+    "In src/stx/cli.py validate command, after printing the report, if report.has_errors is True, raise typer.Exit(code=1) to signal validation failure to calling scripts",
+    "Add a test in tests/test_validate.py that verifies whitespace-only translations emit the empty_translation warning",
+    "Add a test that verifies completely empty translations do NOT emit any issue"
+  ],
+  "acceptance_criteria": [
+    "A document with Entry(key='X', label='Hello', translation='   ') produces a warning with category='empty_translation'",
+    "A document with Entry(key='X', label='Hello', translation='') produces no issue for that entry",
+    "The CLI validate command returns exit code 1 when errors exist",
+    "The CLI validate command returns exit code 0 when only warnings or no issues exist",
+    "Existing validate tests still pass"
+  ],
+  "verification": [
+    "pytest -q tests/test_validate.py"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

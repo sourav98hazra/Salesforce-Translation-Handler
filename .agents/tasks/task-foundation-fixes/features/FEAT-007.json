@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-007",
+  "type": "fix",
+  "description": "BOM handling and parser robustness: read STF files using utf-8-sig to handle Byte Order Marks and update the writer/reader to normalise CRLF lines consistently.",
+  "status": "pending",
+  "steps": [
+    "In src/stx/stf/parser.py parse_stf(), change encoding from 'utf-8' to 'utf-8-sig' so that a leading BOM (\\ufeff) is automatically stripped",
+    "In parse_stf_text(), add a line at the start to strip a leading BOM if present: text = text.lstrip('\\ufeff')",
+    "In parse_stf_text() or _parse_lines(), normalise CRLF to LF before splitting: text = text.replace('\\r\\n', '\\n').replace('\\r', '\\n') before calling splitlines() -- actually splitlines() already handles this, but ensure the raw_line values don't contain trailing \\r",
+    "In src/stx/stf/writer.py _write_lf_utf8(), the existing CR scrubbing is already in place (data.replace(b'\\r\\n', b'\\n').replace(b'\\r', b'\\n')) - confirm this is correct",
+    "Add a test in tests/ that parses an STF file with a BOM prefix and verifies it produces the same Document as one without",
+    "Add a test that parses an STF file with CRLF line endings and verifies correct parsing"
+  ],
+  "acceptance_criteria": [
+    "parse_stf on a file with UTF-8 BOM (\\xef\\xbb\\xbf prefix) succeeds and produces correct metadata",
+    "parse_stf_text on a string with BOM succeeds",
+    "CRLF line endings are handled correctly (no trailing \\r in labels)",
+    "Writer output remains LF-only, no BOM",
+    "Existing STF round-trip tests pass"
+  ],
+  "verification": [
+    "pytest -q tests/test_stf_round_trip.py"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

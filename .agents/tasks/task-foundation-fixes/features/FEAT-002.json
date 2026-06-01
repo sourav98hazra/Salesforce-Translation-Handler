@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix backend wiring: propagate backend selection and API keys from GUI settings into the Phase 3 translation worker so paid backends (DeepL, Azure, OpenAI) are actually used instead of always defaulting to GoogleFreeTranslator. Add backend-availability check in settings and improve error messages when keys are missing or SDKs are not installed.",
+  "status": "pending",
+  "steps": [
+    "In src/stx/gui/workers.py TranslationWorker.__init__, add backend_name and api_key parameters (defaulting to 'google' and None)",
+    "In TranslationWorker.run(), replace the hard-coded 'translator = GoogleFreeTranslator()' with 'translator = make_backend(self._backend_name, **kwargs)' where kwargs includes api_key if provided",
+    "In src/stx/gui/pages/phase3_translate.py _on_start(), read the backend and api_key from gui_settings and pass them to TranslationWorker",
+    "In src/stx/gui/settings_dialog.py, add a 'Check availability' button or inline validation that tests whether the selected backend's SDK is importable and whether an API key is configured (either in the field or in the environment variable). Show a clear status label (green/red) next to the backend combo.",
+    "In src/stx/translate/factory.py, add a check_backend_available(key) function that returns (available: bool, reason: str) by trying to import the SDK and checking env var / key presence",
+    "Improve error messages in deepl_paid.py, azure.py, openai_llm.py __post_init__ to mention both the env var name AND that the key can be set in Edit -> Settings"
+  ],
+  "acceptance_criteria": [
+    "TranslationWorker no longer hardcodes GoogleFreeTranslator - it reads the backend setting",
+    "If backend='deepl' and api_key is set in settings, the DeepLTranslator is constructed",
+    "If no api_key and no env var is set for a paid backend, a clear error message surfaces before translation starts",
+    "The settings dialog shows availability status for the selected backend",
+    "Existing tests still pass (the default remains google so no behavior change for existing users)"
+  ],
+  "verification": [
+    "pytest -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

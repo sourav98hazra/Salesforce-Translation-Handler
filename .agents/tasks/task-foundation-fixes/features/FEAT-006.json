@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-006",
+  "type": "fix",
+  "description": "Fix progress denominator and zero-scope divisions: align progress reporting with the number of rows actually processed (including skipped rows) and guard against divide-by-zero when scope excludes all rows.",
+  "status": "pending",
+  "steps": [
+    "In src/stx/translate/runner.py TranslationProgress.percent property, the guard 'if self.total else 0' already exists - verify it handles total=0",
+    "In _emit_progress(), guard the 'rate = completed / elapsed' calculation: if elapsed <= 0, set rate to None",
+    "In _emit_progress(), guard the ETA calculation: if rate is None or rate <= 0, set eta to None",
+    "In src/stx/gui/pages/phase3_translate.py _on_row_translated(), guard the intermittent summary calculation against self._total_rows == 0 (avoid ZeroDivisionError in 'self._current_row * 100 // self._total_rows')",
+    "In phase3_translate.py _on_translation_done(), guard 'rate = done.translated_count / elapsed' against elapsed == 0",
+    "Ensure the progress total reflects ALL rows in the document (not just in-scope rows) so the progress bar accurately represents position through the entire dataset"
+  ],
+  "acceptance_criteria": [
+    "When scope excludes all rows (0 eligible), no ZeroDivisionError occurs",
+    "Progress bar correctly reaches 100% when all rows are processed",
+    "ETA and rate calculations don't crash on edge cases (0 elapsed, 0 total)",
+    "Existing tests pass"
+  ],
+  "verification": [
+    "pytest -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

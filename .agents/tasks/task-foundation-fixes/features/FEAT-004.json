@@ -1,0 +1,23 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Improve audit workbook: include all fields from SheetSummary.as_audit_row() and StatusEntry.as_audit_row() (including TM hits, dedup hits, and the translation text) in the Translation_Status_Log and Translation_Summary sheets written by write_translation_audit_sheets().",
+  "status": "pending",
+  "steps": [
+    "In src/stx/excel/exporter.py write_translation_audit_sheets(), update summary_columns to include ALL keys returned by SheetSummary.as_audit_row(): ['Sheet Name', 'Total Rows', 'Translated Rows', 'Skipped Rows', 'TM Hits', 'Dedup Hits']",
+    "Update status_columns to include ALL keys returned by StatusEntry.as_audit_row(): ['Sheet Name', 'Row Index', 'Key', 'Label', 'Translation', 'Status'] -- note that 'Translation' was previously missing from the columns list",
+    "Verify that SheetSummary.as_audit_row() in runner.py already returns TM Hits and Dedup Hits (it does)",
+    "Verify that StatusEntry.as_audit_row() in runner.py already returns Translation (it does)",
+    "The fix is simply that write_translation_audit_sheets hardcoded a subset of columns that did not include 'TM Hits', 'Dedup Hits', or 'Translation'"
+  ],
+  "acceptance_criteria": [
+    "write_translation_audit_sheets creates Translation_Summary with columns: Sheet Name, Total Rows, Translated Rows, Skipped Rows, TM Hits, Dedup Hits",
+    "write_translation_audit_sheets creates Translation_Status_Log with columns: Sheet Name, Row Index, Key, Label, Translation, Status",
+    "Existing tests pass"
+  ],
+  "verification": [
+    "pytest -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
