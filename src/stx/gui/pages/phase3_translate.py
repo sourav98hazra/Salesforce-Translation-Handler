@@ -323,6 +323,14 @@ class Phase3TranslatePage(PhasePage):
         )
         self._import_trans_btn.clicked.connect(self._on_import_translations)
 
+        self._import_trans_check = QCheckBox("Use imports")
+        self._import_trans_check.setToolTip(
+            "When checked, imported translations are applied during translation. "
+            "Uncheck to skip imported translations even if a file is loaded."
+        )
+        self._import_trans_check.setChecked(self._state.imported_translations_enabled)
+        self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
+
         self._import_trans_label = QLabel("")
         self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
 
@@ -334,6 +342,7 @@ class Phase3TranslatePage(PhasePage):
         filter_row.setSpacing(12)
         filter_row.addWidget(self._filter_btn)
         filter_row.addWidget(self._import_trans_btn)
+        filter_row.addWidget(self._import_trans_check)
         filter_row.addWidget(self._import_trans_label)
         filter_row.addSpacing(8)
 
@@ -346,7 +355,13 @@ class Phase3TranslatePage(PhasePage):
         )
         self._retranslate_check.setChecked(False)
         self._retranslate_check.setVisible(False)  # shown only when doc has translated entries
+        self._retranslate_check.setStyleSheet("font-weight: 600;")
         filter_row.addWidget(self._retranslate_check)
+
+        self._retranslate_info = QLabel("(overwrites existing)")
+        self._retranslate_info.setStyleSheet("color: #dc2626; font-size: 10px;")
+        self._retranslate_info.setVisible(False)
+        filter_row.addWidget(self._retranslate_info)
 
         # Vertical divider for visual separation between the action and the metric
         divider = QFrame()
@@ -508,6 +523,9 @@ class Phase3TranslatePage(PhasePage):
                 f"Loaded {count:,} translations from imported file"
             )
 
+        # Sync import translations checkbox with state
+        self._import_trans_check.setChecked(self._state.imported_translations_enabled)
+
         self._update_estimate()
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
@@ -516,8 +534,10 @@ class Phase3TranslatePage(PhasePage):
         if self._state.document is not None:
             has_translated = any(e.translation.strip() for e in self._state.document.entries)
             self._retranslate_check.setVisible(has_translated)
+            self._retranslate_info.setVisible(has_translated)
         else:
             self._retranslate_check.setVisible(False)
+            self._retranslate_info.setVisible(False)
 
     def _refresh_settings_summary(self) -> None:
         backend = gui_settings.get_str(gui_settings.KEYS.backend, "google")
@@ -606,12 +626,17 @@ class Phase3TranslatePage(PhasePage):
         self._state.imported_translations = result.translations
         self._state.imported_translations_path = Path(path)
         self._state.imported_translations_enabled = True
+        self._import_trans_check.setChecked(True)
         self._import_trans_label.setText(
             f"Loaded {result.count:,} translations from imported file"
         )
         self.status_message.emit(
             f"Imported {result.count:,} translations from {Path(path).name}"
         )
+
+    def _on_import_trans_toggled(self, checked: bool) -> None:
+        """Toggle whether imported translations are used during translation."""
+        self._state.imported_translations_enabled = checked
 
     # ------------------------------------------------------------------ output path
 
@@ -930,6 +955,8 @@ class Phase3TranslatePage(PhasePage):
             "Excel files (*.xlsx);;All files (*)",
         )
         if not path:
+            return
+        if not self.check_workflow_override(path):
             return
         self.status_message.emit(f"Loading {path.name} ...")
         worker = ImportExcelWorker(

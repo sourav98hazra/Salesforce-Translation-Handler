@@ -109,7 +109,9 @@ class Phase1ImportPage(PhasePage):
             "Salesforce code for the detected source language."
         )
         self._source_detect_label = QLabel("")
-        self._source_detect_label.setStyleSheet("color: #3b82f6; font-size: 11px;")
+        self._source_detect_label.setStyleSheet(
+            "color: #2563eb; font-size: 12px; font-weight: 700;"
+        )
         meta_grid.addWidget(QLabel("Source language:"), 1, 0, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._source_language_field, 1, 1)
         meta_grid.addWidget(QLabel("Source code:"), 1, 2, Qt.AlignmentFlag.AlignRight)

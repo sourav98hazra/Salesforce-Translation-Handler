@@ -150,9 +150,21 @@ class Phase2ExcelPage(PhasePage):
             self._state.set_phase(1, PhaseStatus.DONE)
         except Exception:  # noqa: BLE001
             pass
-        self.status_message.emit(
-            f"Wrote {len(result.sheets_written)} sheets to {result.path}"
+        total_sheets = len(result.sheets_written)
+        # If there is a Content Details sheet, separate the count
+        has_content_details = any(
+            "content" in s.lower() and "detail" in s.lower()
+            for s in result.sheets_written
         )
+        if has_content_details and total_sheets > 1:
+            component_count = total_sheets - 1
+            msg = (
+                f"{component_count} component sheets + 1 Content Details sheet "
+                f"created ({result.path.name})"
+            )
+        else:
+            msg = f"{total_sheets} sheets created ({result.path.name})"
+        self.status_message.emit(msg)
         self._next_btn.setEnabled(True)
         self._save_copy_btn.setEnabled(True)
 
@@ -207,6 +219,8 @@ class Phase2ExcelPage(PhasePage):
     def _on_load_existing(self) -> None:
         path = self.pick_open_file("Select organised workbook", "Excel files (*.xlsx)")
         if not path:
+            return
+        if not self.check_workflow_override(path):
             return
         self.status_message.emit(f"Loading {path.name} ...")
         worker = ImportExcelWorker(

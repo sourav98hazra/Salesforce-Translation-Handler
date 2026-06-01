@@ -387,10 +387,15 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
-        restart_action = QAction("Restart session", self)
-        restart_action.setToolTip("Clear saved session and reset to defaults")
-        restart_action.triggered.connect(self._action_restart_session)
-        file_menu.addAction(restart_action)
+        reset_all_action = QAction("Reset &All", self)
+        reset_all_action.setToolTip("Clear all state and reset session to defaults")
+        reset_all_action.triggered.connect(self._action_restart_session)
+        file_menu.addAction(reset_all_action)
+
+        reset_phase_action = QAction("Reset Current &Phase", self)
+        reset_phase_action.setToolTip("Reset the current phase and all downstream phases")
+        reset_phase_action.triggered.connect(self._action_reset_current_phase)
+        file_menu.addAction(reset_phase_action)
 
         file_menu.addSeparator()
         quit_action = QAction("&Quit", self)
@@ -481,6 +486,19 @@ class MainWindow(QMainWindow):
 
     def _goto(self, index: int) -> None:
         if index < 0 or index >= len(self._pages):
+            return
+        # Block navigation away from Phase 3 while translation is running
+        if (
+            len(self._state.phase_status) > 2
+            and self._state.phase_status[2] == PhaseStatus.RUNNING
+            and index != 2
+        ):
+            QMessageBox.warning(
+                self,
+                "Translation Running",
+                "Cannot switch phases while translation is in progress.\n"
+                "Please wait for translation to complete or cancel it first.",
+            )
             return
         self._state.current_phase = index
         self._stack.setCurrentIndex(index)
@@ -960,7 +978,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Load failed", str(exc))
 
     def _action_restart_session(self) -> None:
-        """Clear the current session and reset to defaults."""
+        """Clear the current session and reset to defaults (Reset All)."""
         # Clear auto-save
         if self._state.source_stf_path is not None:
             self._session_manager.clear_session(self._state.source_stf_path)
@@ -977,6 +995,25 @@ class MainWindow(QMainWindow):
         self._state.source_language_code = "en"
         self._state.target_language_code = "ja"
         self._state.target_language_name = "Japanese"
+
+        # Clear imported translations
+        self._state.imported_translations = None
+        self._state.imported_translations_path = None
+        self._state.imported_translations_enabled = False
+
+        # Clear scope, glossary, memory
+        self._state.scope = None
+        self._state.scope_path = None
+        self._state.glossary = None
+        self._state.glossary_path = None
+        self._state.memory = None
+        self._state.memory_path = None
+
+        # Clear other settings
+        self._state.retranslate_existing = False
+        self._state.target_languages_batch = []
+        self._state.backend_options = {}
+
         from .state import PhaseStatus as PS
         self._state.phase_status = [PS.IDLE for _ in range(6)]
 
@@ -987,3 +1024,29 @@ class MainWindow(QMainWindow):
         self._update_sidebar_footer()
         self._goto(0)
         self._log("Session reset to defaults.")
+
+    def _action_reset_current_phase(self) -> None:
+        """Reset the current phase status and all downstream phases."""
+        current = self._stack.currentIndex()
+        from .state import PhaseStatus as PS
+
+        # Reset current phase and downstream to IDLE
+        for i in range(current, len(self._state.phase_status)):
+            self._state.phase_status[i] = PS.IDLE
+
+        # Clear phase-specific state for current and downstream
+        if current <= 2:
+            # Clear translation audit data
+            self._state.translation_summaries = []
+            self._state.translation_statuses = []
+        if current <= 3:
+            # Clear review path
+            self._state.reviewed_xlsx_path = None
+        if current <= 4:
+            # Clear validation report
+            self._state.last_validation_report = None
+
+        self._refresh_phase_badges()
+        self._update_sidebar_footer()
+        self._pages[current].on_enter()
+        self._log(f"Reset Phase {current + 1} and downstream phases.")

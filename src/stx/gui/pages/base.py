@@ -183,6 +183,15 @@ class PhasePage(QWidget):
         )
         return Path(path_str) if path_str else None
 
+    # ------------------------------------------------------------------ workflow override
+
+    def check_workflow_override(self, file_path: Path) -> bool:
+        """Ask MainWindow to check workflow override. Returns True if load should proceed."""
+        main_win = self.window()
+        if hasattr(main_win, '_check_workflow_override'):
+            return main_win._check_workflow_override(file_path, self._state.current_phase)
+        return True
+
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:

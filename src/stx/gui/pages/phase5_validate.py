@@ -307,6 +307,8 @@ class Phase5ValidatePage(PhasePage):
         )
         if not path:
             return
+        if not self.check_workflow_override(path):
+            return
         from ..workers import ImportExcelWorker
 
         self.set_busy(True)
