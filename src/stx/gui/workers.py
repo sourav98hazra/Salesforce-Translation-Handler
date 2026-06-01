@@ -182,6 +182,7 @@ class TranslationWorker(QThread):
         fuzzy_threshold: Optional[float] = None,
         fuzzy_max_results: int = 5,
         fuzzy_auto_accept_threshold: float = 90.0,
+        imported_translations: Optional[dict] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -200,6 +201,7 @@ class TranslationWorker(QThread):
         self._fuzzy_threshold = fuzzy_threshold
         self._fuzzy_max_results = fuzzy_max_results
         self._fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
+        self._imported_translations = imported_translations
         self._cancel = False
         self._cancel_lock = QObject()  # used only for sender identity
         self._already_finished = False
@@ -259,6 +261,7 @@ class TranslationWorker(QThread):
                 fuzzy_threshold=self._fuzzy_threshold,
                 fuzzy_max_results=self._fuzzy_max_results,
                 fuzzy_auto_accept_threshold=self._fuzzy_auto_accept_threshold,
+                imported_translations=self._imported_translations,
             )
         except Exception as exc:  # noqa: BLE001
             self._already_finished = True

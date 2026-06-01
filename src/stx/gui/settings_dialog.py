@@ -271,6 +271,33 @@ class SettingsDialog(QDialog):
 
         outer.addWidget(fuzzy_box)
 
+        # Import existing translations
+        import_box = QGroupBox("Import existing translations")
+        import_layout = QVBoxLayout(import_box)
+        import_help = QLabel(
+            "Reuse translations from a previously translated Excel file.  "
+            "Imported translations have the highest priority -- they are used "
+            "before the TM or network translator."
+        )
+        import_help.setWordWrap(True)
+        import_help.setStyleSheet("color: #64748b; font-size: 11px;")
+        import_layout.addWidget(import_help)
+        row = QHBoxLayout()
+        self._import_trans_field = QLineEdit()
+        self._import_trans_field.setPlaceholderText("Path to translated .xlsx file")
+        import_browse = QPushButton("Browse...")
+        import_browse.clicked.connect(self._on_browse_import_translations)
+        row.addWidget(self._import_trans_field, stretch=1)
+        row.addWidget(import_browse)
+        import_layout.addLayout(row)
+        self._import_trans_check = QCheckBox("Use imported translations")
+        self._import_trans_check.setToolTip(
+            "When checked, translations from the imported file are applied "
+            "with highest priority during translation runs."
+        )
+        import_layout.addWidget(self._import_trans_check)
+        outer.addWidget(import_box)
+
         outer.addStretch(1)
         return widget
 
@@ -377,6 +404,15 @@ class SettingsDialog(QDialog):
                 self._theme_combo.setCurrentIndex(i)
                 break
 
+        # Import existing translations
+        self._import_trans_field.setText(
+            gui_settings.get_str(gui_settings.KEYS.import_translations_path, "")
+        )
+        import_enabled = gui_settings.get_str(
+            gui_settings.KEYS.import_translations_enabled, "0"
+        )
+        self._import_trans_check.setChecked(import_enabled in {"1", "true"})
+
         # Session persistence
         self._session_check.setChecked(gui_settings.get_session_enabled())
 
@@ -417,6 +453,14 @@ class SettingsDialog(QDialog):
         gui_settings.set_str(
             gui_settings.KEYS.fuzzy_auto_accept, str(self._fuzzy_auto_accept_spin.value())
         )
+        gui_settings.set_str(
+            gui_settings.KEYS.import_translations_path,
+            self._import_trans_field.text().strip(),
+        )
+        gui_settings.set_str(
+            gui_settings.KEYS.import_translations_enabled,
+            "1" if self._import_trans_check.isChecked() else "0",
+        )
         gui_settings.set_theme(self._theme_combo.currentData())
         gui_settings.set_session_enabled(self._session_check.isChecked())
 
@@ -442,6 +486,8 @@ class SettingsDialog(QDialog):
         self._fuzzy_threshold_spin.setValue(75.0)
         self._fuzzy_max_results_spin.setValue(5)
         self._fuzzy_auto_accept_spin.setValue(90.0)
+        self._import_trans_field.clear()
+        self._import_trans_check.setChecked(False)
         self._theme_combo.setCurrentIndex(0)
         self._session_check.setChecked(False)
 
@@ -500,6 +546,16 @@ class SettingsDialog(QDialog):
         )
         if path:
             self._memory_field.setText(path)
+
+    def _on_browse_import_translations(self) -> None:
+        start = self._import_trans_field.text() or str(Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose translated Excel file", start,
+            "Excel files (*.xlsx);;All files (*)"
+        )
+        if path:
+            self._import_trans_field.setText(path)
+            self._import_trans_check.setChecked(True)
 
 
 def open_settings(parent: Optional[QWidget] = None) -> bool:

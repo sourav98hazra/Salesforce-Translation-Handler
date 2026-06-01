@@ -146,6 +146,7 @@ class TranslationResult:
     deduped_count: int = 0  # from in-run dedup cache
     fuzzy_accepted_count: int = 0  # from fuzzy TM matching
     resumed_count: int = 0  # from checkpoint resume
+    imported_reuse_count: int = 0  # from imported translations file
     target_lang: str = ""
     elapsed_seconds: float = 0.0
 
@@ -187,6 +188,7 @@ def translate_document(
     fuzzy_threshold: Optional[float] = None,
     fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
+    imported_translations: Optional[Dict[str, str]] = None,
 ) -> TranslationResult:
     """Translate every untranslated entry in ``doc`` in place.
 
@@ -244,6 +246,7 @@ def translate_document(
         fuzzy_threshold=fuzzy_threshold,
         fuzzy_max_results=fuzzy_max_results,
         fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
+        imported_translations=imported_translations,
     )
     if prevent_system_sleep:
         from ..wakelock import prevent_sleep
@@ -272,6 +275,7 @@ def translate_document_multi(
     fuzzy_threshold: Optional[float] = None,
     fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
+    imported_translations: Optional[Dict[str, str]] = None,
 ) -> MultiTargetResult:
     """Translate ``doc`` to multiple target languages in sequence.
 
@@ -314,6 +318,7 @@ def translate_document_multi(
             fuzzy_threshold=fuzzy_threshold,
             fuzzy_max_results=fuzzy_max_results,
             fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
+            imported_translations=imported_translations,
         )
         multi.by_target[target] = result
 
@@ -350,6 +355,7 @@ class _Runner:
         fuzzy_threshold: Optional[float] = None,
         fuzzy_max_results: int = 5,
         fuzzy_auto_accept_threshold: float = 90.0,
+        imported_translations: Optional[Dict[str, str]] = None,
     ) -> None:
         self.doc = doc
         self.translator = translator
@@ -365,6 +371,7 @@ class _Runner:
         self.fuzzy_threshold = fuzzy_threshold
         self.fuzzy_max_results = fuzzy_max_results
         self.fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
+        self.imported_translations = imported_translations or {}
         self.limiter: Optional[AdaptiveLimiter] = (
             AdaptiveLimiter(max_capacity=rate_limit_per_second)
             if rate_limit_per_second and rate_limit_per_second > 0
@@ -386,6 +393,7 @@ class _Runner:
         self._deduped = 0
         self._fuzzy_accepted = 0
         self._resumed = 0
+        self._imported_reuse = 0
         self._completed_for_eta = 0
         self._started = time.monotonic()
 
@@ -478,6 +486,7 @@ class _Runner:
             deduped_count=self._deduped,
             fuzzy_accepted_count=self._fuzzy_accepted,
             resumed_count=self._resumed,
+            imported_reuse_count=self._imported_reuse,
             target_lang=self.target_lang,
         )
 
@@ -638,6 +647,17 @@ class _Runner:
         sheet = entry.logical_sheet_name
         summary = self._summaries[sheet]
 
+        # ---- imported translations (highest priority)
+        if self.imported_translations:
+            imported = self.imported_translations.get(entry.label)
+            if imported is not None:
+                with self._dedup_lock:
+                    self._dedup[entry.label] = imported
+                self._fill_translated(
+                    index, imported, "Translated (imported)", from_imported=True
+                )
+                return
+
         # ---- in-run dedup
         with self._dedup_lock:
             cached_dedup = self._dedup.get(entry.label)
@@ -763,6 +783,7 @@ class _Runner:
         from_tm: bool = False,
         deduped: bool = False,
         from_fuzzy: bool = False,
+        from_imported: bool = False,
     ) -> None:
         entry = self.doc.entries[index]
         new = Entry(key=entry.key, label=entry.label, translation=translation)
@@ -788,6 +809,8 @@ class _Runner:
                 self._deduped += 1
             if from_fuzzy:
                 self._fuzzy_accepted += 1
+            if from_imported:
+                self._imported_reuse += 1
         # Persist to checkpoint after filling the slot.
         if self.checkpoint is not None:
             try:

@@ -231,6 +231,9 @@ def translate(
     memory_db: Optional[Path] = typer.Option(
         None, "--memory-db", help="Path to a SQLite translation memory."
     ),
+    import_translations_path: Optional[Path] = typer.Option(
+        None, "--import-translations", help="Path to an existing translated .xlsx to reuse translations from."
+    ),
     workers: int = typer.Option(
         4, "--workers", "-w", help="Concurrent translation workers."
     ),
@@ -319,6 +322,19 @@ def translate(
     google_target = to_google_code(target)
     rate = rate_limit if rate_limit > 0 else None
 
+    # Import existing translations if requested
+    imported_trans: Optional[dict] = None
+    if import_translations_path is not None:
+        from .import_translations import parse_translation_file
+
+        imported = parse_translation_file(import_translations_path)
+        if imported.count:
+            imported_trans = imported.translations
+            console.print(
+                f"[blue]Imported {imported.count:,} translations from[/blue] "
+                f"[bold]{import_translations_path}[/bold]"
+            )
+
     # Checkpoint setup
     checkpoint: Optional[CheckpointStore] = None
     if resume:
@@ -337,6 +353,7 @@ def translate(
         fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
         fuzzy_max_results=fuzzy_max_results,
         fuzzy_auto_accept_threshold=fuzzy_auto_accept,
+        imported_translations=imported_trans,
     )
 
     export_document_to_excel(doc, xlsx_out)
@@ -347,10 +364,11 @@ def translate(
     )
 
     resumed_info = f", resumed {result.resumed_count:,}" if result.resumed_count else ""
+    imported_info = f", imported {result.imported_reuse_count:,}" if result.imported_reuse_count else ""
     console.print(
         f"[green]OK[/green] Translated {result.translated_count:,} "
         f"(TM hits {result.cached_count:,}, fuzzy {result.fuzzy_accepted_count:,}, "
-        f"dedup {result.deduped_count:,}{resumed_info}); "
+        f"dedup {result.deduped_count:,}{imported_info}{resumed_info}); "
         f"skipped {result.skipped_count:,}; "
         f"elapsed {result.elapsed_seconds:.1f}s; output: [bold]{xlsx_out}[/bold]"
     )
@@ -402,6 +420,9 @@ def run_pipeline(
     scope_file: Optional[Path] = typer.Option(None, "--scope-file"),
     glossary_path: Optional[Path] = typer.Option(None, "--glossary"),
     memory_db: Optional[Path] = typer.Option(None, "--memory-db"),
+    import_translations_path: Optional[Path] = typer.Option(
+        None, "--import-translations", help="Path to an existing translated .xlsx to reuse translations from."
+    ),
     workers: int = typer.Option(4, "--workers", "-w"),
     rate_limit: float = typer.Option(8.0, "--rate-limit"),
     skip_translation: bool = typer.Option(False, "--skip-translation"),
@@ -492,6 +513,19 @@ def run_pipeline(
         memory = TranslationMemory(path=memory_db) if memory_db else None
         rate = rate_limit if rate_limit > 0 else None
 
+        # Import existing translations if requested
+        imported_trans: Optional[dict] = None
+        if import_translations_path is not None:
+            from .import_translations import parse_translation_file
+
+            imported = parse_translation_file(import_translations_path)
+            if imported.count:
+                imported_trans = imported.translations
+                console.print(
+                    f"[blue]Imported {imported.count:,} translations from[/blue] "
+                    f"[bold]{import_translations_path}[/bold]"
+                )
+
         for target_code in targets_list:
             console.rule(f"[bold]Phase 3: translate -> {target_code}[/bold]")
             per_lang_doc = parse_stf(stf_in)
@@ -516,6 +550,7 @@ def run_pipeline(
                 fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
                 fuzzy_max_results=fuzzy_max_results,
                 fuzzy_auto_accept_threshold=fuzzy_auto_accept,
+                imported_translations=imported_trans,
             )
             export_document_to_excel(per_lang_doc, translated_xlsx)
             write_translation_audit_sheets(
@@ -934,6 +969,7 @@ def _run_translation_with_progress(
     workers: int = 4, rate_limit_per_second=8.0,
     fuzzy_threshold=None, fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
+    imported_translations=None,
 ):
     with Progress(
         SpinnerColumn(),
@@ -966,6 +1002,7 @@ def _run_translation_with_progress(
             fuzzy_threshold=fuzzy_threshold,
             fuzzy_max_results=fuzzy_max_results,
             fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
+            imported_translations=imported_translations,
         )
 
 

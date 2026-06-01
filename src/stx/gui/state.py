@@ -94,6 +94,10 @@ class AppState:
     memory: Optional[TranslationMemory] = None
     memory_path: Optional[Path] = None
 
+    imported_translations: Optional[dict] = None
+    imported_translations_path: Optional[Path] = None
+    imported_translations_enabled: bool = False
+
     phase_status: List[PhaseStatus] = field(
         default_factory=lambda: [PhaseStatus.IDLE for _ in range(6)]
     )

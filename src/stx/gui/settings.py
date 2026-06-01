@@ -45,6 +45,8 @@ class SettingsKeys:
     fuzzy_threshold: str = "translation/fuzzy_threshold"
     fuzzy_max_results: str = "translation/fuzzy_max_results"
     fuzzy_auto_accept: str = "translation/fuzzy_auto_accept"
+    import_translations_path: str = "io/import_translations_path"
+    import_translations_enabled: str = "io/import_translations_enabled"
     session_enabled: str = "session/enabled"
 
 

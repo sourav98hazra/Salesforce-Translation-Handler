@@ -314,6 +314,17 @@ class Phase3TranslatePage(PhasePage):
         )
         self._filter_btn.clicked.connect(self._on_filter_components)
 
+        self._import_trans_btn = QPushButton("Import existing translations...")
+        self._import_trans_btn.setStyleSheet("padding: 5px 16px;")
+        self._import_trans_btn.setToolTip(
+            "Load translations from a previously translated Excel file. "
+            "Imported translations are applied with highest priority."
+        )
+        self._import_trans_btn.clicked.connect(self._on_import_translations)
+
+        self._import_trans_label = QLabel("")
+        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
+
         self._estimate_label = QLabel("Rows to translate: --")
         self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
 
@@ -321,6 +332,8 @@ class Phase3TranslatePage(PhasePage):
         filter_row.setContentsMargins(0, 8, 0, 0)
         filter_row.setSpacing(12)
         filter_row.addWidget(self._filter_btn)
+        filter_row.addWidget(self._import_trans_btn)
+        filter_row.addWidget(self._import_trans_label)
         filter_row.addSpacing(8)
 
         # Vertical divider for visual separation between the action and the metric
@@ -443,6 +456,36 @@ class Phase3TranslatePage(PhasePage):
         elif self._state.document is not None:
             self._selected_components = {e.component_type for e in self._state.document.entries}
 
+        # Restore imported translations from settings if not already loaded
+        if self._state.imported_translations is None:
+            import_path = gui_settings.get_str(
+                gui_settings.KEYS.import_translations_path, ""
+            ).strip()
+            import_enabled = gui_settings.get_str(
+                gui_settings.KEYS.import_translations_enabled, "0"
+            ) in {"1", "true"}
+            if import_path and import_enabled and Path(import_path).exists():
+                from ...import_translations import parse_translation_file
+
+                try:
+                    result = parse_translation_file(Path(import_path))
+                    if result.count:
+                        self._state.imported_translations = result.translations
+                        self._state.imported_translations_path = Path(import_path)
+                        self._state.imported_translations_enabled = True
+                        self._import_trans_label.setText(
+                            f"Loaded {result.count:,} translations from imported file"
+                        )
+                except Exception:  # noqa: BLE001
+                    pass
+
+        # Show label if already loaded
+        if self._state.imported_translations and self._state.imported_translations_enabled:
+            count = len(self._state.imported_translations)
+            self._import_trans_label.setText(
+                f"Loaded {count:,} translations from imported file"
+            )
+
         self._update_estimate()
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
@@ -502,6 +545,44 @@ class Phase3TranslatePage(PhasePage):
         self._total_rows = count
         self._estimate_label.setText(f"Rows to translate: <b>{count:,}</b>")
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
+
+    # ------------------------------------------------------------------ import translations
+
+    def _on_import_translations(self) -> None:
+        """Open a file dialog, parse the selected Excel, and store imported translations."""
+        from PySide6.QtWidgets import QFileDialog
+        from ...import_translations import parse_translation_file
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import existing translations",
+            str(Path.home()),
+            "Excel files (*.xlsx);;All files (*)",
+        )
+        if not path:
+            return
+        try:
+            result = parse_translation_file(Path(path))
+        except Exception as exc:  # noqa: BLE001
+            self.error(f"Failed to parse import file: {exc}", "Import error")
+            return
+
+        if result.count == 0:
+            self.warn(
+                "No translations found in the selected file.\n\n"
+                "The file should have columns like Label/Translation, "
+                "Source/Translation, or Source/Target."
+            )
+            return
+
+        self._state.imported_translations = result.translations
+        self._state.imported_translations_path = Path(path)
+        self._state.imported_translations_enabled = True
+        self._import_trans_label.setText(
+            f"Loaded {result.count:,} translations from imported file"
+        )
+        self.status_message.emit(
+            f"Imported {result.count:,} translations from {Path(path).name}"
+        )
 
     # ------------------------------------------------------------------ output path
 
@@ -618,6 +699,11 @@ class Phase3TranslatePage(PhasePage):
             fuzzy_threshold=self._get_fuzzy_threshold(),
             fuzzy_max_results=gui_settings.get_int(gui_settings.KEYS.fuzzy_max_results, 5),
             fuzzy_auto_accept_threshold=self._get_fuzzy_auto_accept(),
+            imported_translations=(
+                self._state.imported_translations
+                if self._state.imported_translations_enabled
+                else None
+            ),
             parent=self,
         )
         self._worker.progress.connect(self._on_progress)
