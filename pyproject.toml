@@ -47,6 +47,7 @@ gui = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-qt>=4.0",
     "ruff>=0.5",
     "mypy>=1.10",
 ]
