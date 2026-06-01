@@ -481,6 +481,7 @@ class Phase5ValidatePage(PhasePage):
                 + ("\n  ..." if len(report.details) > 20 else ""),
                 "Auto-fix results",
             )
+            self.action_recorded.emit(f"Auto-fix all ({report.fixed_count} fixes)")
         # Re-validate to update the table.
         self._on_validate()
 

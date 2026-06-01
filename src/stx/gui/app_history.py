@@ -51,6 +51,8 @@ _SCALAR_FIELDS = (
     "workflow_started_from_phase",
     "current_phase",
     "has_unsaved_changes",
+    "last_validation_report",
+    "last_translation_progress",
 )
 
 # Fields that are list/set/dict containers -- copied one level deep.
@@ -61,6 +63,7 @@ _CONTAINER_FIELDS = (
     "phase_status",
     "completed_phases",
     "backend_options",
+    "last_export_paths",
 )
 
 

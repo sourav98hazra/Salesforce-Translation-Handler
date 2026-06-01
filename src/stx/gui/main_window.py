@@ -1173,6 +1173,9 @@ class MainWindow(QMainWindow):
         self._update_sidebar_footer()
         self._goto(0)
         self._log("Session reset to defaults.")
+        self._app_history.clear()
+        self._app_history.record(capture_snapshot(self._state, "Initial state"))
+        self._refresh_app_history_actions()
 
     def _action_reset_current_phase(self) -> None:
         """Reset the current phase status and all downstream phases."""
