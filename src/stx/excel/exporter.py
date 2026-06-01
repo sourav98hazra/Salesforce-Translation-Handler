@@ -142,8 +142,8 @@ def write_translation_audit_sheets(
     target = Path(workbook_path)
     wb = load_workbook(target)
 
-    summary_columns = ["Sheet Name", "Total Rows", "Translated Rows", "Skipped Rows"]
-    status_columns = ["Sheet Name", "Row Index", "Key", "Label", "Status"]
+    summary_columns = ["Sheet Name", "Total Rows", "Translated Rows", "Skipped Rows", "TM Hits", "Dedup Hits"]
+    status_columns = ["Sheet Name", "Row Index", "Key", "Label", "Translation", "Status"]
 
     _replace_sheet_with_dict_rows(wb, "Translation_Summary", summary_columns, summary_rows)
     _replace_sheet_with_dict_rows(wb, "Translation_Status_Log", status_columns, status_rows)

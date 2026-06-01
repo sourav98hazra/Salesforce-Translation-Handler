@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "fix",
   "description": "Improve audit workbook: include all fields from SheetSummary.as_audit_row() and StatusEntry.as_audit_row() (including TM hits, dedup hits, and the translation text) in the Translation_Status_Log and Translation_Summary sheets written by write_translation_audit_sheets().",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "In src/stx/excel/exporter.py write_translation_audit_sheets(), update summary_columns to include ALL keys returned by SheetSummary.as_audit_row(): ['Sheet Name', 'Total Rows', 'Translated Rows', 'Skipped Rows', 'TM Hits', 'Dedup Hits']",
     "Update status_columns to include ALL keys returned by StatusEntry.as_audit_row(): ['Sheet Name', 'Row Index', 'Key', 'Label', 'Translation', 'Status'] -- note that 'Translation' was previously missing from the columns list",
@@ -19,5 +19,5 @@
     "pytest -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Fix applied cleanly. All 68 tests pass. Used pyenv 3.11.15 with pip install -e '.[gui,dev]' for environment setup."
 }
