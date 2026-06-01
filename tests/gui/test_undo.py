@@ -97,6 +97,30 @@ class TestUndoStackStandalone:
         stack = UndoStack()
         assert stack.redo() is None
 
+    def test_max_size_evicts_oldest(self):
+        """When stack exceeds MAX_SIZE, oldest commands are evicted."""
+        stack = UndoStack()
+        # Push MAX_SIZE + 10 commands
+        for i in range(UndoStack.MAX_SIZE + 10):
+            stack.push(UndoCommand(row=i, column=5, old_value=f"old{i}", new_value=f"new{i}"))
+        # Stack should be capped at MAX_SIZE
+        undo_count = 0
+        while stack.can_undo:
+            stack.undo()
+            undo_count += 1
+        assert undo_count == UndoStack.MAX_SIZE
+
+    def test_max_size_preserves_newest(self):
+        """After eviction, the newest commands are still accessible."""
+        stack = UndoStack()
+        for i in range(UndoStack.MAX_SIZE + 5):
+            stack.push(UndoCommand(row=i, column=5, old_value=f"old{i}", new_value=f"new{i}"))
+        # The most recent command should be undoable
+        cmd = stack.undo()
+        assert cmd is not None
+        expected_row = UndoStack.MAX_SIZE + 5 - 1
+        assert cmd.row == expected_row
+
     def test_stack_changed_signal_emitted(self):
         stack = UndoStack()
         signals_received = []

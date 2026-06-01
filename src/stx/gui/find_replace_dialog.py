@@ -27,9 +27,6 @@ from ..model import Document
 
 _SCOPE_LABELS = [
     ("Translations Only", ReplaceScope.TRANSLATION),
-    ("Labels", ReplaceScope.LABEL),
-    ("Keys", ReplaceScope.KEY),
-    ("All Fields", ReplaceScope.ALL),
 ]
 
 

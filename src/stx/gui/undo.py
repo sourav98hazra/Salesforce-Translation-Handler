@@ -47,6 +47,9 @@ class UndoStack(QObject):
 
     stack_changed = Signal()
 
+    MAX_SIZE = 500
+    """Maximum number of commands retained. Oldest are evicted when exceeded."""
+
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._commands: List[UndoCommand] = []
@@ -60,6 +63,11 @@ class UndoStack(QObject):
         self._commands = self._commands[: self._index]
         self._commands.append(command)
         self._index += 1
+        # Evict oldest commands when exceeding max size
+        if len(self._commands) > self.MAX_SIZE:
+            overflow = len(self._commands) - self.MAX_SIZE
+            self._commands = self._commands[overflow:]
+            self._index -= overflow
         self.stack_changed.emit()
 
     def undo(self) -> Optional[UndoCommand]:

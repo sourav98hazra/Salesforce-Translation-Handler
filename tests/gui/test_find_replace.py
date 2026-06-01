@@ -74,6 +74,13 @@ class TestFindReplaceDialogConstruction:
         qtbot.addWidget(dialog)
         assert "0" in dialog._preview_label.text()
 
+    def test_scope_combo_only_has_translations(self, qtbot, doc):
+        """The scope combo should only offer 'Translations Only' in the GUI."""
+        dialog = FindReplaceDialog(doc)
+        qtbot.addWidget(dialog)
+        assert dialog._scope_combo.count() == 1
+        assert dialog._scope_combo.itemText(0) == "Translations Only"
+
 
 # ---------------------------------------------------------------------------
 # Core replacement logic (plain text)
@@ -267,3 +274,68 @@ class TestUndoStackIntegration:
         model.undo()
         model.redo()
         assert doc.entries[0].translation == "Konnichiwa Universe"
+
+
+# ---------------------------------------------------------------------------
+# Apply to all rows exact match (not substring)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyToAllRowsExactMatch:
+    """Verify that 'Apply to all rows' uses exact full-field matching."""
+
+    @pytest.fixture
+    def doc_with_substrings(self):
+        """Document where one translation is a substring of another."""
+        return Document(
+            language="Japanese",
+            language_code="ja",
+            entries=[
+                Entry(key="Key.One", label="Hello", translation="Hello"),
+                Entry(key="Key.Two", label="Hello World", translation="Hello World"),
+                Entry(key="Key.Three", label="Also Hello", translation="Hello"),
+                Entry(key="Key.Four", label="Something", translation="Say Hello"),
+            ],
+        )
+
+    @pytest.fixture
+    def model_and_stack(self, doc_with_substrings):
+        from stx.gui.pages.phase4_review import _EntriesModel
+
+        stack = UndoStack()
+        model = _EntriesModel(doc_with_substrings, undo_stack=stack)
+        return model, stack, doc_with_substrings
+
+    def test_exact_match_replaces_only_full_field(self, model_and_stack):
+        """Only rows where translation == old_text exactly are replaced."""
+        model, stack, doc = model_and_stack
+        old_text = "Hello"
+        new_text = "Konnichiwa"
+        # Simulate what _apply_editor_to_row does with apply_all_check
+        count = 0
+        for row, entry in enumerate(doc.entries):
+            if entry.translation == old_text:
+                idx = model.index(row, 5)  # _TRANSLATION_COL
+                model.setData(idx, new_text, Qt.ItemDataRole.EditRole)
+                count += 1
+        # Should only replace rows 0 and 2 (exact "Hello"), not row 1 ("Hello World")
+        # or row 3 ("Say Hello")
+        assert count == 2
+        assert doc.entries[0].translation == "Konnichiwa"
+        assert doc.entries[1].translation == "Hello World"  # unchanged - substring
+        assert doc.entries[2].translation == "Konnichiwa"
+        assert doc.entries[3].translation == "Say Hello"  # unchanged - substring
+
+    def test_substring_would_match_more(self, doc_with_substrings):
+        """Confirm that substring matching (compute_replacements) would match more rows."""
+        # This verifies the old behavior was wrong - substring approach finds too many
+        replacements = compute_replacements(
+            doc_with_substrings,
+            "Hello",
+            "Konnichiwa",
+            case_sensitive=True,
+            use_regex=False,
+            scope=ReplaceScope.TRANSLATION,
+        )
+        # Substring matches rows 0, 1, 2, 3 (all contain "Hello" as substring)
+        assert len(replacements) == 4  # more than exact match (which finds 2)

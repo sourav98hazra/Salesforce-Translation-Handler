@@ -401,6 +401,9 @@ class MainWindow(QMainWindow):
         phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
         phase4._undo_stack.stack_changed.connect(self._refresh_undo_actions)
 
+        # Refresh undo/redo menu state when navigating between pages
+        self._stack.currentChanged.connect(lambda _idx: self._refresh_undo_actions())
+
         view_menu = bar.addMenu("&View")
         themes = [
             ("light", "&Light theme"),

@@ -47,7 +47,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...find_replace import ReplaceScope, compute_replacements
 from ...model import Document, Entry
 from ...validate import validate_document
 from ..find_replace_dialog import FindReplaceDialog
@@ -556,13 +555,15 @@ class Phase4ReviewPage(PhasePage):
             self.status_message.emit("No replacements to apply.")
             return
         # Apply each replacement through the model (pushes undo commands)
+        count = 0
         for rep in replacements:
             if rep.field == "translation":
                 idx = self._model.index(rep.row, _TRANSLATION_COL)
                 self._model.setData(idx, rep.new_value, Qt.ItemDataRole.EditRole)
+                count += 1
         self._update_counters()
         self._run_auto_validation()
-        self.status_message.emit(f"Replaced {len(replacements)} occurrence(s).")
+        self.status_message.emit(f"Replaced {count} occurrence(s).")
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -684,23 +685,16 @@ class Phase4ReviewPage(PhasePage):
             return
         new_text = self._translation_field.toPlainText()
 
-        # "Apply to all rows" mode: find/replace old translation across all rows
+        # "Apply to all rows" mode: exact full-field replacement across all rows
         if self._apply_all_check.isChecked() and self._state.document is not None:
             old_text = self._state.document.entries[self._current_row].translation
             if old_text and old_text != new_text:
-                replacements = compute_replacements(
-                    self._state.document,
-                    old_text,
-                    new_text,
-                    case_sensitive=True,
-                    use_regex=False,
-                    scope=ReplaceScope.TRANSLATION,
-                )
                 count = 0
-                for rep in replacements:
-                    idx = self._model.index(rep.row, _TRANSLATION_COL)
-                    self._model.setData(idx, rep.new_value, Qt.ItemDataRole.EditRole)
-                    count += 1
+                for row, entry in enumerate(self._state.document.entries):
+                    if entry.translation == old_text:
+                        idx = self._model.index(row, _TRANSLATION_COL)
+                        self._model.setData(idx, new_text, Qt.ItemDataRole.EditRole)
+                        count += 1
                 self._update_counters()
                 self._run_auto_validation()
                 self.status_message.emit(f"Replaced {count} occurrence(s) across all rows.")
