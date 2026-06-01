@@ -99,19 +99,36 @@ class Phase1ImportPage(PhasePage):
         meta_grid.addWidget(self._language_field, 0, 1)
         meta_grid.addWidget(QLabel("Language code:"), 0, 2, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._language_code_field, 0, 3)
-        # Row 1
-        meta_grid.addWidget(QLabel("STF type:"), 1, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._stf_type_field, 1, 1)
-        meta_grid.addWidget(QLabel("Total rows:"), 1, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._total_field, 1, 3)
+        # Row 1 - Source language (auto-detected)
+        self._source_language_field = QLineEdit()
+        self._source_language_field.setToolTip(
+            "Auto-detected source language. Edit if incorrect."
+        )
+        self._source_language_code_field = QLineEdit()
+        self._source_language_code_field.setToolTip(
+            "Salesforce code for the detected source language."
+        )
+        self._source_detect_label = QLabel("")
+        self._source_detect_label.setStyleSheet("color: #3b82f6; font-size: 11px;")
+        meta_grid.addWidget(QLabel("Source language:"), 1, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._source_language_field, 1, 1)
+        meta_grid.addWidget(QLabel("Source code:"), 1, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._source_language_code_field, 1, 3)
         # Row 2
-        meta_grid.addWidget(QLabel("Translated:"), 2, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._translated_field, 2, 1)
-        meta_grid.addWidget(QLabel("Untranslated:"), 2, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._untranslated_field, 2, 3)
+        meta_grid.addWidget(QLabel("STF type:"), 2, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._stf_type_field, 2, 1)
+        meta_grid.addWidget(QLabel("Total rows:"), 2, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._total_field, 2, 3)
         # Row 3
-        meta_grid.addWidget(QLabel("Component types:"), 3, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._components_field, 3, 1, 1, 3)
+        meta_grid.addWidget(QLabel("Translated:"), 3, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._translated_field, 3, 1)
+        meta_grid.addWidget(QLabel("Untranslated:"), 3, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._untranslated_field, 3, 3)
+        # Row 4
+        meta_grid.addWidget(QLabel("Component types:"), 4, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._components_field, 4, 1, 1, 3)
+        # Row 5 - Detection info label
+        meta_grid.addWidget(self._source_detect_label, 5, 1, 1, 3)
 
         meta_grid.setColumnStretch(1, 1)
         meta_grid.setColumnStretch(3, 1)
@@ -208,6 +225,9 @@ class Phase1ImportPage(PhasePage):
         self._set_field(self._untranslated_field, f"{stats['untranslated']:,}")
         self._set_field(self._components_field, str(stats["components"]))
 
+        # Auto-detect source language
+        self._detect_source_language(doc)
+
         self._populate_preview(doc)
         self._save_stf_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
@@ -227,6 +247,38 @@ class Phase1ImportPage(PhasePage):
             f"Parsed {stats['total']:,} rows ({stats['untranslated']:,} untranslated) "
             f"across {stats['components']} component types."
         )
+
+    def _detect_source_language(self, doc) -> None:
+        """Run language detection on labels and populate source language fields."""
+        try:
+            from ...lang_detect import detect_source_language, map_detected_to_salesforce
+            from ...languages import language_for_code
+        except ImportError:
+            return
+
+        labels = [e.label for e in doc.entries if e.label]
+        detected = detect_source_language(labels)
+        if not detected:
+            self._source_detect_label.setText("")
+            return
+
+        iso_code, confidence = detected[0]
+        sf_code = map_detected_to_salesforce(iso_code)
+        if sf_code:
+            lang_name = language_for_code(sf_code) or iso_code
+            self._set_field(self._source_language_field, lang_name)
+            self._set_field(self._source_language_code_field, sf_code)
+            self._state.source_language_code = sf_code
+            self._state.source_language_name = lang_name
+            self._source_detect_label.setText(
+                f"Auto-detected: {lang_name} ({confidence * 100:.0f}%)"
+            )
+        else:
+            self._set_field(self._source_language_field, iso_code)
+            self._set_field(self._source_language_code_field, iso_code)
+            self._source_detect_label.setText(
+                f"Auto-detected: {iso_code} ({confidence * 100:.0f}%)"
+            )
 
     def _populate_preview(self, doc) -> None:
         rows = doc.entries[:_PREVIEW_ROWS]

@@ -223,9 +223,37 @@ class Phase2ExcelPage(PhasePage):
         self._state.document = doc
         self._state.organized_xlsx_path = path
         self._state.output_dir = path.parent
+
+        # Auto-detect source language from labels
+        self._detect_source_language(doc)
+
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
+
+    def _detect_source_language(self, doc) -> None:
+        """Run language detection on labels and update state with suggestion."""
+        try:
+            from ...lang_detect import detect_source_language, map_detected_to_salesforce
+            from ...languages import language_for_code
+        except ImportError:
+            return
+
+        labels = [e.label for e in doc.entries if e.label]
+        detected = detect_source_language(labels)
+        if not detected:
+            return
+
+        iso_code, confidence = detected[0]
+        sf_code = map_detected_to_salesforce(iso_code)
+        if sf_code:
+            lang_name = language_for_code(sf_code) or iso_code
+            self._state.source_language_code = sf_code
+            self._state.source_language_name = lang_name
+            self._summary_label.setText(
+                self._summary_label.text()
+                + f" | Source: {lang_name} ({confidence * 100:.0f}%)"
+            )
 
     # ------------------------------------------------------------------ pop-out details
 

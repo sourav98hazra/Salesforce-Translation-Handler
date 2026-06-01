@@ -77,6 +77,7 @@ class AppState:
     translation_statuses: List[StatusEntry] = field(default_factory=list)
 
     source_language_code: str = "en"
+    source_language_name: str = "English"
     target_language_code: str = "ja"
     target_language_name: str = "Japanese"
     target_languages_batch: List[str] = field(default_factory=list)

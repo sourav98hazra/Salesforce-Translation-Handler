@@ -250,11 +250,36 @@ def translate(
     reset_checkpoint: bool = typer.Option(
         False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
     ),
+    detect_source: bool = typer.Option(
+        True, "--detect-source/--no-detect-source",
+        help="Auto-detect source language from labels (overridden by explicit --source).",
+    ),
 ) -> None:
     """Phase 3: translate every untranslated row in an organised Excel workbook."""
 
     if language_name is None:
         language_name = language_for_code(target) or target
+
+    # Auto-detect source language if enabled and --source was not explicitly set
+    source_explicitly_set = any(
+        arg in sys.argv for arg in ("--source", "-s")
+    )
+    if detect_source and not source_explicitly_set:
+        from .lang_detect import detect_source_language, map_detected_to_salesforce
+
+        doc_for_detect = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
+        labels = [e.label for e in doc_for_detect.entries if e.label]
+        detected = detect_source_language(labels)
+        if detected:
+            iso_code, confidence = detected[0]
+            sf_code = map_detected_to_salesforce(iso_code)
+            lang_name = language_for_code(sf_code) if sf_code else iso_code
+            console.print(
+                f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+            )
+            if sf_code:
+                source = to_google_code(sf_code)
 
     console.print(
         f"Translating [bold]{xlsx_in}[/bold] from [cyan]{source}[/cyan] -> "
@@ -377,6 +402,10 @@ def run_pipeline(
     reset_checkpoint: bool = typer.Option(
         False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
     ),
+    detect_source: bool = typer.Option(
+        True, "--detect-source/--no-detect-source",
+        help="Auto-detect source language from labels (overridden by explicit --source).",
+    ),
 ) -> None:
     """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF."""
 
@@ -388,6 +417,26 @@ def run_pipeline(
 
     console.rule("[bold]Phase 1+2: parse STF and export Excel[/bold]")
     doc = parse_stf(stf_in)
+
+    # Auto-detect source language if enabled and --source was not explicitly set
+    source_explicitly_set = any(
+        arg in sys.argv for arg in ("--source", "-s")
+    )
+    if detect_source and not source_explicitly_set:
+        from .lang_detect import detect_source_language, map_detected_to_salesforce
+
+        labels = [e.label for e in doc.entries if e.label]
+        detected = detect_source_language(labels)
+        if detected:
+            iso_code, confidence = detected[0]
+            sf_code = map_detected_to_salesforce(iso_code)
+            lang_name = language_for_code(sf_code) if sf_code else iso_code
+            console.print(
+                f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+            )
+            if sf_code:
+                source = to_google_code(sf_code)
     if not doc.language:
         doc.language = language_name
     if not doc.language_code:

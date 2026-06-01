@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Signed Windows installer (Inno Setup): Create the Inno Setup script (.iss), build pipeline scripts, CI workflow for building the installer, and documentation. Uses existing build_exe.py as the base for PyInstaller output, then wraps in Inno Setup.",
+  "status": "pending",
+  "steps": [
+    "1. Create installer/stx_installer.iss - a complete Inno Setup script that: (a) installs the PyInstaller-generated dist/ directory contents to {pf}\\SalesforceTranslationHandler, (b) creates Start Menu shortcuts and optional Desktop shortcut, (c) sets up uninstaller that cleans cached files and registry entries, (d) includes placeholder [Code] section for code-signing via SignTool, (e) sets AppPublisher, AppVersion (read from a define), LicenseFile, etc.",
+    "2. Create installer/build_installer.py - a Python script that orchestrates: (a) running build_exe.py to produce PyInstaller output, (b) invoking ISCC (Inno Setup compiler) to compile the .iss script, (c) optionally signing the resulting Setup.exe with signtool (placeholder path for certificate), (d) printing clear status messages at each stage.",
+    "3. Create installer/sign_executable.ps1 - a PowerShell script placeholder that signs a given .exe with signtool using a certificate file/thumbprint from environment variables (SIGN_CERT_PATH, SIGN_CERT_PASSWORD, SIGN_TIMESTAMP_URL).",
+    "4. Create .github/workflows/build-installer.yml - a GitHub Actions workflow that: (a) runs on push to release/** branches and manual dispatch, (b) runs on windows-latest, (c) installs Python 3.11, Inno Setup (choco install innosetup), (d) installs project deps + PyInstaller, (e) runs build_exe.py, (f) runs ISCC on the .iss script, (g) has a conditional signing step (skipped if no certificate secret), (h) uploads the installer as an artifact.",
+    "5. Create docs/INSTALLER.md documenting: (a) prerequisites (Python 3.11, Inno Setup 6, PyInstaller, optionally signtool), (b) local build instructions, (c) code-signing setup (certificate acquisition, environment variables), (d) CI/CD pipeline explanation, (e) how to customize the installer (version, publisher, etc.).",
+    "6. Update the main README.md (if it has a 'Building' or 'Distribution' section) to reference the new docs/INSTALLER.md. If no such section exists, add a brief 'Windows Installer' section.",
+    "7. Create tests/test_installer_script.py with basic tests: (a) verify the .iss file exists and contains expected sections ([Setup], [Files], [Icons], [UninstallDelete]), (b) verify build_installer.py is importable and has a main() function, (c) verify the .iss file references the correct app name and version."
+  ],
+  "acceptance_criteria": [
+    "installer/stx_installer.iss exists with complete Inno Setup sections ([Setup], [Files], [Icons], [Run], [UninstallDelete])",
+    "installer/build_installer.py exists and is runnable (python installer/build_installer.py --help or similar)",
+    "installer/sign_executable.ps1 exists with signtool invocation placeholders",
+    ".github/workflows/build-installer.yml exists with windows-latest job",
+    "docs/INSTALLER.md exists with build instructions and signing documentation",
+    "tests/test_installer_script.py has tests validating the .iss structure",
+    "All existing tests continue to pass (pytest -q)"
+  ],
+  "verification": [
+    "Run: pytest -q to confirm no regressions",
+    "Run: pytest tests/test_installer_script.py -v to verify installer tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
