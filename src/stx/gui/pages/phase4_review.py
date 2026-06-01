@@ -595,6 +595,7 @@ class Phase4ReviewPage(PhasePage):
                 self._state.document, self, undo_stack=self._undo_stack
             )
             self._model.edited.connect(lambda _row: self._update_counters())
+            self._model.edited.connect(lambda _row: self._mark_unsaved())
             self._proxy.setSourceModel(self._model)
             self._table.selectionModel().currentChanged.connect(self._on_selection_changed)
         else:
@@ -815,6 +816,12 @@ class Phase4ReviewPage(PhasePage):
                 self._on_selection_changed(proxy_index, QModelIndex())
                 return
 
+    # ------------------------------------------------------------------ unsaved changes tracking
+
+    def _mark_unsaved(self) -> None:
+        """Mark the state as having unsaved changes after an edit."""
+        self._state.has_unsaved_changes = True
+
     # ------------------------------------------------------------------ save
 
     def _on_save(self) -> None:
@@ -854,6 +861,7 @@ class Phase4ReviewPage(PhasePage):
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
         self._state.set_phase(3, PhaseStatus.DONE)
+        self._state.has_unsaved_changes = False
         self.set_busy(False)
         self.status_message.emit(f"Reviewed workbook saved: {path}")
 

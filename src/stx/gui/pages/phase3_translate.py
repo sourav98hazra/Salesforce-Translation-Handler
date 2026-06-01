@@ -827,6 +827,7 @@ class Phase3TranslatePage(PhasePage):
         self._save_copy_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
         self._state.set_phase(2, PhaseStatus.DONE)
+        self._state.has_unsaved_changes = True
 
     def _on_translation_failed(self, message: str) -> None:
         self._set_running(False)

@@ -431,3 +431,120 @@ def test_set_active_workflow_context_reset_downstream():
     assert state.phase_status[3] == PhaseStatus.IDLE
     assert state.phase_status[4] == PhaseStatus.IDLE
     assert state.phase_status[5] == PhaseStatus.IDLE
+
+
+# ============================================================
+# Integration: test_integration_override_accepted
+# ============================================================
+
+
+def test_integration_override_accepted(qtbot, tmp_path):
+    """MainWindow override check returns True when dialog is accepted."""
+    from unittest.mock import patch
+
+    from stx.gui.main_window import MainWindow
+
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    # Set up an active workflow on the state
+    doc = _make_doc()
+    source = tmp_path / "original.stf"
+    source.write_text("dummy")
+    win._state.set_active_workflow_context(
+        document=doc,
+        original_source_path=source,
+        current_working_path=source,
+        current_working_artifact_type="stf",
+        start_phase=0,
+        current_phase=0,
+    )
+
+    new_file = tmp_path / "new_file.stf"
+    new_file.write_text("dummy2")
+
+    # Patch the dialog to auto-accept
+    from PySide6.QtWidgets import QDialog
+
+    with patch(
+        "stx.gui.main_window.OverrideConfirmationDialog"
+    ) as mock_dlg_cls:
+        mock_dlg = mock_dlg_cls.return_value
+        mock_dlg.exec.return_value = QDialog.DialogCode.Accepted
+        result = win._check_workflow_override(new_file, 0)
+
+    assert result is True
+
+
+# ============================================================
+# Integration: test_integration_override_rejected
+# ============================================================
+
+
+def test_integration_override_rejected(qtbot, tmp_path):
+    """MainWindow override check returns False when dialog is rejected."""
+    from unittest.mock import patch
+
+    from stx.gui.main_window import MainWindow
+
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    # Set up an active workflow on the state
+    doc = _make_doc()
+    source = tmp_path / "original.stf"
+    source.write_text("dummy")
+    win._state.set_active_workflow_context(
+        document=doc,
+        original_source_path=source,
+        current_working_path=source,
+        current_working_artifact_type="stf",
+        start_phase=0,
+        current_phase=0,
+    )
+
+    # Record state before override attempt
+    original_doc = win._state.document
+    original_source = win._state.original_source_path
+
+    new_file = tmp_path / "new_file.stf"
+    new_file.write_text("dummy2")
+
+    # Patch the dialog to auto-reject
+    from PySide6.QtWidgets import QDialog
+
+    with patch(
+        "stx.gui.main_window.OverrideConfirmationDialog"
+    ) as mock_dlg_cls:
+        mock_dlg = mock_dlg_cls.return_value
+        mock_dlg.exec.return_value = QDialog.DialogCode.Rejected
+        result = win._check_workflow_override(new_file, 0)
+
+    assert result is False
+    # State should be unchanged
+    assert win._state.document is original_doc
+    assert win._state.original_source_path is original_source
+
+
+# ============================================================
+# Integration: test_integration_current_phase_advances
+# ============================================================
+
+
+def test_integration_current_phase_advances(qtbot):
+    """Calling _goto(3) on MainWindow updates state.current_phase to 3."""
+    from stx.gui.main_window import MainWindow
+
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    assert win._state.current_phase == 0
+
+    win._goto(3)
+    assert win._state.current_phase == 3
+
+    win._goto(5)
+    assert win._state.current_phase == 5
+
+    win._goto(0)
+    assert win._state.current_phase == 0

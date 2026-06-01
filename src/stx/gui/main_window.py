@@ -70,7 +70,7 @@ from .dialogs.override_dialog import (
     OverrideConfirmationDialog,
     UnsavedChangesDialog,
     UnsavedChangesResult,
-    _PHASE_NAMES,
+    PHASE_NAMES,
 )
 
 _PHASES = [
@@ -478,6 +478,7 @@ class MainWindow(QMainWindow):
     def _goto(self, index: int) -> None:
         if index < 0 or index >= len(self._pages):
             return
+        self._state.current_phase = index
         self._stack.setCurrentIndex(index)
         self._phase_list.blockSignals(True)
         self._phase_list.setCurrentRow(index)
@@ -628,7 +629,7 @@ class MainWindow(QMainWindow):
             return True
 
         # Show override confirmation dialog
-        current_phase_name = _PHASE_NAMES.get(
+        current_phase_name = PHASE_NAMES.get(
             self._state.current_phase, f"Phase {self._state.current_phase}"
         )
         dlg = OverrideConfirmationDialog(
@@ -648,13 +649,8 @@ class MainWindow(QMainWindow):
         if save_first:
             self._action_save_current()
 
-        # Clear stale state
-        self._state.translation_summaries = []
-        self._state.translation_statuses = []
-        self._state.last_validation_report = None
-        self._state.last_export_paths = None
-        self._state.last_translation_progress = None
-        self._state.has_unsaved_changes = False
+        # Clear stale state via clear_workflow_context (resets all workflow fields)
+        self._state.clear_workflow_context()
 
         # Reset downstream phase statuses
         current = self._state.current_phase

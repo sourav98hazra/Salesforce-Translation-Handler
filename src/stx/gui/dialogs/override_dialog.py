@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-_PHASE_NAMES = {
+PHASE_NAMES = {
     0: "Phase 1 - Import STF",
     1: "Phase 2 - STF to Excel",
     2: "Phase 3 - Translate",
