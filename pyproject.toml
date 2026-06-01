@@ -41,6 +41,7 @@ dependencies = [
 # Desktop GUI (heavier dependency, optional install)
 gui = [
     "PySide6>=6.6.0,<7",
+    "keyring>=23.0",
 ]
 # Development / testing
 dev = [

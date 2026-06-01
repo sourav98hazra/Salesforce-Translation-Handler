@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from ..memory import default_tm_path
 from ..translate import list_backends
 from ..translate.factory import check_backend_available
+from . import secrets as gui_secrets
 from . import settings as gui_settings
 
 
@@ -121,6 +122,17 @@ class SettingsDialog(QDialog):
         self._api_key_field.setPlaceholderText("Leave blank to use environment variable")
         self._api_key_field.textChanged.connect(self._update_backend_status)
         form.addRow("API key:", self._api_key_field)
+
+        self._remember_key_check = QCheckBox("Remember API key (secure storage)")
+        self._remember_key_check.setToolTip(
+            "Store the key in your OS credential manager (Keychain / Credential Manager / SecretService)."
+        )
+        form.addRow("", self._remember_key_check)
+
+        self._keyring_status_label = QLabel(gui_secrets.keyring_status())
+        self._keyring_status_label.setWordWrap(True)
+        self._keyring_status_label.setStyleSheet("color: #64748b; font-size: 10px;")
+        form.addRow("", self._keyring_status_label)
 
         self._backend_help = QLabel("")
         self._backend_help.setWordWrap(True)
@@ -254,7 +266,16 @@ class SettingsDialog(QDialog):
                 self._backend_combo.setCurrentIndex(i)
                 break
         self._update_backend_help()
-        self._api_key_field.setText(gui_settings.get_str("translation/api_key", ""))
+
+        # Load API key from secure storage, not QSettings
+        backend = self._backend_combo.currentData() or "google"
+        remember = gui_settings.get_str(f"translation/remember_api_key_{backend}", "0") == "1"
+        self._remember_key_check.setChecked(remember)
+        if remember:
+            stored_key = gui_secrets.retrieve_api_key(backend) or ""
+            self._api_key_field.setText(stored_key)
+        else:
+            self._api_key_field.setText("")
 
         # Performance
         self._workers_spin.setValue(gui_settings.get_int(gui_settings.KEYS.workers, 4))
@@ -282,7 +303,17 @@ class SettingsDialog(QDialog):
 
     def _save_values(self) -> None:
         gui_settings.set_str(gui_settings.KEYS.backend, self._backend_combo.currentData())
-        gui_settings.set_str("translation/api_key", self._api_key_field.text().strip())
+
+        # Handle API key via secure storage, never in QSettings
+        backend = self._backend_combo.currentData() or "google"
+        api_key = self._api_key_field.text().strip()
+        if self._remember_key_check.isChecked() and api_key:
+            gui_secrets.store_api_key(backend, api_key)
+            gui_settings.set_str(f"translation/remember_api_key_{backend}", "1")
+        else:
+            gui_secrets.delete_api_key(backend)
+            gui_settings.set_str(f"translation/remember_api_key_{backend}", "0")
+
         gui_settings.set_int(gui_settings.KEYS.workers, self._workers_spin.value())
         gui_settings.set_str("translation/rate_limit", str(self._rate_spin.value()))
         gui_settings.set_str(

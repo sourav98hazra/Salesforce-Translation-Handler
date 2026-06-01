@@ -2,7 +2,7 @@
   "id": "FEAT-009",
   "type": "fix",
   "description": "Security of secrets: stop storing API keys in plaintext QSettings; prefer environment variables, OS-level credential stores (keyring), or make 'remember API key' explicit. Ensure keys are masked in logs and dialogues.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add 'keyring' to pyproject.toml optional dev/gui dependencies (it's a lightweight cross-platform credential store)",
     "Create src/stx/gui/secrets.py module that: (1) tries to import keyring, (2) provides store_api_key(backend, key), retrieve_api_key(backend) -> Optional[str], delete_api_key(backend) functions, (3) falls back to env var lookup if keyring unavailable",

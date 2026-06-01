@@ -39,6 +39,7 @@ from ...languages import (
 from ...memory import TranslationMemory, default_tm_path
 from ...scope import Scope, StatusFilter
 from .. import settings as gui_settings
+from .. import secrets as gui_secrets
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
@@ -602,7 +603,9 @@ class Phase3TranslatePage(PhasePage):
             rate_limit_per_second=rate_limit,
             prevent_system_sleep=prevent_sleep,
             backend_name=gui_settings.get_str(gui_settings.KEYS.backend, "google"),
-            api_key=gui_settings.get_str("translation/api_key", "").strip() or None,
+            api_key=gui_secrets.retrieve_api_key(
+                gui_settings.get_str(gui_settings.KEYS.backend, "google")
+            ) or None,
             parent=self,
         )
         self._worker.progress.connect(self._on_progress)
@@ -690,7 +693,7 @@ class Phase3TranslatePage(PhasePage):
     def _on_translation_failed(self, message: str) -> None:
         self._set_running(False)
         self._state.set_phase(2, PhaseStatus.ERROR)
-        self.error(message, "Translation failed")
+        self.error(gui_secrets.sanitize_error_message(message), "Translation failed")
 
     def _on_save_copy_to(self) -> None:
         """Open a save dialog and persist the in-memory translated document.
