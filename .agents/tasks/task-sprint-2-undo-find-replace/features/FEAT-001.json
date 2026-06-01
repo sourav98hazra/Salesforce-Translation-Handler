@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Implement Undo/Redo in Phase 4 Editor using a custom undo stack that tracks changes to translations and approved status, integrates with the Edit menu (Ctrl+Z/Ctrl+Y), and updates validation/counters on undo/redo.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create a new module src/stx/gui/undo.py that implements an UndoStack class with: (1) an internal list of UndoCommand objects (each storing row index, column, old_value, new_value), (2) push(command) method, (3) undo() method that restores old_value and returns the command, (4) redo() method that re-applies new_value, (5) can_undo/can_redo properties, (6) clear() method, (7) a Qt Signal 'stack_changed' emitted whenever push/undo/redo/clear is called so the UI can enable/disable buttons.",
     "Modify src/stx/gui/pages/phase4_review.py _EntriesModel.setData() to push an UndoCommand onto the undo stack BEFORE applying the change. The command stores: row, column (TRANSLATION_COL or APPROVED_COL), old_value, new_value. The setData method should apply the new value as it does now.",
@@ -29,5 +29,5 @@
     "QT_QPA_PLATFORM=offscreen pytest -q (all tests pass including existing ones)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "UndoStack is a QObject (not QWidget) so qtbot.addWidget() cannot be used for it in tests - just instantiate directly. The _applying_undo guard flag prevents infinite recursion when undo/redo calls setData internally. The type annotation uses string literal for forward reference to avoid import issues with UndoStack | None on Python 3.9."
 }
