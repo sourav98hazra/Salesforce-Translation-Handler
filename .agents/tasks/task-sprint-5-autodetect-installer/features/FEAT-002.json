@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Signed Windows installer (Inno Setup): Create the Inno Setup script (.iss), build pipeline scripts, CI workflow for building the installer, and documentation. Uses existing build_exe.py as the base for PyInstaller output, then wraps in Inno Setup.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "1. Create installer/stx_installer.iss - a complete Inno Setup script that: (a) installs the PyInstaller-generated dist/ directory contents to {pf}\\SalesforceTranslationHandler, (b) creates Start Menu shortcuts and optional Desktop shortcut, (c) sets up uninstaller that cleans cached files and registry entries, (d) includes placeholder [Code] section for code-signing via SignTool, (e) sets AppPublisher, AppVersion (read from a define), LicenseFile, etc.",
     "2. Create installer/build_installer.py - a Python script that orchestrates: (a) running build_exe.py to produce PyInstaller output, (b) invoking ISCC (Inno Setup compiler) to compile the .iss script, (c) optionally signing the resulting Setup.exe with signtool (placeholder path for certificate), (d) printing clear status messages at each stage.",
@@ -26,5 +26,5 @@
     "Run: pytest tests/test_installer_script.py -v to verify installer tests pass"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 311 tests pass (32 new installer tests + 279 existing). Created LICENSE file since it was referenced by the .iss script but did not exist. README updated with Windows Installer section linking to docs/INSTALLER.md."
 }
