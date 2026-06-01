@@ -331,6 +331,15 @@ class AboutDialog(QDialog):
             "Drag-and-drop file loading anywhere in the window",
             "Recent files menu and persistent settings",
             "Multi-language batch translation",
+            "Column-wise filtering (Excel-like header right-click menus) "
+            "in Phase 4 -- sort, filter by distinct values",
+            "App-wide action history (Ctrl+Shift+Z / Ctrl+Shift+Y) for "
+            "undoing major actions like file loads and translations",
+            "Professional filename generation with date and language code",
+            "Reset Session / Reset Phase for controlled state management",
+            "Previous Phase navigation (Ctrl+B) for quick back-stepping",
+            "Workflow override confirmation when loading a new file into "
+            "an active workflow",
         ]))
 
         layout.addWidget(_heading("Look & feel"))

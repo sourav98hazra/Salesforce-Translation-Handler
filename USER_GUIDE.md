@@ -717,3 +717,54 @@ API keys for paid translation backends can be stored in your operating system's 
 To remove a stored key, clear the field and click "Save to keyring" again, or use your OS keyring manager directly.
 
 The `keyring` library is included in the `[gui]` install extra.
+
+---
+
+## FAQ
+
+**Q: What file types does the app support?**
+A: `.stf` files (Salesforce Translation Workbench export) and `.xlsx` Excel workbooks. STF files are loaded in Phase 1; Excel files can be loaded in Phases 2-6 depending on their stage.
+
+**Q: Can I skip phases?**
+A: Yes. Click any phase in the sidebar and use its "Load..." button to bring in your file directly. You do not have to start at Phase 1 every time.
+
+**Q: How does Translation Memory work?**
+A: The app stores every translation in a local SQLite database. On subsequent runs, if the same source text appears, the cached translation is reused instantly (no API call). Configure the TM path in Settings > Resources.
+
+**Q: Where is my API key stored?**
+A: When "Remember API key" is checked in Settings > Appearance > Credentials, the key is stored in your OS secure credential manager (macOS Keychain, Windows Credential Manager, or Linux SecretService). It is never saved in plain text.
+
+**Q: What does Reset Session do?**
+A: It clears ALL application state: document, file paths, phase statuses, undo history, filters, imported translations, scope, glossary, batch targets -- everything. The app returns to its initial empty state. Use "Reset Current Phase" if you only want to redo the current step.
+
+**Q: Can I translate to multiple languages at once?**
+A: Yes. In Settings > Translation > Batch, enter comma-separated language codes (e.g. `fr, de, es`). Each language gets its own output subfolder with a separate translated workbook.
+
+**Q: How do I undo a mistake?**
+A: There are two undo levels:
+- **Phase 4 per-edit undo** (Ctrl+Z / Ctrl+Y): reverses individual translation edits in the Review table.
+- **App-wide undo** (Ctrl+Shift+Z / Ctrl+Shift+Y): reverses major actions like loading a file, running translation, or auto-fix. Accessible from Edit menu.
+
+**Q: What is the Approved column in Phase 4?**
+A: Checking "Approved" marks a translation as reviewed and accepted. Approved rows are skipped during validation in Phase 5, reducing noise when you have already verified certain translations.
+
+**Q: Why does the override dialog appear when I load a file?**
+A: If a workflow is already active (you have loaded a file and progressed through phases), loading a different file would replace the current work. The dialog gives you a chance to save first, discard, or cancel.
+
+**Q: How do I build the standalone installer?**
+A: On Windows, run `python build_secure_setup.py --exe` for a standalone .exe, or `python build_secure_setup.py` for a full installer (requires Inno Setup 6). If the app crashes on launch, check `%TEMP%\stx_crash.log` for details.
+
+---
+
+## Getting Stuck? (Troubleshooting)
+
+| Problem | Solution |
+|---------|----------|
+| App won't start | Ensure Python 3.9+ is installed and on PATH. Run `pip install -e ".[gui]"` to install dependencies. Check that PySide6 installed correctly. |
+| Translation fails with HTTP 429 | You are hitting the API rate limit. Go to Settings > Translation > Performance and reduce the rate limit (try 2-4 req/s). |
+| Exported STF looks wrong | Double-check that the target language code (e.g. `ja`, `de`, `fr`) matches your Salesforce Translation Workbench setup exactly. |
+| Window opens off-screen | The app saves window geometry. Delete the QSettings file and restart. On Windows: delete registry key under `HKCU\Software\SalesforceTranslationManager`. On macOS/Linux: delete `~/.config/SalesforceTranslationManager/`. |
+| Undo not working as expected | Phase 4 Ctrl+Z only works for translation cell edits. For undoing major actions (load file, translate, auto-fix), use Ctrl+Shift+Z (Edit > Undo Last Action). |
+| Reset Session clears everything? | Yes, that is by design. "Reset Session" = full clear. Use "Reset Current Phase" (File menu) to only reset the active phase and downstream. |
+| Standalone .exe crashes immediately | Check `%TEMP%\stx_crash.log` (Windows) or `/tmp/stx_crash.log` (Mac/Linux) for the error message. Common cause: missing hidden imports -- ensure build_exe.py includes all required modules. |
+| "No module named stx" when running .exe | Rebuild with `python build_exe.py` after installing `pip install -e ".[gui]" pyinstaller`. |
