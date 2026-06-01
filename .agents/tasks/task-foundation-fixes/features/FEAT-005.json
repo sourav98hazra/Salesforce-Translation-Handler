@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "fix",
   "description": "Count failures/cancellations: increment skipped counters and per-sheet skipped_rows when translation failures or cancellations occur so progress and summary statistics are accurate.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In src/stx/translate/runner.py _mark_failed(), add 'summary.skipped_rows += 1' and 'self._skipped += 1' (currently _mark_failed does NOT increment skipped counters - it only fills the status slot)",
     "In _mark_cancelled(), add 'summary.skipped_rows += 1' and 'self._skipped += 1' (currently _mark_cancelled does NOT increment skipped counters)",
@@ -21,5 +21,5 @@
     "pytest -q tests/test_runner_integration.py"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Fix applied cleanly. All 70 tests pass including 2 new tests for this fix. The gap-prevention sweep at end of run() already handles the same counters for truly unprocessed rows, so no conflict."
 }
