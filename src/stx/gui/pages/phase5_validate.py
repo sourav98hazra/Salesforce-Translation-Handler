@@ -91,6 +91,12 @@ class Phase5ValidatePage(PhasePage):
             "placeholders. Use 'Auto-fix this row' below for finer control."
         )
         self._fix_all_btn.clicked.connect(self._on_fix_all)
+        self._fix_selected_btn = QPushButton("Fix Selected")
+        self._fix_selected_btn.setToolTip(
+            "Auto-fix only the rows currently selected in the issues table."
+        )
+        self._fix_selected_btn.setEnabled(False)
+        self._fix_selected_btn.clicked.connect(self._on_fix_selected)
         self._save_btn = QPushButton("Save (.xlsx)")
         self._save_btn.setToolTip(
             "Save the current (fixed) document as an .xlsx file."
@@ -107,6 +113,7 @@ class Phase5ValidatePage(PhasePage):
             self._load_btn,
             self._validate_btn,
             self._fix_all_btn,
+            self._fix_selected_btn,
             self._save_btn,
             self._download_report_btn,
         )
@@ -143,6 +150,7 @@ class Phase5ValidatePage(PhasePage):
         self._table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self._table.cellDoubleClicked.connect(self._on_row_double_clicked)
         self._table.currentCellChanged.connect(self._on_current_row_changed)
+        self._table.itemSelectionChanged.connect(self._on_selection_changed)
         splitter.addWidget(self._table)
 
         # Inline editor for the selected issue row
@@ -431,6 +439,13 @@ class Phase5ValidatePage(PhasePage):
             if e.key == key:
                 return e
         return None
+
+    # ------------------------------------------------------------------ selection
+
+    def _on_selection_changed(self) -> None:
+        """Enable/disable Fix Selected button based on table selection."""
+        has_selection = bool(self._table.selectedIndexes())
+        self._fix_selected_btn.setEnabled(has_selection)
 
     # ------------------------------------------------------------------ auto-fix
 

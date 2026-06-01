@@ -81,10 +81,10 @@ class SettingsDialog(QDialog):
             0, "Translator backend, API key, performance, multi-language batch"
         )
         self._tabs.setTabToolTip(
-            1, "Glossary CSV and translation memory database paths"
+            1, "Translation memory, glossary, imported translations, session"
         )
         self._tabs.setTabToolTip(
-            2, "Application theme and visual preferences"
+            2, "Application theme and credential storage"
         )
         layout.addWidget(self._tabs)
 
@@ -108,8 +108,8 @@ class SettingsDialog(QDialog):
         outer.setContentsMargins(0, 8, 0, 0)
         outer.setSpacing(12)
 
-        # Backend group
-        backend_box = QGroupBox("Backend")
+        # --- Translator Backend group ---
+        backend_box = QGroupBox("Translator Backend")
         form = QFormLayout(backend_box)
         self._backend_combo = QComboBox()
         for info in list_backends():
@@ -123,17 +123,6 @@ class SettingsDialog(QDialog):
         self._api_key_field.textChanged.connect(self._update_backend_status)
         form.addRow("API key:", self._api_key_field)
 
-        self._remember_key_check = QCheckBox("Remember API key (secure storage)")
-        self._remember_key_check.setToolTip(
-            "Store the key in your OS credential manager (Keychain / Credential Manager / SecretService)."
-        )
-        form.addRow("", self._remember_key_check)
-
-        self._keyring_status_label = QLabel(gui_secrets.keyring_status())
-        self._keyring_status_label.setWordWrap(True)
-        self._keyring_status_label.setStyleSheet("color: #64748b; font-size: 10px;")
-        form.addRow("", self._keyring_status_label)
-
         self._backend_help = QLabel("")
         self._backend_help.setWordWrap(True)
         self._backend_help.setStyleSheet("color: #64748b; font-size: 11px;")
@@ -145,7 +134,7 @@ class SettingsDialog(QDialog):
         form.addRow("", self._backend_status)
         outer.addWidget(backend_box)
 
-        # Performance group
+        # --- Performance group ---
         perf_box = QGroupBox("Performance")
         perf_form = QFormLayout(perf_box)
 
@@ -169,8 +158,8 @@ class SettingsDialog(QDialog):
         perf_form.addRow("", self._wakelock_check)
         outer.addWidget(perf_box)
 
-        # Multi-language batch group
-        batch_box = QGroupBox("Multi-language batch (optional)")
+        # --- Batch group ---
+        batch_box = QGroupBox("Batch")
         batch_form = QFormLayout(batch_box)
         self._batch_field = QLineEdit()
         self._batch_field.setPlaceholderText("Comma separated extra target codes (e.g. fr, de, es)")
@@ -186,8 +175,70 @@ class SettingsDialog(QDialog):
         outer.setContentsMargins(0, 8, 0, 0)
         outer.setSpacing(12)
 
-        # Glossary
-        gloss_box = QGroupBox("Glossary (optional)")
+        # --- Translation Memory group ---
+        tm_box = QGroupBox("Translation Memory")
+        tm_layout = QVBoxLayout(tm_box)
+        tm_help = QLabel(
+            "SQLite database that caches every translation.  Subsequent runs "
+            "with the same source text reuse the cached translation -- much "
+            "faster, and no API quota consumed."
+        )
+        tm_help.setWordWrap(True)
+        tm_help.setStyleSheet("color: #64748b; font-size: 11px;")
+        tm_layout.addWidget(tm_help)
+        row = QHBoxLayout()
+        self._memory_field = QLineEdit()
+        self._memory_field.setPlaceholderText(str(default_tm_path()))
+        tm_browse = QPushButton("Browse...")
+        tm_browse.clicked.connect(self._on_browse_memory)
+        row.addWidget(self._memory_field, stretch=1)
+        row.addWidget(tm_browse)
+        tm_layout.addLayout(row)
+
+        # Fuzzy matching controls within TM group
+        fuzzy_form = QFormLayout()
+        fuzzy_help = QLabel(
+            "When an exact TM match is not found, fuzzy matching searches for "
+            "similar source strings.  Matches above the auto-accept threshold "
+            "are used automatically; others are logged as suggestions."
+        )
+        fuzzy_help.setWordWrap(True)
+        fuzzy_help.setStyleSheet("color: #64748b; font-size: 11px;")
+        fuzzy_form.addRow(fuzzy_help)
+
+        self._fuzzy_threshold_spin = QDoubleSpinBox()
+        self._fuzzy_threshold_spin.setRange(0.0, 100.0)
+        self._fuzzy_threshold_spin.setSingleStep(5.0)
+        self._fuzzy_threshold_spin.setValue(75.0)
+        self._fuzzy_threshold_spin.setSuffix("%")
+        self._fuzzy_threshold_spin.setSpecialValueText("disabled")
+        self._fuzzy_threshold_spin.setToolTip(
+            "Minimum similarity score (0-100) for a fuzzy match.  0 = disabled."
+        )
+        fuzzy_form.addRow("Fuzzy threshold:", self._fuzzy_threshold_spin)
+
+        self._fuzzy_max_results_spin = QSpinBox()
+        self._fuzzy_max_results_spin.setRange(1, 20)
+        self._fuzzy_max_results_spin.setValue(5)
+        self._fuzzy_max_results_spin.setToolTip("Maximum number of fuzzy matches to consider.")
+        fuzzy_form.addRow("Fuzzy max results:", self._fuzzy_max_results_spin)
+
+        self._fuzzy_auto_accept_spin = QDoubleSpinBox()
+        self._fuzzy_auto_accept_spin.setRange(0.0, 100.0)
+        self._fuzzy_auto_accept_spin.setSingleStep(5.0)
+        self._fuzzy_auto_accept_spin.setValue(90.0)
+        self._fuzzy_auto_accept_spin.setSuffix("%")
+        self._fuzzy_auto_accept_spin.setToolTip(
+            "Fuzzy matches scoring above this threshold are auto-accepted "
+            "without calling the translator backend."
+        )
+        fuzzy_form.addRow("Fuzzy auto-accept:", self._fuzzy_auto_accept_spin)
+
+        tm_layout.addLayout(fuzzy_form)
+        outer.addWidget(tm_box)
+
+        # --- Glossary group ---
+        gloss_box = QGroupBox("Glossary")
         gloss_layout = QVBoxLayout(gloss_box)
         gloss_help = QLabel(
             "CSV with three columns: source, target, do_not_translate.  "
@@ -207,72 +258,8 @@ class SettingsDialog(QDialog):
         gloss_layout.addLayout(row)
         outer.addWidget(gloss_box)
 
-        # Translation memory
-        tm_box = QGroupBox("Translation memory")
-        tm_layout = QVBoxLayout(tm_box)
-        tm_help = QLabel(
-            "SQLite database that caches every translation.  Subsequent runs "
-            "with the same source text reuse the cached translation -- much "
-            "faster, and no API quota consumed."
-        )
-        tm_help.setWordWrap(True)
-        tm_help.setStyleSheet("color: #64748b; font-size: 11px;")
-        tm_layout.addWidget(tm_help)
-        row = QHBoxLayout()
-        self._memory_field = QLineEdit()
-        self._memory_field.setPlaceholderText(str(default_tm_path()))
-        tm_browse = QPushButton("Browse...")
-        tm_browse.clicked.connect(self._on_browse_memory)
-        row.addWidget(self._memory_field, stretch=1)
-        row.addWidget(tm_browse)
-        tm_layout.addLayout(row)
-        outer.addWidget(tm_box)
-
-        # Fuzzy matching
-        fuzzy_box = QGroupBox("Fuzzy Matching")
-        fuzzy_form = QFormLayout(fuzzy_box)
-
-        fuzzy_help = QLabel(
-            "When an exact TM match is not found, fuzzy matching searches for "
-            "similar source strings.  Matches above the auto-accept threshold "
-            "are used automatically; others are logged as suggestions."
-        )
-        fuzzy_help.setWordWrap(True)
-        fuzzy_help.setStyleSheet("color: #64748b; font-size: 11px;")
-        fuzzy_form.addRow(fuzzy_help)
-
-        self._fuzzy_threshold_spin = QDoubleSpinBox()
-        self._fuzzy_threshold_spin.setRange(0.0, 100.0)
-        self._fuzzy_threshold_spin.setSingleStep(5.0)
-        self._fuzzy_threshold_spin.setValue(75.0)
-        self._fuzzy_threshold_spin.setSuffix("%")
-        self._fuzzy_threshold_spin.setSpecialValueText("disabled")
-        self._fuzzy_threshold_spin.setToolTip(
-            "Minimum similarity score (0-100) for a fuzzy match.  0 = disabled."
-        )
-        fuzzy_form.addRow("Threshold:", self._fuzzy_threshold_spin)
-
-        self._fuzzy_max_results_spin = QSpinBox()
-        self._fuzzy_max_results_spin.setRange(1, 20)
-        self._fuzzy_max_results_spin.setValue(5)
-        self._fuzzy_max_results_spin.setToolTip("Maximum number of fuzzy matches to consider.")
-        fuzzy_form.addRow("Max results:", self._fuzzy_max_results_spin)
-
-        self._fuzzy_auto_accept_spin = QDoubleSpinBox()
-        self._fuzzy_auto_accept_spin.setRange(0.0, 100.0)
-        self._fuzzy_auto_accept_spin.setSingleStep(5.0)
-        self._fuzzy_auto_accept_spin.setValue(90.0)
-        self._fuzzy_auto_accept_spin.setSuffix("%")
-        self._fuzzy_auto_accept_spin.setToolTip(
-            "Fuzzy matches scoring above this threshold are auto-accepted "
-            "without calling the translator backend."
-        )
-        fuzzy_form.addRow("Auto-accept:", self._fuzzy_auto_accept_spin)
-
-        outer.addWidget(fuzzy_box)
-
-        # Import existing translations
-        import_box = QGroupBox("Import existing translations")
+        # --- Import Translations group ---
+        import_box = QGroupBox("Import Translations")
         import_layout = QVBoxLayout(import_box)
         import_help = QLabel(
             "Reuse translations from a previously translated Excel file.  "
@@ -298,6 +285,24 @@ class SettingsDialog(QDialog):
         import_layout.addWidget(self._import_trans_check)
         outer.addWidget(import_box)
 
+        # --- Session group ---
+        session_box = QGroupBox("Session")
+        session_form = QFormLayout(session_box)
+        self._session_check = QCheckBox("Enable session persistence")
+        self._session_check.setToolTip(
+            "When enabled, the application automatically saves your session on exit "
+            "and restores it when you re-open the same source file."
+        )
+        session_form.addRow(self._session_check)
+        session_note = QLabel(
+            "Auto-saves project state (document, translation progress, phase status) "
+            "on close and restores it on next launch."
+        )
+        session_note.setWordWrap(True)
+        session_note.setStyleSheet("color: #64748b; font-size: 11px;")
+        session_form.addRow(session_note)
+        outer.addWidget(session_box)
+
         outer.addStretch(1)
         return widget
 
@@ -307,6 +312,7 @@ class SettingsDialog(QDialog):
         outer.setContentsMargins(0, 8, 0, 0)
         outer.setSpacing(12)
 
+        # --- Theme group ---
         theme_box = QGroupBox("Theme")
         theme_form = QFormLayout(theme_box)
         self._theme_combo = QComboBox()
@@ -323,23 +329,30 @@ class SettingsDialog(QDialog):
         theme_form.addRow("", note)
         outer.addWidget(theme_box)
 
-        # Session persistence
-        session_box = QGroupBox("Session persistence")
-        session_form = QFormLayout(session_box)
-        self._session_check = QCheckBox("Enable session persistence")
-        self._session_check.setToolTip(
-            "When enabled, the application automatically saves your session on exit "
-            "and restores it when you re-open the same source file."
+        # --- Credentials group ---
+        cred_box = QGroupBox("Credentials")
+        cred_form = QFormLayout(cred_box)
+
+        self._remember_key_check = QCheckBox("Remember API key (secure storage)")
+        self._remember_key_check.setToolTip(
+            "Store the key in your OS credential manager (Keychain / Credential Manager / SecretService)."
         )
-        session_form.addRow(self._session_check)
-        session_note = QLabel(
-            "Auto-saves project state (document, translation progress, phase status) "
-            "on close and restores it on next launch."
+        cred_form.addRow(self._remember_key_check)
+
+        self._keyring_status_label = QLabel(gui_secrets.keyring_status())
+        self._keyring_status_label.setWordWrap(True)
+        self._keyring_status_label.setStyleSheet("color: #64748b; font-size: 10px;")
+        cred_form.addRow(self._keyring_status_label)
+
+        cred_note = QLabel(
+            "When enabled, your API key is stored in the operating system's "
+            "secure credential manager (macOS Keychain, Windows Credential "
+            "Manager, or Linux SecretService/kwallet)."
         )
-        session_note.setWordWrap(True)
-        session_note.setStyleSheet("color: #64748b; font-size: 11px;")
-        session_form.addRow(session_note)
-        outer.addWidget(session_box)
+        cred_note.setWordWrap(True)
+        cred_note.setStyleSheet("color: #64748b; font-size: 11px;")
+        cred_form.addRow(cred_note)
+        outer.addWidget(cred_box)
 
         outer.addStretch(1)
         return widget

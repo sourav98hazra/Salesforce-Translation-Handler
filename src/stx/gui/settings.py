@@ -106,14 +106,17 @@ def clear_recent_files() -> None:
     settings().setValue(KEYS.recent_files, [])
 
 
+_VALID_THEMES = {"light", "dark", "ocean", "forest", "sunset", "auto"}
+
+
 def get_theme() -> str:
-    """Return the active theme name -- ``light``, ``dark`` or ``auto``."""
+    """Return the active theme name."""
     value = get_str(KEYS.theme, "auto")
-    return value if value in {"light", "dark", "auto"} else "auto"
+    return value if value in _VALID_THEMES else "auto"
 
 
 def set_theme(name: str) -> None:
-    if name in {"light", "dark", "auto"}:
+    if name in _VALID_THEMES:
         set_str(KEYS.theme, name)
 
 
