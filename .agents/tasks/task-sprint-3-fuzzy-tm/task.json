@@ -1,0 +1,7 @@
+{
+  "task_id": "task-sprint-3-fuzzy-tm",
+  "task_description": "Implement fuzzy translation memory - extend the existing TM to return similar (not just exact) matches using rapidfuzz, integrate into runner/CLI/GUI with configurable thresholds and auto-accept behavior.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

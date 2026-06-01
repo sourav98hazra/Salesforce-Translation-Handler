@@ -1,0 +1,28 @@
+{
+  "project_type": "Python desktop app (PySide6 GUI + Typer CLI + library) for Salesforce translation workflows",
+  "language": "Python",
+  "build_system": "setuptools via pyproject.toml, editable install with pip install -e '.[gui,dev]'",
+  "test_framework": "pytest with conftest.py fixtures; 203 tests; QT_QPA_PLATFORM=offscreen for GUI tests",
+  "build_command": "pip install -e '.[gui,dev]'",
+  "test_command": "pytest -q",
+  "verification_instructions": "1. pip install -e '.[gui,dev]' (must include rapidfuzz). 2. pytest -q (all tests pass). 3. Run 'stx translate --help' and confirm --fuzzy-threshold flag is visible.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pip install -e '.[gui,dev]'",
+  "environment_constraints": "OPEN_INTERNET -- full network access. Python 3.11 default. No Docker needed.",
+  "contribution_requirements": "Follow ruff linting (line-length=100, target py39). Use dataclasses. Tests go in tests/. GUI tests use QT_QPA_PLATFORM=offscreen.",
+  "key_patterns": "TranslationMemory is a dataclass wrapping SQLite. The runner checks TM before calling the translator. CLI uses typer with rich output. GUI uses PySide6 with workers (QThread). Settings persist via QSettings. Entry is a frozen dataclass with key/label/translation/approved fields.",
+  "relevant_files": [
+    "src/stx/memory.py",
+    "src/stx/translate/runner.py",
+    "src/stx/cli.py",
+    "src/stx/gui/pages/phase3_translate.py",
+    "src/stx/gui/pages/phase4_review.py",
+    "src/stx/gui/settings.py",
+    "src/stx/gui/settings_dialog.py",
+    "tests/test_memory.py",
+    "tests/test_runner_integration.py",
+    "tests/conftest.py",
+    "pyproject.toml"
+  ],
+  "directory_structure": "src/stx/ (core library), src/stx/gui/ (PySide6 desktop app), src/stx/gui/pages/ (one module per phase), src/stx/translate/ (translator backends + runner), tests/ (pytest suite)"
+}
