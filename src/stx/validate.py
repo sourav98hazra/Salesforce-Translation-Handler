@@ -59,6 +59,7 @@ class ValidationIssue:
     severity: str  # "error" | "warning" | "info"
     key: str
     message: str
+    component: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -66,6 +67,7 @@ class ValidationIssue:
             "severity": self.severity,
             "key": self.key,
             "message": self.message,
+            "component": self.component,
         }
 
 
@@ -114,17 +116,25 @@ def _check_duplicate_keys(doc: Document, report: ValidationReport) -> None:
         seen[entry.key] = seen.get(entry.key, 0) + 1
     for key, count in seen.items():
         if count > 1:
+            # Extract component from the key's first dot-segment
+            if "." in key:
+                component = key.split(".", 1)[0] or "Unknown"
+            else:
+                component = key or "Unknown"
             report.issues.append(
                 ValidationIssue(
                     category="duplicate_key",
                     severity="error",
                     key=key,
                     message=f"Key occurs {count} times; Salesforce import will fail or overwrite.",
+                    component=component,
                 )
             )
 
 
 def _check_entry(entry: Entry, report: ValidationReport) -> None:
+    component = entry.component_type
+
     # Completely empty (no translation at all) - not an issue
     if not entry.translation:
         return
@@ -137,6 +147,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                 severity="warning",
                 key=entry.key,
                 message="Translation is whitespace-only; will re-import as untranslated.",
+                component=component,
             )
         )
         return
@@ -153,6 +164,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                     f"Translation length {len(entry.translation)} exceeds limit {limit} "
                     f"for {entry.component_type}."
                 ),
+                component=component,
             )
         )
 
@@ -169,6 +181,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                     f"Placeholder mismatch -- source has {src_placeholders}, "
                     f"translation has {tgt_placeholders}."
                 ),
+                component=component,
             )
         )
 
@@ -184,6 +197,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                     f"MessageFormat token mismatch -- source has {src_msgfmt}, "
                     f"translation has {tgt_msgfmt}."
                 ),
+                component=component,
             )
         )
 
@@ -200,5 +214,6 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                     f"HTML tag set differs -- source: {src_tags}, "
                     f"translation: {tgt_tags}."
                 ),
+                component=component,
             )
         )

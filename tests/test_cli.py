@@ -114,3 +114,46 @@ def test_xlsx2stf(tmp_path):
 def test_missing_file():
     result = runner.invoke(app, ["info", "/nonexistent/file.stf"])
     assert result.exit_code != 0
+
+
+def test_validate_export_report_csv(tmp_path):
+    """--export-report with .csv extension writes a CSV file."""
+    doc = Document(
+        language="Japanese", language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello", translation="Konnichiwa"),
+            Entry(key="CustomLabel.A", label="World", translation="Sekai"),
+        ],
+    )
+    stf = tmp_path / "dupes.stf"
+    stf.write_text(render_full_stf(doc), encoding="utf-8")
+    report_path = tmp_path / "report.csv"
+    result = runner.invoke(app, ["validate", str(stf), "--export-report", str(report_path)])
+    # exit code 1 because there are errors, but report still written
+    assert result.exit_code == 1
+    assert report_path.exists()
+    content = report_path.read_text(encoding="utf-8")
+    assert "severity" in content
+    assert "duplicate_key" in content
+
+
+def test_validate_export_report_json(tmp_path):
+    """--export-report with .json extension writes valid JSON."""
+    import json
+
+    doc = Document(
+        language="Japanese", language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello", translation="Konnichiwa"),
+            Entry(key="CustomLabel.A", label="World", translation="Sekai"),
+        ],
+    )
+    stf = tmp_path / "dupes.stf"
+    stf.write_text(render_full_stf(doc), encoding="utf-8")
+    report_path = tmp_path / "report.json"
+    result = runner.invoke(app, ["validate", str(stf), "--export-report", str(report_path)])
+    assert result.exit_code == 1
+    assert report_path.exists()
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    assert data["summary"]["errors"] >= 1
+    assert "duplicate_key" in data["issues_by_category"]

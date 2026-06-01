@@ -189,7 +189,8 @@ The table updates immediately as you type or change dropdowns.
 5. Use the **inline editor** below the table to manually correct rows the auto-fixer can't handle.
 6. Click **"Re-validate"** to confirm everything is now clean.
 7. Click **"Save fixed workbook (.xlsx)"** at any point.
-8. Click **"Continue to Phase 6 (Export STF) →"**.
+8. Click **"Download Report..."** to export the validation results as CSV, JSON, or HTML. A save dialog lets you choose the format; the report includes severity, category, component, key, and message for every issue.
+9. Click **"Continue to Phase 6 (Export STF) →"**.
 
 **Independent path:** click **"Load Excel for validation..."** to land here directly with any workbook — useful when you only want to check / fix issues, not run the full pipeline.
 
@@ -347,6 +348,35 @@ User preferences (window geometry, theme, last target language, recent files, tr
 | Linux | `~/.config/SalesforceTranslationHandler/SalesforceTranslationHandler.conf` |
 
 The default translation memory database lives at `~/.cache/salesforce-translation-handler/tm.sqlite` unless you override it in Settings → Resources.
+
+---
+
+## 10. CLI: Export validation reports
+
+The `stx validate` command supports a `--export-report` flag to write the validation results to a file.  The format is detected from the file extension.
+
+### Usage
+
+```bash
+# Export as CSV
+stx validate input.stf --export-report report.csv
+
+# Export as JSON
+stx validate input.stf --export-report report.json
+
+# Export as HTML (standalone, can be opened in any browser)
+stx validate input.stf --export-report report.html
+```
+
+### Format details
+
+| Format | Description |
+|---|---|
+| CSV | Columns: `severity`, `category`, `component`, `key`, `message`.  A summary comment row at the top shows error/warning counts. |
+| JSON | Structure: `{summary: {errors, warnings, total}, issues_by_category: {...}, issues: [...]}`.  Suitable for programmatic consumption. |
+| HTML | Standalone page with embedded CSS, summary header, and issues table grouped by category.  Open in any browser. |
+
+The report is written regardless of whether validation passes or fails.  The command still exits with code 1 when errors are present (useful for CI pipelines).
 
 ---
 

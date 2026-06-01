@@ -97,11 +97,18 @@ class Phase5ValidatePage(PhasePage):
         )
         self._save_btn.clicked.connect(self._on_save)
 
+        self._download_report_btn = QPushButton("Download Report...")
+        self._download_report_btn.setToolTip(
+            "Export the validation report as CSV, JSON, or HTML."
+        )
+        self._download_report_btn.clicked.connect(self._on_download_report)
+
         actions = make_action_row(
             self._load_btn,
             self._validate_btn,
             self._fix_all_btn,
             self._save_btn,
+            self._download_report_btn,
         )
         self.add_layout(actions)
 
@@ -603,6 +610,37 @@ class Phase5ValidatePage(PhasePage):
         self.set_busy(False)
         self._state.set_phase(4, PhaseStatus.ERROR)
         self.error(message, "Save failed")
+
+    # ------------------------------------------------------------------ download report
+
+    def _on_download_report(self) -> None:
+        """Export the current validation report to CSV, JSON, or HTML."""
+        if self._report is None or not self._report.issues:
+            self.status_message.emit("No validation report available. Run validation first.")
+            return
+        path = self.pick_save_file(
+            "Save validation report",
+            "CSV (*.csv);;JSON (*.json);;HTML (*.html)",
+            "validation_report.csv",
+        )
+        if not path:
+            return
+
+        from ...report import export_csv, export_html, export_json
+
+        ext = path.suffix.lower()
+        if ext == ".csv":
+            export_csv(self._report, path)
+        elif ext == ".json":
+            export_json(self._report, path)
+        elif ext == ".html":
+            export_html(self._report, path)
+        else:
+            self.status_message.emit(
+                f"Unsupported format '{ext}'. Use .csv, .json, or .html."
+            )
+            return
+        self.status_message.emit(f"Report exported to {path}")
 
     # ------------------------------------------------------------------ pop-out (entire splitter: issues table + editor)
 
