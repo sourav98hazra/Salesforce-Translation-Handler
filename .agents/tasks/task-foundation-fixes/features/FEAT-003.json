@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Correct whitespace-only detection in validate.py: move the whitespace check before the early return so that empty or spaces-only translations are reported as empty_translation warnings. Also adjust CLI validate command to return non-zero exit codes when blocking validation errors exist.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In src/stx/validate.py _check_entry(), move the empty_translation check (currently dead code after the early return) to BEFORE the 'if not entry.translation.strip(): return' line. The logic should be: if entry.translation is truthy (non-empty string) but .strip() is empty (whitespace-only), emit the empty_translation warning, then return.",
     "Restructure the function: first check if entry.translation is empty string '' -> return (untranslated, no issue). Then check if entry.translation.strip() is empty (whitespace-only) -> emit empty_translation warning and return. Then proceed with remaining checks for entries that have real translations.",
@@ -21,5 +21,5 @@
     "pytest -q tests/test_validate.py"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 68 tests pass. The fix restructures logic so empty string returns early with no issue, whitespace-only emits a warning, and real translations proceed to further checks."
 }
