@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Feature 10: Implement import_translations module that parses an existing Excel file to extract a source->translation mapping, and integrate it into the translation runner as high-priority translation memory. Add CLI flag --import-translations. Add GUI 'Import existing translations...' button in settings dialog and phase 3. Support various Excel layouts (STF->Excel output, translated workbooks, glossary-style with just source+translation columns). Allow user to specify custom column mappings. Show reuse summary.",
+  "status": "pending",
+  "steps": [
+    "Create src/stx/import_translations.py module with: (a) ImportedTranslations class that holds a dict mapping source_text -> translation, (b) parse_translation_file(path, source_col=None, translation_col=None) function that loads an Excel file and auto-detects or uses specified columns for source and translation extraction, supporting multiple layouts: standard Key/Label/Translation columns, glossary-style (source/translation only), and custom column names specified by user, (c) ImportResult dataclass with counts (total_imported, reused_count, remaining_count)",
+    "Modify src/stx/translate/runner.py: add an optional imported_translations parameter (dict[str, str] or None) to translate_document() and _Runner.__init__(). In _Runner._classify() or _translate_one(), check imported_translations BEFORE the TM lookup -- if entry.label is in imported_translations, use that value directly (highest priority). Track imported_reuse_count in TranslationResult.",
+    "Modify src/stx/cli.py: add --import-translations option (Optional[Path]) to the translate and run commands. When provided, call parse_translation_file() and pass the resulting dict to translate_document(). Print a summary line showing how many translations were reused from the imported file.",
+    "Add to src/stx/gui/settings_dialog.py: In the Resources tab, add a new QGroupBox 'Import existing translations...' section with: (a) a file browser row (QLineEdit + Browse button) for the import file path, (b) a checkbox 'Use imported translations' that auto-checks when a file is selected and can be unchecked to disable, (c) persist the path and enabled state via gui_settings",
+    "Add to src/stx/gui/pages/phase3_translate.py: Add an 'Import existing translations...' button in the setup section. When clicked, open a file dialog for .xlsx files. Parse the selected file and store the imported translations dict in AppState. Pass it to the TranslationWorker. Show a status label with count of imported entries.",
+    "Add import_translations field to src/stx/gui/state.py AppState: imported_translations: Optional[dict[str, str]] = None and imported_translations_path: Optional[Path] = None and imported_translations_enabled: bool = False",
+    "Modify src/stx/gui/workers.py TranslationWorker to accept and pass imported_translations to translate_document()",
+    "Add settings keys for import_translations_path and import_translations_enabled in src/stx/gui/settings.py",
+    "Create tests/test_import_translations.py with tests covering: (a) parsing standard STF->Excel output format, (b) parsing glossary-style 2-column format, (c) custom column specification, (d) integration with runner showing imported translations take priority over TM, (e) empty/missing file handling"
+  ],
+  "acceptance_criteria": [
+    "parse_translation_file() correctly extracts source->translation mappings from various Excel formats",
+    "Runner uses imported translations with highest priority (before TM, before network)",
+    "CLI --import-translations flag works end-to-end with the translate command",
+    "TranslationResult includes imported_reuse_count field",
+    "GUI settings dialog has the Import existing translations section with file picker and checkbox",
+    "Phase 3 page has Import existing translations button that loads and displays count",
+    "All new tests pass with pytest -q",
+    "All existing tests still pass"
+  ],
+  "verification": [
+    "pytest tests/test_import_translations.py -v",
+    "pytest -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

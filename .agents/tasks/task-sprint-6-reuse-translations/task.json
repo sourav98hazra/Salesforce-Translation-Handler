@@ -1,0 +1,7 @@
+{
+  "task_id": "task-sprint-6-reuse-translations",
+  "task_description": "Sprint 6: Feature 10 (reuse translations from existing Excel) and Feature 11 (retranslate existing translations control). Implement both features with CLI flags, GUI integration, and comprehensive tests.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

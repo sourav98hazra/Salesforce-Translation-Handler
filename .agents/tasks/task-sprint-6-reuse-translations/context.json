@@ -1,0 +1,30 @@
+{
+  "project_type": "Python desktop app with CLI (Typer) + GUI (PySide6) for Salesforce STF translation workflow",
+  "language": "Python 3.9+",
+  "build_system": "setuptools with pyproject.toml, editable install via pip install -e '.[gui,dev]'",
+  "test_framework": "pytest with pytest-qt for GUI tests, tests/ directory, 313+ tests passing",
+  "build_command": "pip install -e '.[gui,dev]'",
+  "test_command": "pytest -q",
+  "verification_instructions": "1. pip install -e '.[gui,dev]' 2. pytest -q (all tests pass) 3. Run new tests specifically",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pip install -e '.[gui,dev]'",
+  "environment_constraints": "OPEN_INTERNET network mode. Python 3.11 default. PySide6 available for GUI tests.",
+  "contribution_requirements": "Follow existing code patterns: frozen Entry dataclass, Document model, runner translate_document(). Tests in tests/ directory following pytest patterns.",
+  "key_patterns": "Entry(key, label, translation, approved) frozen dataclass; Document.entries list; TranslationMemory SQLite-backed with get/put; Runner classify/fill/translate_one pattern; GUI AppState shared dataclass; Settings via QSettings; CLI via Typer app; Excel import/export with openpyxl; Columns: Key, Label, Translation, Approved, Do Not Translate",
+  "relevant_files": [
+    "src/stx/memory.py",
+    "src/stx/model.py",
+    "src/stx/cli.py",
+    "src/stx/translate/runner.py",
+    "src/stx/excel/importer.py",
+    "src/stx/excel/exporter.py",
+    "src/stx/gui/state.py",
+    "src/stx/gui/settings.py",
+    "src/stx/gui/settings_dialog.py",
+    "src/stx/gui/pages/phase3_translate.py",
+    "src/stx/gui/pages/phase4_review.py",
+    "tests/test_runner_integration.py",
+    "tests/test_memory.py"
+  ],
+  "directory_structure": "src/stx/ = main package, src/stx/gui/ = PySide6 GUI, src/stx/gui/pages/ = phase pages, src/stx/translate/ = translation backends+runner, src/stx/excel/ = Excel import/export, src/stx/stf/ = STF parser/writer, tests/ = pytest test files"
+}
