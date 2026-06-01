@@ -25,7 +25,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, List, Optional, Tuple
 
 DEFAULT_TM_FILENAME = "tm.sqlite"
 
@@ -128,6 +128,38 @@ class TranslationMemory:
         """Wipe every entry (kept for the "Clear cache" button in settings)."""
         with self._connect() as conn:
             conn.execute("DELETE FROM translations")
+
+    def all_sources(self, source_lang: str, target_lang: str) -> List[Tuple[str, str]]:
+        """Return all (source, translation) pairs for a language pair."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT source, translation FROM translations "
+                "WHERE source_lang = ? AND target_lang = ?",
+                (source_lang, target_lang),
+            ).fetchall()
+        return [(row[0], row[1]) for row in rows]
+
+    def fuzzy_search(
+        self,
+        source: str,
+        source_lang: str,
+        target_lang: str,
+        threshold: float = 75.0,
+        max_results: int = 5,
+    ) -> "List[FuzzyMatch]":
+        """Search the TM for fuzzy matches against *source*.
+
+        Returns matches sorted by score descending, filtered by threshold.
+        """
+        from .fuzzy import FuzzyMatch, FuzzyMatcher
+
+        candidates = self.all_sources(source_lang, target_lang)
+        if not candidates:
+            return []
+        matcher = FuzzyMatcher(threshold=threshold, max_results=max_results)
+        return matcher.find_matches(
+            source, candidates, source_lang=source_lang, target_lang=target_lang
+        )
 
 
 def default_tm_path() -> Path:

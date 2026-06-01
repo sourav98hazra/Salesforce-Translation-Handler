@@ -42,6 +42,9 @@ class SettingsKeys:
     theme: str = "ui/theme"
     window_geometry: str = "ui/window_geometry"
     window_state: str = "ui/window_state"
+    fuzzy_threshold: str = "translation/fuzzy_threshold"
+    fuzzy_max_results: str = "translation/fuzzy_max_results"
+    fuzzy_auto_accept: str = "translation/fuzzy_auto_accept"
 
 
 KEYS = SettingsKeys()

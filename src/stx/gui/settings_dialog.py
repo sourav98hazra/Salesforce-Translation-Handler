@@ -228,6 +228,49 @@ class SettingsDialog(QDialog):
         tm_layout.addLayout(row)
         outer.addWidget(tm_box)
 
+        # Fuzzy matching
+        fuzzy_box = QGroupBox("Fuzzy Matching")
+        fuzzy_form = QFormLayout(fuzzy_box)
+
+        fuzzy_help = QLabel(
+            "When an exact TM match is not found, fuzzy matching searches for "
+            "similar source strings.  Matches above the auto-accept threshold "
+            "are used automatically; others are logged as suggestions."
+        )
+        fuzzy_help.setWordWrap(True)
+        fuzzy_help.setStyleSheet("color: #64748b; font-size: 11px;")
+        fuzzy_form.addRow(fuzzy_help)
+
+        self._fuzzy_threshold_spin = QDoubleSpinBox()
+        self._fuzzy_threshold_spin.setRange(0.0, 100.0)
+        self._fuzzy_threshold_spin.setSingleStep(5.0)
+        self._fuzzy_threshold_spin.setValue(75.0)
+        self._fuzzy_threshold_spin.setSuffix("%")
+        self._fuzzy_threshold_spin.setSpecialValueText("disabled")
+        self._fuzzy_threshold_spin.setToolTip(
+            "Minimum similarity score (0-100) for a fuzzy match.  0 = disabled."
+        )
+        fuzzy_form.addRow("Threshold:", self._fuzzy_threshold_spin)
+
+        self._fuzzy_max_results_spin = QSpinBox()
+        self._fuzzy_max_results_spin.setRange(1, 20)
+        self._fuzzy_max_results_spin.setValue(5)
+        self._fuzzy_max_results_spin.setToolTip("Maximum number of fuzzy matches to consider.")
+        fuzzy_form.addRow("Max results:", self._fuzzy_max_results_spin)
+
+        self._fuzzy_auto_accept_spin = QDoubleSpinBox()
+        self._fuzzy_auto_accept_spin.setRange(0.0, 100.0)
+        self._fuzzy_auto_accept_spin.setSingleStep(5.0)
+        self._fuzzy_auto_accept_spin.setValue(90.0)
+        self._fuzzy_auto_accept_spin.setSuffix("%")
+        self._fuzzy_auto_accept_spin.setToolTip(
+            "Fuzzy matches scoring above this threshold are auto-accepted "
+            "without calling the translator backend."
+        )
+        fuzzy_form.addRow("Auto-accept:", self._fuzzy_auto_accept_spin)
+
+        outer.addWidget(fuzzy_box)
+
         outer.addStretch(1)
         return widget
 
@@ -294,6 +337,21 @@ class SettingsDialog(QDialog):
         self._glossary_field.setText(gui_settings.get_str(gui_settings.KEYS.glossary_path, ""))
         self._memory_field.setText(gui_settings.get_str(gui_settings.KEYS.memory_path, ""))
 
+        # Fuzzy matching
+        fuzzy_thresh = gui_settings.get_str(gui_settings.KEYS.fuzzy_threshold, "75.0")
+        try:
+            self._fuzzy_threshold_spin.setValue(float(fuzzy_thresh))
+        except (TypeError, ValueError):
+            self._fuzzy_threshold_spin.setValue(75.0)
+        self._fuzzy_max_results_spin.setValue(
+            gui_settings.get_int(gui_settings.KEYS.fuzzy_max_results, 5)
+        )
+        fuzzy_auto = gui_settings.get_str(gui_settings.KEYS.fuzzy_auto_accept, "90.0")
+        try:
+            self._fuzzy_auto_accept_spin.setValue(float(fuzzy_auto))
+        except (TypeError, ValueError):
+            self._fuzzy_auto_accept_spin.setValue(90.0)
+
         # Appearance
         theme = gui_settings.get_theme()
         for i in range(self._theme_combo.count()):
@@ -329,6 +387,15 @@ class SettingsDialog(QDialog):
         gui_settings.set_str("translation/batch_targets", self._batch_field.text().strip())
         gui_settings.set_str(gui_settings.KEYS.glossary_path, self._glossary_field.text().strip())
         gui_settings.set_str(gui_settings.KEYS.memory_path, self._memory_field.text().strip())
+        gui_settings.set_str(
+            gui_settings.KEYS.fuzzy_threshold, str(self._fuzzy_threshold_spin.value())
+        )
+        gui_settings.set_int(
+            gui_settings.KEYS.fuzzy_max_results, self._fuzzy_max_results_spin.value()
+        )
+        gui_settings.set_str(
+            gui_settings.KEYS.fuzzy_auto_accept, str(self._fuzzy_auto_accept_spin.value())
+        )
         gui_settings.set_theme(self._theme_combo.currentData())
 
     def _on_accept(self) -> None:
@@ -350,6 +417,9 @@ class SettingsDialog(QDialog):
         self._batch_field.clear()
         self._glossary_field.clear()
         self._memory_field.clear()
+        self._fuzzy_threshold_spin.setValue(75.0)
+        self._fuzzy_max_results_spin.setValue(5)
+        self._fuzzy_auto_accept_spin.setValue(90.0)
         self._theme_combo.setCurrentIndex(0)
 
     # ------------------------------------------------------------------ helpers

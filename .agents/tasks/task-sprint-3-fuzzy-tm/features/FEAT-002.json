@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement the core fuzzy translation memory module and integrate it into the existing TM, CLI, translation runner, and GUI. This is the main feature covering: (1) a FuzzyMatcher class using rapidfuzz for similarity scoring with configurable thresholds, (2) extending TranslationMemory with a fuzzy_search() method, (3) CLI flags for fuzzy matching (--fuzzy-threshold, --fuzzy-max-results, --fuzzy-auto-accept), (4) runner integration to suggest/auto-accept fuzzy matches when exact TM misses occur, (5) GUI display of fuzzy suggestions in Phase 3 live feed and Phase 4 review, (6) settings for fuzzy thresholds, (7) pyproject.toml update to add rapidfuzz dependency, and (8) comprehensive tests.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1 - Create src/stx/fuzzy.py with the FuzzyMatcher class: use rapidfuzz.fuzz (ratio, partial_ratio, or weighted_ratio) and rapidfuzz.process to find top-N matches from TM entries. The class should accept threshold (0-100, default 75), max_results (default 5), and algorithm choice. Include a FuzzyMatch dataclass with fields: source, translation, score, source_lang, target_lang.",
     "Step 2 - Extend src/stx/memory.py TranslationMemory class: add a fuzzy_search(source, source_lang, target_lang, threshold=75, max_results=5) method that retrieves all entries for the given language pair and uses FuzzyMatcher to return ranked FuzzyMatch results. Add an all_sources(source_lang, target_lang) method that returns all source strings for a language pair (for the fuzzy index).",

@@ -227,6 +227,15 @@ def translate(
     rate_limit: float = typer.Option(
         8.0, "--rate-limit", help="Initial token-bucket capacity (req/s).  0 = unlimited."
     ),
+    fuzzy_threshold: float = typer.Option(
+        0, "--fuzzy-threshold", help="Fuzzy TM threshold (0-100). 0 = disabled."
+    ),
+    fuzzy_max_results: int = typer.Option(
+        5, "--fuzzy-max-results", help="Max fuzzy match results to consider."
+    ),
+    fuzzy_auto_accept: float = typer.Option(
+        90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
+    ),
 ) -> None:
     """Phase 3: translate every untranslated row in an organised Excel workbook."""
 
@@ -257,6 +266,9 @@ def translate(
         doc, translator, google_source, google_target,
         scope=scope, memory=memory, glossary=glossary,
         workers=workers, rate_limit_per_second=rate,
+        fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
+        fuzzy_max_results=fuzzy_max_results,
+        fuzzy_auto_accept_threshold=fuzzy_auto_accept,
     )
 
     export_document_to_excel(doc, xlsx_out)
@@ -268,7 +280,8 @@ def translate(
 
     console.print(
         f"[green]OK[/green] Translated {result.translated_count:,} "
-        f"(TM hits {result.cached_count:,}, dedup {result.deduped_count:,}); "
+        f"(TM hits {result.cached_count:,}, fuzzy {result.fuzzy_accepted_count:,}, "
+        f"dedup {result.deduped_count:,}); "
         f"skipped {result.skipped_count:,}; "
         f"elapsed {result.elapsed_seconds:.1f}s; output: [bold]{xlsx_out}[/bold]"
     )
@@ -323,6 +336,15 @@ def run_pipeline(
     workers: int = typer.Option(4, "--workers", "-w"),
     rate_limit: float = typer.Option(8.0, "--rate-limit"),
     skip_translation: bool = typer.Option(False, "--skip-translation"),
+    fuzzy_threshold: float = typer.Option(
+        0, "--fuzzy-threshold", help="Fuzzy TM threshold (0-100). 0 = disabled."
+    ),
+    fuzzy_max_results: int = typer.Option(
+        5, "--fuzzy-max-results", help="Max fuzzy match results to consider."
+    ),
+    fuzzy_auto_accept: float = typer.Option(
+        90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
+    ),
 ) -> None:
     """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF."""
 
@@ -367,6 +389,9 @@ def run_pipeline(
                 to_google_code(source), to_google_code(target_code),
                 scope=scope, memory=memory, glossary=glossary,
                 workers=workers, rate_limit_per_second=rate,
+                fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
+                fuzzy_max_results=fuzzy_max_results,
+                fuzzy_auto_accept_threshold=fuzzy_auto_accept,
             )
             export_document_to_excel(per_lang_doc, translated_xlsx)
             write_translation_audit_sheets(
@@ -377,7 +402,9 @@ def run_pipeline(
             console.print(
                 f"  [green]written[/green] {translated_xlsx} "
                 f"(translated={result.translated_count:,}, "
-                f"TM hits={result.cached_count:,}, dedup={result.deduped_count:,}, "
+                f"TM hits={result.cached_count:,}, "
+                f"fuzzy={result.fuzzy_accepted_count:,}, "
+                f"dedup={result.deduped_count:,}, "
                 f"skipped={result.skipped_count:,})"
             )
 
@@ -722,6 +749,8 @@ def _run_translation_with_progress(
     *,
     scope=None, memory=None, glossary=None,
     workers: int = 4, rate_limit_per_second=8.0,
+    fuzzy_threshold=None, fuzzy_max_results: int = 5,
+    fuzzy_auto_accept_threshold: float = 90.0,
 ):
     with Progress(
         SpinnerColumn(),
@@ -750,6 +779,9 @@ def _run_translation_with_progress(
             progress=on_progress,
             scope=scope, memory=memory, glossary=glossary,
             workers=workers, rate_limit_per_second=rate_limit_per_second,
+            fuzzy_threshold=fuzzy_threshold,
+            fuzzy_max_results=fuzzy_max_results,
+            fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
         )
 
 

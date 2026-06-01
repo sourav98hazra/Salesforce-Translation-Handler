@@ -142,6 +142,7 @@ class TranslationResult:
     skipped_count: int = 0
     cached_count: int = 0   # from persistent translation memory
     deduped_count: int = 0  # from in-run dedup cache
+    fuzzy_accepted_count: int = 0  # from fuzzy TM matching
     target_lang: str = ""
     elapsed_seconds: float = 0.0
 
@@ -179,6 +180,9 @@ def translate_document(
     workers: int = DEFAULT_WORKERS,
     rate_limit_per_second: Optional[float] = 8.0,
     prevent_system_sleep: bool = True,
+    fuzzy_threshold: Optional[float] = None,
+    fuzzy_max_results: int = 5,
+    fuzzy_auto_accept_threshold: float = 90.0,
 ) -> TranslationResult:
     """Translate every untranslated entry in ``doc`` in place.
 
@@ -232,6 +236,9 @@ def translate_document(
         glossary=glossary,
         workers=max(1, int(workers)),
         rate_limit_per_second=rate_limit_per_second,
+        fuzzy_threshold=fuzzy_threshold,
+        fuzzy_max_results=fuzzy_max_results,
+        fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
     )
     if prevent_system_sleep:
         from ..wakelock import prevent_sleep
@@ -328,6 +335,9 @@ class _Runner:
         glossary: Optional[Glossary],
         workers: int,
         rate_limit_per_second: Optional[float] = None,
+        fuzzy_threshold: Optional[float] = None,
+        fuzzy_max_results: int = 5,
+        fuzzy_auto_accept_threshold: float = 90.0,
     ) -> None:
         self.doc = doc
         self.translator = translator
@@ -339,6 +349,9 @@ class _Runner:
         self.memory = memory
         self.glossary = glossary
         self.workers = workers
+        self.fuzzy_threshold = fuzzy_threshold
+        self.fuzzy_max_results = fuzzy_max_results
+        self.fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
         self.limiter: Optional[AdaptiveLimiter] = (
             AdaptiveLimiter(max_capacity=rate_limit_per_second)
             if rate_limit_per_second and rate_limit_per_second > 0
@@ -353,6 +366,7 @@ class _Runner:
         self._skipped = 0
         self._cached = 0
         self._deduped = 0
+        self._fuzzy_accepted = 0
         self._completed_for_eta = 0
         self._started = time.monotonic()
 
@@ -433,6 +447,7 @@ class _Runner:
             skipped_count=self._skipped,
             cached_count=self._cached,
             deduped_count=self._deduped,
+            fuzzy_accepted_count=self._fuzzy_accepted,
             target_lang=self.target_lang,
         )
 
@@ -587,6 +602,28 @@ class _Runner:
                 self._fill_translated(index, final, "Translated (TM hit)", from_tm=True)
                 return
 
+        # ---- fuzzy TM matching
+        if self.fuzzy_threshold is not None and self.memory is not None:
+            try:
+                fuzzy_matches = self.memory.fuzzy_search(
+                    entry.label,
+                    self.source_lang,
+                    self.target_lang,
+                    threshold=self.fuzzy_threshold,
+                    max_results=self.fuzzy_max_results,
+                )
+            except Exception:  # noqa: BLE001
+                fuzzy_matches = []
+            if fuzzy_matches and fuzzy_matches[0].score >= self.fuzzy_auto_accept_threshold:
+                best = fuzzy_matches[0]
+                final = self.glossary.apply_forced(best.translation) if self.glossary else best.translation
+                with self._dedup_lock:
+                    self._dedup[entry.label] = final
+                self._fill_translated(
+                    index, final, "Translated (fuzzy TM)", from_fuzzy=True
+                )
+                return
+
         # ---- glossary DNT protection
         glossary_text = entry.label
         glossary_token_map: list = []
@@ -652,6 +689,7 @@ class _Runner:
         *,
         from_tm: bool = False,
         deduped: bool = False,
+        from_fuzzy: bool = False,
     ) -> None:
         entry = self.doc.entries[index]
         new = Entry(key=entry.key, label=entry.label, translation=translation)
@@ -675,6 +713,8 @@ class _Runner:
             if deduped:
                 summary.deduped_rows += 1
                 self._deduped += 1
+            if from_fuzzy:
+                self._fuzzy_accepted += 1
         self._emit_progress(index, entry.key, sheet, status, entry.label, translation)
 
     def _mark_failed(self, index: int, status: str) -> None:

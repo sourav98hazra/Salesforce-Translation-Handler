@@ -606,6 +606,9 @@ class Phase3TranslatePage(PhasePage):
             api_key=gui_secrets.retrieve_api_key(
                 gui_settings.get_str(gui_settings.KEYS.backend, "google")
             ) or None,
+            fuzzy_threshold=self._get_fuzzy_threshold(),
+            fuzzy_max_results=gui_settings.get_int(gui_settings.KEYS.fuzzy_max_results, 5),
+            fuzzy_auto_accept_threshold=self._get_fuzzy_auto_accept(),
             parent=self,
         )
         self._worker.progress.connect(self._on_progress)
@@ -638,10 +641,17 @@ class Phase3TranslatePage(PhasePage):
             f"T:{self._translated_count} TM:{self._cached_count} D:{self._deduped_count}]"
         )
 
+        # Show [FUZZY] prefix for fuzzy TM matches
+        fuzzy_prefix = ""
+        if "fuzzy" in status.lower():
+            fuzzy_prefix = "[FUZZY] "
+
         if translation:
-            self._log.appendPlainText(f"{prefix} {src_code}: {source} -> {tgt_code}: {translation}")
+            self._log.appendPlainText(
+                f"{prefix} {fuzzy_prefix}{src_code}: {source} -> {tgt_code}: {translation}"
+            )
         else:
-            self._log.appendPlainText(f"{prefix} [{status}] {source}")
+            self._log.appendPlainText(f"{prefix} {fuzzy_prefix}[{status}] {source}")
 
         # Intermittent summary every 50 rows
         if self._current_row % 50 == 0 and self._start_time is not None:
@@ -823,6 +833,23 @@ class Phase3TranslatePage(PhasePage):
         worker.start()
 
     # ------------------------------------------------------------------ helpers
+
+    def _get_fuzzy_threshold(self) -> Optional[float]:
+        """Read fuzzy threshold from settings; returns None if disabled (0)."""
+        raw = gui_settings.get_str(gui_settings.KEYS.fuzzy_threshold, "75.0")
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            val = 75.0
+        return val if val > 0 else None
+
+    def _get_fuzzy_auto_accept(self) -> float:
+        """Read fuzzy auto-accept threshold from settings."""
+        raw = gui_settings.get_str(gui_settings.KEYS.fuzzy_auto_accept, "90.0")
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return 90.0
 
     def _set_running(self, running: bool) -> None:
         self.set_busy(running)

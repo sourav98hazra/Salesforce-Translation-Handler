@@ -127,6 +127,7 @@ class TranslationDone:
     skipped_count: int
     cached_count: int = 0
     deduped_count: int = 0
+    fuzzy_accepted_count: int = 0
     elapsed_seconds: float = 0.0
 
 
@@ -174,6 +175,9 @@ class TranslationWorker(QThread):
         prevent_system_sleep: bool = True,
         backend_name: str = "google",
         api_key: Optional[str] = None,
+        fuzzy_threshold: Optional[float] = None,
+        fuzzy_max_results: int = 5,
+        fuzzy_auto_accept_threshold: float = 90.0,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -188,6 +192,9 @@ class TranslationWorker(QThread):
         self._prevent_sleep = prevent_system_sleep
         self._backend_name = backend_name
         self._api_key = api_key
+        self._fuzzy_threshold = fuzzy_threshold
+        self._fuzzy_max_results = fuzzy_max_results
+        self._fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
         self._cancel = False
         self._cancel_lock = QObject()  # used only for sender identity
         self._already_finished = False
@@ -242,6 +249,9 @@ class TranslationWorker(QThread):
                 workers=self._workers,
                 rate_limit_per_second=self._rate_limit,
                 prevent_system_sleep=self._prevent_sleep,
+                fuzzy_threshold=self._fuzzy_threshold,
+                fuzzy_max_results=self._fuzzy_max_results,
+                fuzzy_auto_accept_threshold=self._fuzzy_auto_accept_threshold,
             )
         except Exception as exc:  # noqa: BLE001
             self._already_finished = True
@@ -257,6 +267,7 @@ class TranslationWorker(QThread):
                 skipped_count=result.skipped_count,
                 cached_count=result.cached_count,
                 deduped_count=result.deduped_count,
+                fuzzy_accepted_count=result.fuzzy_accepted_count,
                 elapsed_seconds=result.elapsed_seconds,
             )
         )
