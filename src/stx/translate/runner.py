@@ -680,6 +680,7 @@ class _Runner:
     def _mark_failed(self, index: int, status: str) -> None:
         entry = self.doc.entries[index]
         sheet = entry.logical_sheet_name
+        summary = self._summaries.setdefault(sheet, SheetSummary(sheet_name=sheet))
         with self._completion_lock:
             self._new_entries[index] = entry  # untouched
             self._statuses[index] = StatusEntry(
@@ -690,11 +691,14 @@ class _Runner:
                 translation=entry.translation,
                 status=status,
             )
+            summary.skipped_rows += 1
+            self._skipped += 1
         self._emit_progress(index, entry.key, sheet, status, entry.label, entry.translation)
 
     def _mark_cancelled(self, index: int) -> None:
         entry = self.doc.entries[index]
         sheet = entry.logical_sheet_name
+        summary = self._summaries.setdefault(sheet, SheetSummary(sheet_name=sheet))
         with self._completion_lock:
             self._new_entries[index] = entry
             self._statuses[index] = StatusEntry(
@@ -705,6 +709,8 @@ class _Runner:
                 translation=entry.translation,
                 status="Cancelled",
             )
+            summary.skipped_rows += 1
+            self._skipped += 1
         self._emit_progress(index, entry.key, sheet, "Cancelled", entry.label, entry.translation)
 
     # ------------------------------------------------------------------ progress

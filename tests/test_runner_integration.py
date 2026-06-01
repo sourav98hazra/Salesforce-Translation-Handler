@@ -95,6 +95,66 @@ def test_translation_memory_serves_repeated_runs(tmp_path: Path) -> None:
     assert result.cached_count == 1
 
 
+class FailingTranslator(Translator):
+    """Translator that always raises an exception."""
+
+    def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+        raise RuntimeError("Simulated failure")
+
+
+def test_failed_rows_count_as_skipped() -> None:
+    doc = Document(
+        language="Japanese", language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello"),
+            Entry(key="CustomLabel.B", label="World"),
+        ]
+    )
+    translator = FailingTranslator()
+    result = translate_document(
+        doc, translator,
+        source_lang="en", target_lang="ja",
+        workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+    )
+    assert result.skipped_count == 2
+    assert result.translated_count == 0
+    assert result.translated_count + result.skipped_count == len(doc.entries)
+    # Per-sheet skipped_rows should also be 2
+    assert sum(s.skipped_rows for s in result.summaries) == 2
+
+
+def test_cancelled_rows_count_as_skipped() -> None:
+    """Cancel after the first row - remaining rows should be skipped."""
+    call_count = 0
+
+    class CancelAfterOneTranslator(Translator):
+        def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            return f"<ja>{text}"
+
+    doc = Document(
+        language="Japanese", language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello"),
+            Entry(key="CustomLabel.B", label="World"),
+            Entry(key="CustomLabel.C", label="Foo"),
+        ]
+    )
+
+    def cancel_after_first():
+        return call_count >= 1
+
+    result = translate_document(
+        doc, CancelAfterOneTranslator(),
+        source_lang="en", target_lang="ja",
+        workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+        cancel=cancel_after_first,
+    )
+    # At least some should be skipped due to cancellation
+    assert result.translated_count + result.skipped_count == len(doc.entries)
+
+
 def test_glossary_protects_dnt_term_through_translation() -> None:
     class CapitalisingTranslator:
         def translate(self, text, src, tgt):
