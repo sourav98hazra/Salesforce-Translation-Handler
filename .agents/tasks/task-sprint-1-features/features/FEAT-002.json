@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Row-level Approved Status: extend the Entry model with an 'approved' boolean, add an 'Approved' column to Phase 4 table with checkbox and filter, treat approved rows as implicitly valid in Phase 5, persist the flag in Excel (new column), add CLI commands 'stx approve' and 'stx unapprove' for batch marking.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In src/stx/model.py, change Entry from frozen dataclass to a non-frozen one (or add approved as a mutable field). Add 'approved: bool = False' field. Update the status property to return 'Approved' when approved=True and translation is non-empty (as a third status alongside Translated/Untranslated). Update logical_sheet_name if needed (approved rows should still group by component + translated status, not by approved).",
     "2. In src/stx/excel/exporter.py, add 'Approved' as a 4th column in ENTRY_COLUMNS. Update _write_entry_sheet to write the approved boolean as 'Yes'/'No' (or empty). Update CONTENT_DETAILS_COLUMNS documentation if needed.",
@@ -32,5 +32,5 @@
     "QT_QPA_PLATFORM=offscreen pytest tests/gui/ (GUI tests still pass)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 147 tests pass (16 new in test_approved.py). Entry stays frozen with approved=False default for backward compat. Autofix functions preserve approved field. GUI checkbox uses CheckStateRole. CLI approve/unapprove use _write_lf_utf8 for STF saves."
 }
