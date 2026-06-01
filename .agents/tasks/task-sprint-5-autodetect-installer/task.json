@@ -1,7 +1,14 @@
 {
   "task_id": "task-sprint-5-autodetect-installer",
   "task_description": "Sprint 5: Feature 8 (auto-detect source language) and Feature 4 (signed Windows installer via Inno Setup). Implement detection module with CLI/GUI integration, then create installer infrastructure.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 311 tests pass (15 new for lang_detect + 32 new for installer + 264 existing). Both features fully implemented."
+  }
 }
