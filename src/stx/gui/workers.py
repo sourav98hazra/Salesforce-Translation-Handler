@@ -23,7 +23,7 @@ from ..excel import (
 from ..languages import to_google_code
 from ..model import Document
 from ..stf import parse_stf, write_stf_files
-from ..translate import GoogleFreeTranslator, TranslationProgress, translate_document
+from ..translate import TranslationProgress, make_backend, translate_document
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +172,8 @@ class TranslationWorker(QThread):
         workers: int = 4,
         rate_limit_per_second=8.0,
         prevent_system_sleep: bool = True,
+        backend_name: str = "google",
+        api_key: Optional[str] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -184,6 +186,8 @@ class TranslationWorker(QThread):
         self._workers = workers
         self._rate_limit = rate_limit_per_second
         self._prevent_sleep = prevent_system_sleep
+        self._backend_name = backend_name
+        self._api_key = api_key
         self._cancel = False
         self._cancel_lock = QObject()  # used only for sender identity
         self._already_finished = False
@@ -207,7 +211,10 @@ class TranslationWorker(QThread):
             # but avoids any chance of double-emit if someone re-invokes run().
             return
 
-        translator = GoogleFreeTranslator()
+        translator_kwargs = {}
+        if self._api_key:
+            translator_kwargs["api_key"] = self._api_key
+        translator = make_backend(self._backend_name, **translator_kwargs)
 
         def on_progress(event: TranslationProgress) -> None:
             self.progress.emit(

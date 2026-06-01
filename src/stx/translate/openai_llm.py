@@ -54,8 +54,9 @@ class OpenAITranslator(Translator):
         self.api_key = self.api_key or os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "OpenAI backend requires an API key.  Set OPENAI_API_KEY "
-                "or pass api_key= explicitly."
+                "OpenAI backend requires an API key. Set the OPENAI_API_KEY "
+                "environment variable, pass api_key= explicitly, or enter "
+                "the key in Edit -> Settings -> Translation."
             )
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> str:

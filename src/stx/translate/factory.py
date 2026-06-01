@@ -52,6 +52,53 @@ def make_backend(key: str, **kwargs) -> Translator:
     return factory(**kwargs)
 
 
+def check_backend_available(key: str) -> tuple[bool, str]:
+    """Check whether a backend is ready to use.
+
+    Returns a ``(available, reason)`` tuple.  If the backend is ready,
+    ``available`` is True and ``reason`` is an empty string.  Otherwise,
+    ``reason`` describes what is missing (SDK not installed, API key not
+    configured, etc.).
+    """
+    if key not in _REGISTRY:
+        available_keys = ", ".join(_REGISTRY.keys())
+        return False, f"Unknown backend {key!r}. Available: {available_keys}"
+
+    info, _ = _REGISTRY[key]
+
+    # Check SDK availability for backends that need external packages.
+    if key == "deepl":
+        try:
+            import deep_translator  # noqa: F401
+        except ImportError:
+            return False, "deep_translator package not installed. Run: pip install deep-translator"
+
+    elif key == "azure":
+        try:
+            import deep_translator  # noqa: F401
+        except ImportError:
+            return False, "deep_translator package not installed. Run: pip install deep-translator"
+
+    elif key == "openai":
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False, "openai package not installed. Run: pip install openai"
+
+    # Check API key availability for backends that require one.
+    if info.requires_api_key:
+        import os
+        env_value = os.environ.get(info.env_var or "", "")
+        if not env_value:
+            return (
+                False,
+                f"No API key found. Set the {info.env_var} environment variable "
+                f"or enter a key in Edit -> Settings -> Translation.",
+            )
+
+    return True, ""
+
+
 # ---------------------------------------------------------------------------
 # Default registrations
 # ---------------------------------------------------------------------------

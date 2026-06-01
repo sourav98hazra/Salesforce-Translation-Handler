@@ -38,8 +38,9 @@ class DeepLTranslator(Translator):
         self.api_key = self.api_key or os.environ.get("DEEPL_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "DeepL backend requires an API key.  Set DEEPL_API_KEY or pass "
-                "api_key= explicitly."
+                "DeepL backend requires an API key. Set the DEEPL_API_KEY "
+                "environment variable, pass api_key= explicitly, or enter "
+                "the key in Edit -> Settings -> Translation."
             )
 
     # ------------------------------------------------------------------ API

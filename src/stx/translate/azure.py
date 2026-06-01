@@ -39,8 +39,9 @@ class AzureTranslator(Translator):
         self.region = self.region or os.environ.get("AZURE_TRANSLATOR_REGION")
         if not self.api_key:
             raise ValueError(
-                "Azure backend requires an API key.  Set AZURE_TRANSLATOR_KEY "
-                "or pass api_key= explicitly."
+                "Azure backend requires an API key. Set the AZURE_TRANSLATOR_KEY "
+                "environment variable, pass api_key= explicitly, or enter "
+                "the key in Edit -> Settings -> Translation."
             )
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> str:

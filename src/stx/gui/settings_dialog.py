@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from ..memory import default_tm_path
 from ..translate import list_backends
+from ..translate.factory import check_backend_available
 from . import settings as gui_settings
 
 
@@ -118,12 +119,18 @@ class SettingsDialog(QDialog):
         self._api_key_field = QLineEdit()
         self._api_key_field.setEchoMode(QLineEdit.EchoMode.Password)
         self._api_key_field.setPlaceholderText("Leave blank to use environment variable")
+        self._api_key_field.textChanged.connect(self._update_backend_status)
         form.addRow("API key:", self._api_key_field)
 
         self._backend_help = QLabel("")
         self._backend_help.setWordWrap(True)
         self._backend_help.setStyleSheet("color: #64748b; font-size: 11px;")
         form.addRow("", self._backend_help)
+
+        self._backend_status = QLabel("")
+        self._backend_status.setWordWrap(True)
+        self._backend_status.setStyleSheet("font-size: 11px; font-weight: 600;")
+        form.addRow("", self._backend_status)
         outer.addWidget(backend_box)
 
         # Performance group
@@ -317,7 +324,33 @@ class SettingsDialog(QDialog):
                 env_hint = f"  Env var: {info.env_var}" if info.env_var else ""
                 requires = "API key required" if info.requires_api_key else "No API key needed"
                 self._backend_help.setText(f"{info.description}  ({requires}.{env_hint})")
-                return
+                break
+        self._update_backend_status()
+
+    def _update_backend_status(self) -> None:
+        """Check availability of the currently selected backend and show status."""
+        key = self._backend_combo.currentData()
+        if key is None:
+            return
+        # If the user has typed an API key in the field, that counts as available
+        # even if it is not yet in the environment variable.
+        has_local_key = bool(self._api_key_field.text().strip())
+        info = None
+        for bi in list_backends():
+            if bi.key == key:
+                info = bi
+                break
+        if info is not None and info.requires_api_key and has_local_key:
+            self._backend_status.setText("\u2705 Ready (API key provided in field above)")
+            self._backend_status.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+            return
+        available, reason = check_backend_available(key)
+        if available:
+            self._backend_status.setText("\u2705 Ready")
+            self._backend_status.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+        else:
+            self._backend_status.setText(f"\u274c {reason}")
+            self._backend_status.setStyleSheet("color: #dc2626; font-size: 11px; font-weight: 600;")
 
     def _on_browse_glossary(self) -> None:
         start = self._glossary_field.text() or str(Path.home())

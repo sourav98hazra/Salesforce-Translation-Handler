@@ -18,7 +18,7 @@ new backends can be slotted in without touching the GUI or CLI.
 from __future__ import annotations
 
 from .base import Translator
-from .factory import BackendInfo, list_backends, make_backend, register
+from .factory import BackendInfo, check_backend_available, list_backends, make_backend, register
 from .google_free import GoogleFreeTranslator
 from .protect import all_tokens_restored, protect_tokens, restore_tokens
 from .runner import (
@@ -35,6 +35,7 @@ __all__ = [
     "Translator",
     "GoogleFreeTranslator",
     "BackendInfo",
+    "check_backend_available",
     "list_backends",
     "make_backend",
     "register",

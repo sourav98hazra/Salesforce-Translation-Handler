@@ -601,6 +601,8 @@ class Phase3TranslatePage(PhasePage):
             workers=workers,
             rate_limit_per_second=rate_limit,
             prevent_system_sleep=prevent_sleep,
+            backend_name=gui_settings.get_str(gui_settings.KEYS.backend, "google"),
+            api_key=gui_settings.get_str("translation/api_key", "").strip() or None,
             parent=self,
         )
         self._worker.progress.connect(self._on_progress)

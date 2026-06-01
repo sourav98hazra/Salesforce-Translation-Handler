@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "Fix backend wiring: propagate backend selection and API keys from GUI settings into the Phase 3 translation worker so paid backends (DeepL, Azure, OpenAI) are actually used instead of always defaulting to GoogleFreeTranslator. Add backend-availability check in settings and improve error messages when keys are missing or SDKs are not installed.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "In src/stx/gui/workers.py TranslationWorker.__init__, add backend_name and api_key parameters (defaulting to 'google' and None)",
     "In TranslationWorker.run(), replace the hard-coded 'translator = GoogleFreeTranslator()' with 'translator = make_backend(self._backend_name, **kwargs)' where kwargs includes api_key if provided",
