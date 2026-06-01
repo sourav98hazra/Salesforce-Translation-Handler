@@ -49,7 +49,7 @@ def parse_stf(source: Union[str, Path]) -> Document:
     """
 
     path = Path(source)
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")
     return parse_stf_text(text)
 
 
@@ -60,6 +60,10 @@ def parse_stf_text(text: str) -> Document:
     held in memory (e.g. when uploaded through the GUI).
     """
 
+    # Strip BOM if present (e.g. when text is read from a stream that didn't use utf-8-sig)
+    if text.startswith("\ufeff"):
+        text = text[1:]
+
     return _parse_lines(text.splitlines())
 
 
@@ -67,6 +71,8 @@ def _parse_lines(lines: Iterable[str]) -> Document:
     doc = Document()
 
     for raw_line in lines:
+        raw_line = raw_line.rstrip("\r")  # normalise any stray CR
+
         # Empty / whitespace-only lines carry no information.
         if not raw_line.strip():
             continue

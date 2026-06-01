@@ -2,7 +2,7 @@
   "id": "FEAT-007",
   "type": "fix",
   "description": "BOM handling and parser robustness: read STF files using utf-8-sig to handle Byte Order Marks and update the writer/reader to normalise CRLF lines consistently.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "In src/stx/stf/parser.py parse_stf(), change encoding from 'utf-8' to 'utf-8-sig' so that a leading BOM (\\ufeff) is automatically stripped",
     "In parse_stf_text(), add a line at the start to strip a leading BOM if present: text = text.lstrip('\\ufeff')",
