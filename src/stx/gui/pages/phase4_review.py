@@ -107,6 +107,13 @@ class _EntriesModel(QAbstractTableModel):
         return None
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):  # noqa: N802
+        if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
+            if section == _APPROVED_COL:
+                return (
+                    "Mark translations as reviewed and accepted.\n"
+                    "Approved rows are skipped during validation in Phase 5."
+                )
+            return None
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
@@ -221,6 +228,7 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
         self._component = "All"
         self._status = "All"
         self._needle = ""
+        self._column_filters: dict[int, set[str]] = {}  # col -> allowed values
 
     def set_component(self, component: str) -> None:
         self._component = component
@@ -233,6 +241,27 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
     def set_search(self, needle: str) -> None:
         self._needle = needle.strip().lower()
         self.invalidateFilter()
+
+    def set_column_filter(self, col: int, values: "Optional[set[str]]") -> None:
+        """Set allowed values for a column, or clear if *values* is None."""
+        if values is None:
+            self._column_filters.pop(col, None)
+        else:
+            self._column_filters[col] = values
+        self.invalidateFilter()
+
+    def clear_column_filter(self, col: int) -> None:
+        """Remove the column filter for *col*."""
+        self._column_filters.pop(col, None)
+        self.invalidateFilter()
+
+    def column_filter(self, col: int) -> "Optional[set[str]]":
+        """Return the active allowed-value set for *col*, or None if unfiltered."""
+        return self._column_filters.get(col)
+
+    def has_column_filter(self, col: int) -> bool:
+        """True when a per-value filter is currently active on *col*."""
+        return col in self._column_filters
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:  # noqa: N802
         model = self.sourceModel()
@@ -248,6 +277,13 @@ class _ComponentStatusFilter(QSortFilterProxyModel):
             return False
         if self._needle and self._needle not in key and self._needle not in label:
             return False
+        # Per-column value filters
+        for col, allowed in self._column_filters.items():
+            val = str(
+                model.index(source_row, col, source_parent).data(Qt.ItemDataRole.DisplayRole) or ""
+            )
+            if val not in allowed:
+                return False
         return True
 
 
@@ -398,6 +434,12 @@ class Phase4ReviewPage(PhasePage):
         self._table.setAlternatingRowColors(True)
         self._table.setSortingEnabled(True)
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._table.horizontalHeader().setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self._table.horizontalHeader().customContextMenuRequested.connect(
+            self._on_header_context_menu
+        )
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(
             QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.SelectedClicked
@@ -754,6 +796,98 @@ class Phase4ReviewPage(PhasePage):
             clear_action = menu.addAction("Clear for retranslation")
             clear_action.triggered.connect(self._on_clear_for_retranslation)
         menu.exec(self._table.viewport().mapToGlobal(pos))
+
+    # ------------------------------------------------------------------ column-wise filtering (Excel-like header menu)
+
+    def _on_header_context_menu(self, pos) -> None:
+        """Excel-like column filter / sort menu shown on header right-click.
+
+        Right-clicking a column header opens a menu offering:
+
+        * **Sort Ascending / Sort Descending** for that column.
+        * **Filter by value** -- a submenu of every distinct value in the
+          column (built from the *source* model), each a checkable action.
+          Unchecking values hides the matching rows via the proxy's
+          ``set_column_filter`` / ``clear_column_filter`` hooks.
+        * **Clear filter** -- removes any active per-value filter on the
+          column.
+        """
+        if self._model is None:
+            return
+        header = self._table.horizontalHeader()
+        col = header.logicalIndexAt(pos)
+        if col < 0:
+            return
+
+        menu = QMenu(self._table)
+        menu.setTitle(_HEADERS[col] if 0 <= col < len(_HEADERS) else "")
+
+        # ---- Sort actions
+        sort_asc = menu.addAction("Sort Ascending")
+        sort_asc.triggered.connect(
+            lambda _checked=False, c=col: self._table.sortByColumn(
+                c, Qt.SortOrder.AscendingOrder
+            )
+        )
+        sort_desc = menu.addAction("Sort Descending")
+        sort_desc.triggered.connect(
+            lambda _checked=False, c=col: self._table.sortByColumn(
+                c, Qt.SortOrder.DescendingOrder
+            )
+        )
+        menu.addSeparator()
+
+        # ---- Clear filter
+        clear_action = menu.addAction("Clear filter")
+        clear_action.setEnabled(self._proxy.has_column_filter(col))
+        clear_action.triggered.connect(
+            lambda _checked=False, c=col: self._proxy.clear_column_filter(c)
+        )
+
+        # ---- Distinct values submenu (checkable)
+        distinct = sorted(
+            {
+                str(self._model.index(r, col).data(Qt.ItemDataRole.DisplayRole) or "")
+                for r in range(self._model.rowCount())
+            }
+        )
+        allowed = self._proxy.column_filter(col)
+
+        values_menu = menu.addMenu("Filter by value")
+        # Quick (de)select helpers at the top of the submenu.
+        select_all = values_menu.addAction("Select all")
+        select_none = values_menu.addAction("Select none")
+        values_menu.addSeparator()
+
+        value_actions: dict[str, object] = {}
+        for val in distinct:
+            act = values_menu.addAction(val if val else "(empty)")
+            act.setCheckable(True)
+            act.setChecked(allowed is None or val in allowed)
+            value_actions[val] = act
+
+        def _apply_value_filter() -> None:
+            chosen = {v for v, a in value_actions.items() if a.isChecked()}
+            # All (or nothing) selected behaves as "no filter" so the user
+            # always sees rows again instead of an empty table.
+            if not chosen or chosen == set(distinct):
+                self._proxy.clear_column_filter(col)
+            else:
+                self._proxy.set_column_filter(col, chosen)
+
+        def _select_all() -> None:
+            self._proxy.clear_column_filter(col)
+
+        def _select_none() -> None:
+            # Empty allowed set -> hide everything in this column.
+            self._proxy.set_column_filter(col, set())
+
+        select_all.triggered.connect(lambda _checked=False: _select_all())
+        select_none.triggered.connect(lambda _checked=False: _select_none())
+        for act in value_actions.values():
+            act.triggered.connect(lambda _checked=False: _apply_value_filter())
+
+        menu.exec(header.mapToGlobal(pos))
 
     # ------------------------------------------------------------------ load Excel
 
