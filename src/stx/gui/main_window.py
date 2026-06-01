@@ -743,6 +743,13 @@ class MainWindow(QMainWindow):
             return
 
         last_path = Path(recent[0])
+
+        # If the source file no longer exists on disk, clear the stale
+        # session and skip restoration to avoid broken state.
+        if not last_path.is_file():
+            self._session_manager.clear_session(last_path)
+            return
+
         if not self._session_manager.has_session(last_path):
             return
 

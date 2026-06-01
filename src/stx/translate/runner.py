@@ -511,7 +511,11 @@ class _Runner:
             translation = cp.get("translation", "")
             new_entry = Entry(key=entry.key, label=entry.label, translation=translation)
             self._new_entries[index] = new_entry
-            status = "Resumed from checkpoint"
+            cp_status = cp.get("status", "")
+            if cp_status.startswith("Fallback to original"):
+                status = f"Resumed from checkpoint ({cp_status})"
+            else:
+                status = "Resumed from checkpoint"
             self._statuses[index] = StatusEntry(
                 sheet_name=sheet,
                 row_index=index + 2,
@@ -810,7 +814,31 @@ class _Runner:
             )
             summary.skipped_rows += 1
             self._skipped += 1
+        # Checkpoint permanent failures so they are not retried on resume.
+        # Transient errors (network timeouts, rate limits) are left un-checkpointed
+        # so they get a fresh attempt on the next run.
+        if self.checkpoint is not None and self._is_permanent_failure(status):
+            try:
+                self.checkpoint.save_progress(index, entry.key, entry.translation, status)
+            except Exception:  # noqa: BLE001
+                LOGGER.debug("Checkpoint save failed for failed index %d", index, exc_info=True)
         self._emit_progress(index, entry.key, sheet, status, entry.label, entry.translation)
+
+    @staticmethod
+    def _is_permanent_failure(status: str) -> bool:
+        """Return True if the failure status represents a permanent condition.
+
+        Permanent failures are those where retrying will produce the same
+        outcome (e.g., the translator returned the source text verbatim,
+        or a glossary token was irrecoverably lost).  Transient errors
+        (network issues, rate limits) should be retried on resume.
+        """
+        permanent_indicators = (
+            "no change",
+            "glossary token lost",
+        )
+        status_lower = status.lower()
+        return any(indicator in status_lower for indicator in permanent_indicators)
 
     def _mark_cancelled(self, index: int) -> None:
         entry = self.doc.entries[index]

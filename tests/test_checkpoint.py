@@ -261,3 +261,167 @@ class TestRunnerCheckpointResume:
         assert result.cached_count == 1
         assert doc.entries[0].translation == "Cached from checkpoint"
         assert doc.entries[1].translation == "From TM"
+
+
+# ---------------------------------------------------------------------------
+# Thread safety tests
+# ---------------------------------------------------------------------------
+
+class TestCheckpointThreadSafety:
+    """Verify that concurrent save_progress calls do not lose entries."""
+
+    def test_concurrent_save_progress_no_data_loss(self, tmp_path: Path) -> None:
+        """Multiple threads writing to the same checkpoint must not drop entries."""
+        import threading
+
+        store = CheckpointStore("concurrent.xlsx", "ja", checkpoint_dir=tmp_path)
+        num_threads = 10
+        entries_per_thread = 20
+        barrier = threading.Barrier(num_threads)
+
+        def worker(thread_id: int) -> None:
+            barrier.wait()  # synchronize start for maximum contention
+            for i in range(entries_per_thread):
+                idx = thread_id * entries_per_thread + i
+                store.save_progress(idx, f"Key.{idx}", f"Trans {idx}", "Translated")
+
+        threads = [
+            threading.Thread(target=worker, args=(t,)) for t in range(num_threads)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Reload from disk in a fresh instance to verify persistence
+        store2 = CheckpointStore("concurrent.xlsx", "ja", checkpoint_dir=tmp_path)
+        data = store2.load()
+        expected_count = num_threads * entries_per_thread
+        assert len(data) == expected_count, (
+            f"Expected {expected_count} entries but got {len(data)} -- "
+            f"data loss from concurrent writes"
+        )
+        # Verify each entry is present and correct
+        for idx in range(expected_count):
+            assert idx in data, f"Missing entry at index {idx}"
+            assert data[idx]["key"] == f"Key.{idx}"
+            assert data[idx]["translation"] == f"Trans {idx}"
+
+
+# ---------------------------------------------------------------------------
+# Permanent failure checkpoint tests
+# ---------------------------------------------------------------------------
+
+class TestPermanentFailureCheckpoint:
+    """Verify that permanent failures are checkpointed so they are not retried."""
+
+    def test_no_change_failure_is_checkpointed(self, tmp_path: Path) -> None:
+        """A row where translator returns source text verbatim is checkpointed."""
+
+        class EchoTranslator(Translator):
+            """Returns the source text unchanged (simulates 'no change' failure)."""
+            def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+                return text  # identical to source -> triggers "no change" path
+
+        doc = _make_doc(3)
+        cp = CheckpointStore("nochange.xlsx", "ja", checkpoint_dir=tmp_path)
+
+        # Use cancel to prevent checkpoint from being cleared on completion
+        call_count = [0]
+
+        class PartialEchoTranslator(Translator):
+            """First row echoes (permanent fail), rest translate normally."""
+            def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return text  # "no change" -> permanent failure
+                return f"<{target_lang}>{text}</{target_lang}>"
+
+        # Cancel after processing to keep checkpoint around
+        done_count = [0]
+
+        def on_progress(event):
+            done_count[0] += 1
+
+        def cancel_fn():
+            return done_count[0] >= 2
+
+        translate_document(
+            doc, PartialEchoTranslator(),
+            source_lang="en", target_lang="ja",
+            checkpoint=cp,
+            progress=on_progress,
+            cancel=cancel_fn,
+            workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+        )
+
+        # Checkpoint should exist (cancelled run)
+        assert cp.exists()
+        data = cp.load()
+        # Row 0 should be checkpointed as a permanent failure
+        assert 0 in data
+        assert "no change" in data[0]["status"].lower()
+
+    def test_permanent_failure_not_retried_on_resume(self, tmp_path: Path) -> None:
+        """A permanently-failed row that was checkpointed is skipped on resume."""
+        doc = _make_doc(3)
+        translator = CountingTranslator()
+
+        # Simulate a prior run that checkpointed row 0 as a permanent failure
+        store = CheckpointStore("perm.xlsx", "ja", checkpoint_dir=tmp_path)
+        store.save_progress(0, "CustomLabel.Row0", "", "Fallback to original (no change)")
+
+        cp = CheckpointStore("perm.xlsx", "ja", checkpoint_dir=tmp_path)
+        result = translate_document(
+            doc, translator,
+            source_lang="en", target_lang="ja",
+            checkpoint=cp,
+            workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+        )
+
+        # Row 0 should NOT have been sent to the translator
+        assert all(call[0] != "Label 0" for call in translator.calls)
+        # Only rows 1 and 2 should be translated
+        assert len(translator.calls) == 2
+        # Row 0 should be resumed from checkpoint
+        assert result.resumed_count == 1
+
+    def test_transient_error_not_checkpointed(self, tmp_path: Path) -> None:
+        """Transient errors (network issues) are NOT checkpointed for retry."""
+
+        class FailFirstTranslator(Translator):
+            """Fails on first call with a network error, succeeds after."""
+            def __init__(self):
+                self.calls = 0
+
+            def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+                self.calls += 1
+                if self.calls == 1:
+                    raise ConnectionError("Network timeout")
+                return f"<{target_lang}>{text}</{target_lang}>"
+
+        doc = _make_doc(3)
+        cp = CheckpointStore("transient.xlsx", "ja", checkpoint_dir=tmp_path)
+
+        done_count = [0]
+
+        def on_progress(event):
+            done_count[0] += 1
+
+        def cancel_fn():
+            # Cancel after first 2 progress events to keep checkpoint
+            return done_count[0] >= 2
+
+        translate_document(
+            doc, FailFirstTranslator(),
+            source_lang="en", target_lang="ja",
+            checkpoint=cp,
+            progress=on_progress,
+            cancel=cancel_fn,
+            workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
+        )
+
+        assert cp.exists()
+        data = cp.load()
+        # Row 0 failed with a transient error -- should NOT be in checkpoint
+        assert 0 not in data

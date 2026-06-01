@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -76,6 +77,8 @@ class CheckpointStore:
         self._path = self._dir / f"{self._run_id}.json"
         # In-memory cache of loaded entries (populated lazily by load()).
         self._loaded: Optional[Dict[int, dict]] = None
+        # Guard concurrent save_progress / _write from parallel worker threads.
+        self._lock = threading.Lock()
 
     @property
     def path(self) -> Path:
@@ -129,17 +132,18 @@ class CheckpointStore:
         status:
             Status string (e.g. ``"Translated"``, ``"Translated (TM hit)"``).
         """
-        # Ensure the in-memory cache is initialized.
-        if self._loaded is None:
-            self.load()
-        assert self._loaded is not None
+        with self._lock:
+            # Ensure the in-memory cache is initialized.
+            if self._loaded is None:
+                self.load()
+            assert self._loaded is not None
 
-        self._loaded[index] = {
-            "key": key,
-            "translation": translation,
-            "status": status,
-        }
-        self._write()
+            self._loaded[index] = {
+                "key": key,
+                "translation": translation,
+                "status": status,
+            }
+            self._write()
 
     def clear(self) -> None:
         """Remove the checkpoint file (called on successful completion)."""
