@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement Find & Replace across all translations with a modal dialog in Phase 4, integration with the undo stack from FEAT-001, and a CLI 'stx replace' command for batch operations.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Create src/stx/gui/find_replace_dialog.py with a FindReplaceDialog(QDialog) class that has: (1) Find QLineEdit, (2) Replace QLineEdit, (3) Match Case checkbox, (4) Regex checkbox, (5) Scope combo (Translations Only / Labels / Keys / All Fields), (6) a preview count label showing how many matches exist, (7) Replace All button, (8) Cancel button. The dialog should accept the Document and return a list of (row_index, old_value, new_value) tuples when Replace All is clicked.",
     "Add a 'Global Replace...' QPushButton to the Phase4ReviewPage toolbar (after the 'Load reviewed Excel...' button). Clicking opens the FindReplaceDialog modally.",
@@ -31,5 +31,5 @@
     "QT_QPA_PLATFORM=offscreen pytest -q (all tests pass)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Shared utility in src/stx/find_replace.py decouples replacement logic from both GUI and CLI. The dialog uses a debounce timer (150ms) for preview updates. All 198 tests pass (30 new). The 'Apply to all rows' checkbox uses case-sensitive exact matching by default since it replaces the exact old translation value. Replacement through GUI pushes individual UndoCommands per row so each can be individually undone with Ctrl+Z."
 }
