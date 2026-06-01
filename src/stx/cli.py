@@ -638,6 +638,61 @@ def _save_source(doc: Document, source: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Replace
+# ---------------------------------------------------------------------------
+
+@app.command("replace")
+def replace_cmd(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    find: str = typer.Option(..., "--find", "-f", help="Text (or regex pattern) to search for."),
+    replace: str = typer.Option("", "--replace", "-r", help="Replacement text."),
+    case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Enable case-sensitive matching."),
+    regex: bool = typer.Option(False, "--regex", help="Treat --find as a regular expression."),
+    scope: str = typer.Option(
+        "translation", "--scope", "-s",
+        help="Field scope: translation / label / key / all.",
+    ),
+) -> None:
+    """Find and replace text across entries in an STF or Excel file."""
+    from .find_replace import ReplaceScope, apply_replacements, compute_replacements
+
+    scope_map = {
+        "translation": ReplaceScope.TRANSLATION,
+        "label": ReplaceScope.LABEL,
+        "key": ReplaceScope.KEY,
+        "all": ReplaceScope.ALL,
+    }
+    replace_scope = scope_map.get(scope.lower())
+    if replace_scope is None:
+        console.print(
+            f"[red]Error:[/red] invalid scope '{scope}'. "
+            "Use: translation, label, key, or all."
+        )
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    replacements = compute_replacements(
+        doc,
+        find,
+        replace,
+        case_sensitive=case_sensitive,
+        use_regex=regex,
+        scope=replace_scope,
+    )
+
+    if not replacements:
+        console.print("[yellow]No matches found.[/yellow]")
+        return
+
+    apply_replacements(doc, replacements)
+    _save_source(doc, source)
+    console.print(
+        f"[green]OK[/green] Replaced {len(replacements)} occurrence(s) "
+        f"in [bold]{source}[/bold]."
+    )
+
+
+# ---------------------------------------------------------------------------
 # GUI launcher
 # ---------------------------------------------------------------------------
 

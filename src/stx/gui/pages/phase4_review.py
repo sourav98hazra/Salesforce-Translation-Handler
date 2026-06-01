@@ -29,6 +29,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
@@ -46,8 +47,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...find_replace import ReplaceScope, compute_replacements
 from ...model import Document, Entry
 from ...validate import validate_document
+from ..find_replace_dialog import FindReplaceDialog
 from ..state import AppState, PhaseStatus
 from ..undo import UndoCommand, UndoStack
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
@@ -323,6 +326,15 @@ class Phase4ReviewPage(PhasePage):
         )
         self._load_btn.clicked.connect(self._on_load_excel)
         tb_layout.addWidget(self._load_btn)
+
+        self._find_replace_btn = QPushButton("Global Replace...")
+        self._find_replace_btn.setToolTip(
+            "Open Find & Replace dialog to perform bulk text replacements "
+            "across translations (Ctrl+H)."
+        )
+        self._find_replace_btn.clicked.connect(self._on_find_replace)
+        tb_layout.addWidget(self._find_replace_btn)
+
         self.add_widget(toolbar)
 
         # ---------- Filter row (slim)
@@ -407,6 +419,12 @@ class Phase4ReviewPage(PhasePage):
         self._key_field.setReadOnly(True)
         self._key_field.setStyleSheet("font-family: monospace;")
         meta.addWidget(self._key_field, stretch=1)
+        self._apply_all_check = QCheckBox("Apply to all rows")
+        self._apply_all_check.setToolTip(
+            "When checked, clicking Apply will find the old translation of "
+            "this row across ALL rows and replace matches with the new text."
+        )
+        meta.addWidget(self._apply_all_check)
         self._apply_btn = primary(QPushButton("Apply"))
         self._apply_btn.setToolTip("Apply your edits to the translation in the table above.")
         self._apply_btn.clicked.connect(self._apply_editor_to_row)
@@ -523,6 +541,28 @@ class Phase4ReviewPage(PhasePage):
             self._model.redo()
             self._update_counters()
             self._run_auto_validation()
+
+    # ------------------------------------------------------------------ find & replace
+
+    def _on_find_replace(self) -> None:
+        """Open Find & Replace dialog and apply replacements via undo stack."""
+        if self._state.document is None or self._model is None:
+            return
+        dialog = FindReplaceDialog(self._state.document, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        replacements = dialog.replacements
+        if not replacements:
+            self.status_message.emit("No replacements to apply.")
+            return
+        # Apply each replacement through the model (pushes undo commands)
+        for rep in replacements:
+            if rep.field == "translation":
+                idx = self._model.index(rep.row, _TRANSLATION_COL)
+                self._model.setData(idx, rep.new_value, Qt.ItemDataRole.EditRole)
+        self._update_counters()
+        self._run_auto_validation()
+        self.status_message.emit(f"Replaced {len(replacements)} occurrence(s).")
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -643,6 +683,29 @@ class Phase4ReviewPage(PhasePage):
         if self._current_row is None or self._model is None:
             return
         new_text = self._translation_field.toPlainText()
+
+        # "Apply to all rows" mode: find/replace old translation across all rows
+        if self._apply_all_check.isChecked() and self._state.document is not None:
+            old_text = self._state.document.entries[self._current_row].translation
+            if old_text and old_text != new_text:
+                replacements = compute_replacements(
+                    self._state.document,
+                    old_text,
+                    new_text,
+                    case_sensitive=True,
+                    use_regex=False,
+                    scope=ReplaceScope.TRANSLATION,
+                )
+                count = 0
+                for rep in replacements:
+                    idx = self._model.index(rep.row, _TRANSLATION_COL)
+                    self._model.setData(idx, rep.new_value, Qt.ItemDataRole.EditRole)
+                    count += 1
+                self._update_counters()
+                self._run_auto_validation()
+                self.status_message.emit(f"Replaced {count} occurrence(s) across all rows.")
+                return
+
         idx = self._model.index(self._current_row, _TRANSLATION_COL)
         self._model.setData(idx, new_text, Qt.ItemDataRole.EditRole)
         self.status_message.emit(f"Updated translation for row {self._current_row + 1}.")

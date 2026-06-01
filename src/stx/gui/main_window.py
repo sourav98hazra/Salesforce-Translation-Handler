@@ -384,6 +384,14 @@ class MainWindow(QMainWindow):
 
         edit_menu.addSeparator()
 
+        self._find_replace_action = QAction("Find && Replace...", self)
+        self._find_replace_action.setShortcut("Ctrl+H")
+        self._find_replace_action.setEnabled(False)
+        self._find_replace_action.triggered.connect(self._action_find_replace)
+        edit_menu.addAction(self._find_replace_action)
+
+        edit_menu.addSeparator()
+
         settings_action = QAction("&Settings...", self)
         settings_action.setShortcut("Ctrl+,")
         settings_action.triggered.connect(self._action_open_settings)
@@ -497,12 +505,20 @@ class MainWindow(QMainWindow):
             phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
             phase4._on_redo()
 
+    def _action_find_replace(self) -> None:
+        """Delegate Ctrl+H to Phase 4 when it is the active page."""
+        if self._stack.currentIndex() == 3:
+            phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+            phase4._on_find_replace()
+
     def _refresh_undo_actions(self) -> None:
         """Enable/disable Edit menu undo/redo based on stack + active page."""
         is_phase4 = self._stack.currentIndex() == 3
         phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
         self._undo_action.setEnabled(is_phase4 and phase4._undo_stack.can_undo)
         self._redo_action.setEnabled(is_phase4 and phase4._undo_stack.can_redo)
+        if hasattr(self, "_find_replace_action"):
+            self._find_replace_action.setEnabled(is_phase4)
 
     # ------------------------------------------------------------------ recent files
 

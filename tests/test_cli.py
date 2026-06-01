@@ -116,6 +116,123 @@ def test_missing_file():
     assert result.exit_code != 0
 
 
+# ---------------------------------------------------------------------------
+# Replace command tests
+# ---------------------------------------------------------------------------
+
+
+def test_replace_plain(tmp_path):
+    """Plain text find and replace in translations."""
+    stf = _write_sample_stf(tmp_path)
+    result = runner.invoke(
+        app, ["replace", str(stf), "--find", "Konnichiwa", "--replace", "Hello-JP"]
+    )
+    assert result.exit_code == 0
+    assert "1" in result.output  # 1 occurrence replaced
+    # Verify the file was actually modified
+    from stx.stf import parse_stf
+
+    doc = parse_stf(stf)
+    assert doc.entries[0].translation == "Hello-JP"
+
+
+def test_replace_regex(tmp_path):
+    """Regex-based find and replace."""
+    doc = Document(
+        language="Japanese",
+        language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello", translation="Test 123"),
+            Entry(key="CustomLabel.B", label="World", translation="Test 456"),
+        ],
+    )
+    from stx.stf import render_full_stf
+
+    stf = tmp_path / "regex.stf"
+    stf.write_text(render_full_stf(doc), encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["replace", str(stf), "--find", r"Test \d+", "--replace", "Result", "--regex"]
+    )
+    assert result.exit_code == 0
+    assert "2" in result.output
+
+    from stx.stf import parse_stf
+
+    updated = parse_stf(stf)
+    assert updated.entries[0].translation == "Result"
+    assert updated.entries[1].translation == "Result"
+
+
+def test_replace_case_sensitive(tmp_path):
+    """Case-sensitive replacement only matches exact case."""
+    doc = Document(
+        language="Japanese",
+        language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello", translation="hello world"),
+            Entry(key="CustomLabel.B", label="World", translation="Hello World"),
+        ],
+    )
+    from stx.stf import render_full_stf
+
+    stf = tmp_path / "case.stf"
+    stf.write_text(render_full_stf(doc), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["replace", str(stf), "--find", "Hello", "--replace", "Hi", "--case-sensitive"],
+    )
+    assert result.exit_code == 0
+    assert "1" in result.output  # only "Hello World" matches
+
+    from stx.stf import parse_stf
+
+    updated = parse_stf(stf)
+    assert updated.entries[0].translation == "hello world"  # unchanged
+    assert updated.entries[1].translation == "Hi World"
+
+
+def test_replace_no_matches(tmp_path):
+    """When nothing matches, print a message and do not error."""
+    stf = _write_sample_stf(tmp_path)
+    result = runner.invoke(
+        app, ["replace", str(stf), "--find", "NONEXISTENT", "--replace", "X"]
+    )
+    assert result.exit_code == 0
+    assert "No matches" in result.output
+
+
+def test_replace_scope_label(tmp_path):
+    """Replace in label field using --scope label."""
+    doc = Document(
+        language="Japanese",
+        language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello World", translation="Konnichiwa"),
+            Entry(key="CustomLabel.B", label="Hello Again", translation="Hello"),
+        ],
+    )
+    from stx.stf import render_full_stf
+
+    stf = tmp_path / "scope.stf"
+    stf.write_text(render_full_stf(doc), encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["replace", str(stf), "--find", "Hello", "--replace", "Hi", "--scope", "label"]
+    )
+    assert result.exit_code == 0
+    assert "2" in result.output
+
+    from stx.stf import parse_stf
+
+    updated = parse_stf(stf)
+    assert updated.entries[0].label == "Hi World"
+    assert updated.entries[1].label == "Hi Again"
+    # Translation with "Hello" should NOT be changed (wrong scope)
+    assert updated.entries[1].translation == "Hello"
+
+
 def test_validate_export_report_csv(tmp_path):
     """--export-report with .csv extension writes a CSV file."""
     doc = Document(
