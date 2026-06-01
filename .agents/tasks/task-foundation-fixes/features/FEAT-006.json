@@ -2,7 +2,7 @@
   "id": "FEAT-006",
   "type": "fix",
   "description": "Fix progress denominator and zero-scope divisions: align progress reporting with the number of rows actually processed (including skipped rows) and guard against divide-by-zero when scope excludes all rows.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In src/stx/translate/runner.py TranslationProgress.percent property, the guard 'if self.total else 0' already exists - verify it handles total=0",
     "In _emit_progress(), guard the 'rate = completed / elapsed' calculation: if elapsed <= 0, set rate to None",
@@ -21,5 +21,5 @@
     "pytest -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "runner.py _emit_progress() and TranslationProgress.percent were already safe with existing guards. The _on_translation_done() rate calculation was also already guarded. Only the intermittent summary in _on_row_translated() had an unguarded self._total_rows division."
 }
