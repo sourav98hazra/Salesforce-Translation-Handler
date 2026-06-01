@@ -249,6 +249,8 @@ class Phase1ImportPage(PhasePage):
             f"Parsed {stats['total']:,} rows ({stats['untranslated']:,} untranslated) "
             f"across {stats['components']} component types."
         )
+        if self._state.source_stf_path is not None:
+            self.action_recorded.emit(f"Load STF ({self._state.source_stf_path.name})")
 
     def _detect_source_language(self, doc) -> None:
         """Run language detection on labels and populate source language fields."""
@@ -338,6 +340,25 @@ class Phase1ImportPage(PhasePage):
         self.request_navigate.emit(1)
 
     # ------------------------------------------------------------------ pop-out preview
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._path_label.setText("No file selected.")
+        self._language_field.clear()
+        self._language_code_field.clear()
+        self._source_language_field.clear()
+        self._source_language_code_field.clear()
+        self._source_detect_label.setText("")
+        self._stf_type_field.clear()
+        self._total_field.clear()
+        self._translated_field.clear()
+        self._untranslated_field.clear()
+        self._components_field.clear()
+        self._preview.setRowCount(0)
+        self._save_stf_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)
+        if hasattr(self, 'reparse_btn') and self.reparse_btn is not None:
+            self.reparse_btn.setEnabled(False)
 
     def _on_popout_preview(self) -> None:
         if hasattr(self, '_preview_dialog') and self._preview_dialog is not None:

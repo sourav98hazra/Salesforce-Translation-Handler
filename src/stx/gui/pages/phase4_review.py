@@ -541,7 +541,7 @@ class Phase4ReviewPage(PhasePage):
         add_popout_to_groupbox(review_box, self._on_popout_review)
 
         # ---------- Bottom action buttons
-        self._save_btn = primary(QPushButton("Save reviewed workbook (.xlsx)"))
+        self._save_btn = primary(QPushButton("Save Workbook"))
         self._save_btn.setToolTip(
             "Save the current document (with all edits applied) as an .xlsx file. "
             "This becomes the canonical reviewed workbook used by Phase 5/6."
@@ -1018,6 +1018,34 @@ class Phase4ReviewPage(PhasePage):
         self.request_navigate.emit(4)
 
     # ------------------------------------------------------------------ pop-out (entire splitter: table + editor)
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        if self._model is not None:
+            self._model.beginResetModel()
+            self._model.endResetModel()
+        self._model = None
+        self._proxy.setSourceModel(None)
+        self._current_row = None
+        self._key_field.clear()
+        self._source_field.clear()
+        self._translation_field.clear()
+        self._undo_stack.clear()
+        self._component_combo.blockSignals(True)
+        self._component_combo.clear()
+        self._component_combo.addItem("All")
+        self._component_combo.blockSignals(False)
+        self._status_combo.setCurrentText("All")
+        self._search.clear()
+        self._stat_translated["value"].setText("0")
+        self._stat_untranslated["value"].setText("0")
+        self._stat_issues["value"].setText("0")
+        self._status_pill.setText("\u2022  No document loaded")
+        self._status_pill.setStyleSheet(
+            "padding: 4px 10px; border-radius: 12px; "
+            "background: #f1f5f9; color: #475569; font-weight: 700;"
+        )
+        self._save_btn.setEnabled(False)
 
     def _on_popout_review(self) -> None:
         if hasattr(self, '_review_dialog') and self._review_dialog is not None:

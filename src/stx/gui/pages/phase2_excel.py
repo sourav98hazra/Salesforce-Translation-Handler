@@ -76,7 +76,7 @@ class Phase2ExcelPage(PhasePage):
             "This is the path used by later phases."
         )
 
-        self._save_copy_btn = QPushButton("Save copy to...")
+        self._save_copy_btn = QPushButton("Save a Copy...")
         self._save_copy_btn.clicked.connect(self._on_save_copy)
         self._save_copy_btn.setEnabled(False)
         self._save_copy_btn.setToolTip(
@@ -242,6 +242,7 @@ class Phase2ExcelPage(PhasePage):
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
+        self.action_recorded.emit(f"Load Excel ({path.name})")
 
     def _detect_source_language(self, doc) -> None:
         """Run language detection on labels and update state with suggestion."""
@@ -275,6 +276,13 @@ class Phase2ExcelPage(PhasePage):
             )
 
     # ------------------------------------------------------------------ pop-out details
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._summary_label.setText("No document loaded yet \u2014 complete Phase 1 first.")
+        self._details.setRowCount(0)
+        self._save_copy_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)
 
     def _on_popout_details(self) -> None:
         if hasattr(self, '_details_dialog') and self._details_dialog is not None:

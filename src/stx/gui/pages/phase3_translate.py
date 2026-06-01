@@ -431,7 +431,7 @@ class Phase3TranslatePage(PhasePage):
             "translated portion is still saved."
         )
         self._cancel_btn.clicked.connect(self._on_cancel)
-        self._save_copy_btn = QPushButton("Save copy to...")
+        self._save_copy_btn = QPushButton("Save a Copy...")
         self._save_copy_btn.setEnabled(False)
         self._save_copy_btn.setToolTip(
             "Save the translated document to a file of your choice. "
@@ -1038,6 +1038,32 @@ class Phase3TranslatePage(PhasePage):
             self._save_copy_btn.setEnabled(False)
 
     # ------------------------------------------------------------------ pop-out feed
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._log.clear()
+        self._progress.setValue(0)
+        self._eta_label.setText("Idle.")
+        self._save_copy_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)
+        self._start_btn.setEnabled(False)
+        self._source_combo.setCurrentText("English")
+        self._target_combo.setCurrentText("Japanese")
+        self._selected_components = None
+        self._estimate_label.setText("Rows to translate: --")
+        self._translated_count = 0
+        self._cached_count = 0
+        self._deduped_count = 0
+        self._skipped_count = 0
+        self._total_rows = 0
+        self._current_row = 0
+        self._start_time = None
+        self._retranslate_check.setChecked(False)
+        self._retranslate_check.setVisible(False)
+        self._retranslate_info.setVisible(False)
+        self._import_trans_label.setText("")
+        self._import_trans_check.setChecked(False)
 
     def _on_popout_feed(self) -> None:
         if hasattr(self, '_feed_dialog') and self._feed_dialog is not None:

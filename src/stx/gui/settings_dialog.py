@@ -60,6 +60,14 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setMinimumWidth(520)
         self.setModal(True)
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowCloseButtonHint
+        )
+        from .pages.base import clamp_to_screen
+        clamp_to_screen(self, 600, 700)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -163,6 +171,10 @@ class SettingsDialog(QDialog):
         batch_form = QFormLayout(batch_box)
         self._batch_field = QLineEdit()
         self._batch_field.setPlaceholderText("Comma separated extra target codes (e.g. fr, de, es)")
+        self._batch_field.setToolTip(
+            "Translate to multiple languages in one run. Comma-separated codes "
+            "(e.g. fr, de, es). Each language gets its own output subfolder."
+        )
         batch_form.addRow("Extra targets:", self._batch_field)
         outer.addWidget(batch_box)
 

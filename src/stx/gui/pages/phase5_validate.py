@@ -97,13 +97,13 @@ class Phase5ValidatePage(PhasePage):
         )
         self._fix_selected_btn.setEnabled(False)
         self._fix_selected_btn.clicked.connect(self._on_fix_selected)
-        self._save_btn = QPushButton("Save (.xlsx)")
+        self._save_btn = QPushButton("Save Workbook")
         self._save_btn.setToolTip(
             "Save the current (fixed) document as an .xlsx file."
         )
         self._save_btn.clicked.connect(self._on_save)
 
-        self._download_report_btn = QPushButton("Download Report...")
+        self._download_report_btn = QPushButton("Export Validation Report")
         self._download_report_btn.setToolTip(
             "Export the validation report as CSV, JSON, or HTML."
         )
@@ -663,6 +663,24 @@ class Phase5ValidatePage(PhasePage):
         self.status_message.emit(f"Report exported to {path}")
 
     # ------------------------------------------------------------------ pop-out (entire splitter: issues table + editor)
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._table.setRowCount(0)
+        self._issues = []
+        self._report = None
+        self._banner.setText("No document loaded.  Complete earlier phases first.")
+        self._banner.setStyleSheet(
+            "padding: 10px; border-radius: 6px; font-weight: 700; "
+            "background-color: #f1f5f9; color: #475569;"
+        )
+        self._fix_all_btn.setEnabled(False)
+        self._fix_selected_btn.setEnabled(False)
+        self._save_btn.setEnabled(False)
+        self._key_label.clear()
+        self._issue_label.setText("")
+        self._src_field.clear()
+        self._tgt_field.clear()
 
     def _on_popout_issues(self) -> None:
         if hasattr(self, '_issues_dialog') and self._issues_dialog is not None:

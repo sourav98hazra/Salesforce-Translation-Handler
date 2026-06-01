@@ -289,6 +289,16 @@ class Phase6ExportPage(PhasePage):
 
     # ------------------------------------------------------------------ pop-out results
 
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._result_table.setRowCount(0)
+        self._load_status.setText("Or use the document already loaded from previous phases.")
+        self._validation_summary.setText("Not run.  Click to check before exporting.")
+        self._validation_summary.setStyleSheet("color: #4a5568; font-weight: 700;")
+        self._export_btn.setEnabled(False)
+        self._validate_btn.setEnabled(False)
+        self._code_field.clear()
+
     def _on_popout_results(self) -> None:
         if hasattr(self, '_results_dialog') and self._results_dialog is not None:
             self._results_dialog.raise_()

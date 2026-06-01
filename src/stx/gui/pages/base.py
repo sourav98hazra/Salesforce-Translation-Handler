@@ -125,6 +125,7 @@ class PhasePage(QWidget):
     request_jump_to_row = Signal(str)  # entry key
     file_dropped = Signal(str)         # absolute path of a dropped file
     busy_changed = Signal(bool)
+    action_recorded = Signal(str)      # a major action completed (label) -> app history
 
     def __init__(
         self,
@@ -306,6 +307,9 @@ class PhasePage(QWidget):
 
     def on_enter(self) -> None:
         """Called by :class:`MainWindow` when this page becomes active."""
+
+    def reset_page(self) -> None:
+        """Called by Reset Session to clear all displayed widgets back to defaults."""
 
     # ------------------------------------------------------------------ drag-and-drop
 

@@ -65,6 +65,7 @@ from .pages.phase4_review import Phase4ReviewPage
 from .pages.phase5_validate import Phase5ValidatePage
 from .pages.phase6_export import Phase6ExportPage
 from .state import AppState, PhaseStatus
+from .app_history import AppHistory, capture_snapshot, restore_snapshot
 from .workers import ImportExcelWorker, ParseStfWorker
 from .dialogs.override_dialog import (
     OverrideConfirmationDialog,
@@ -115,6 +116,11 @@ class MainWindow(QMainWindow):
         clamp_to_screen(self, 1400, 900)
         self.setAcceptDrops(True)
         self._state = AppState()
+        # App-wide action history (coarse undo/redo of major actions:
+        # load file / translate / auto-fix / reset).  Distinct from the
+        # Phase 4 per-translation undo stack.
+        self._app_history = AppHistory(self)
+        self._restoring_snapshot = False
 
         # ---- central layout
         central = QWidget(self)
@@ -154,6 +160,7 @@ class MainWindow(QMainWindow):
             page.request_navigate.connect(self._goto)
             page.busy_changed.connect(lambda _busy: self._refresh_phase_badges())
             page.file_dropped.connect(self._handle_dropped_file)
+            page.action_recorded.connect(self._record_app_action)
 
         # Any page exposing request_jump_to_row jumps to the Review phase
         # (currently index 3) focused on the matching row.
@@ -171,6 +178,10 @@ class MainWindow(QMainWindow):
         # ---- session persistence: attempt restore
         self._session_manager = SessionManager()
         self._try_restore_session()
+
+        # ---- baseline snapshot for app-wide undo/redo
+        self._app_history.record(capture_snapshot(self._state, "Initial state"))
+        self._refresh_app_history_actions()
 
         self._goto(0)
 
@@ -387,7 +398,7 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
-        reset_all_action = QAction("Reset &All", self)
+        reset_all_action = QAction("Reset &Session", self)
         reset_all_action.setToolTip("Clear all state and reset session to defaults")
         reset_all_action.triggered.connect(self._action_restart_session)
         file_menu.addAction(reset_all_action)
@@ -417,6 +428,31 @@ class MainWindow(QMainWindow):
         self._redo_action.setEnabled(False)
         self._redo_action.triggered.connect(self._action_redo)
         edit_menu.addAction(self._redo_action)
+
+        edit_menu.addSeparator()
+
+        # App-wide (coarse) undo/redo of major actions -- separate from the
+        # Phase 4 per-translation undo above.  Different shortcuts so both
+        # coexist without clashing.
+        self._app_undo_action = QAction("Undo Last Action (App-wide)", self)
+        self._app_undo_action.setShortcut("Ctrl+Shift+Z")
+        self._app_undo_action.setEnabled(False)
+        self._app_undo_action.setToolTip(
+            "Reverse the last major action (load file, translate, auto-fix, reset)."
+        )
+        self._app_undo_action.triggered.connect(self._app_undo)
+        edit_menu.addAction(self._app_undo_action)
+
+        self._app_redo_action = QAction("Redo Last Action (App-wide)", self)
+        self._app_redo_action.setShortcut("Ctrl+Shift+Y")
+        self._app_redo_action.setEnabled(False)
+        self._app_redo_action.setToolTip(
+            "Re-apply the last major action reversed by App-wide Undo."
+        )
+        self._app_redo_action.triggered.connect(self._app_redo)
+        edit_menu.addAction(self._app_redo_action)
+
+        self._app_history.changed.connect(self._refresh_app_history_actions)
 
         edit_menu.addSeparator()
 
@@ -462,6 +498,13 @@ class MainWindow(QMainWindow):
         self._toggle_log_action.triggered.connect(lambda checked: self._status_dock.setVisible(checked))
         view_menu.addAction(self._toggle_log_action)
         self._status_dock.visibilityChanged.connect(self._toggle_log_action.setChecked)
+
+        view_menu.addSeparator()
+        prev_phase_action = QAction("&Previous Phase", self)
+        prev_phase_action.setShortcut("Ctrl+B")
+        prev_phase_action.setToolTip("Navigate to the previous phase (app-wide back)")
+        prev_phase_action.triggered.connect(self._action_previous_phase)
+        view_menu.addAction(prev_phase_action)
 
         help_menu = bar.addMenu("&Help")
         guide_action = QAction("User Guide (F1)", self)
@@ -518,6 +561,11 @@ class MainWindow(QMainWindow):
         review = self._pages[3]
         if hasattr(review, "focus_key"):
             review.focus_key(key)
+
+    def _action_previous_phase(self) -> None:
+        """Navigate to the previous phase (app-wide back)."""
+        idx = max(0, self._stack.currentIndex() - 1)
+        self._goto(idx)
 
     def _log(self, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -576,6 +624,97 @@ class MainWindow(QMainWindow):
         self._redo_action.setEnabled(is_phase4 and phase4._undo_stack.can_redo)
         if hasattr(self, "_find_replace_action"):
             self._find_replace_action.setEnabled(is_phase4)
+
+    # ------------------------------------------------------------------ app-wide history (major actions)
+
+    def _record_app_action(self, label: str) -> None:
+        """Record a snapshot of the app state after a major action.
+
+        Connected to every page's ``action_recorded`` signal and called
+        directly after file loads / resets.  Suppressed while restoring a
+        snapshot so undo/redo never re-records itself.
+        """
+        if self._restoring_snapshot:
+            return
+        self._app_history.record(capture_snapshot(self._state, label))
+        self._refresh_app_history_actions()
+
+    def _app_undo(self) -> None:
+        """Reverse the last major action (app-wide)."""
+        if self._is_translation_running():
+            self._warn_translation_running()
+            return
+        snapshot = self._app_history.undo()
+        if snapshot is None:
+            self._log("Nothing to undo.")
+            return
+        self._restore_app_snapshot(snapshot)
+        self._log(f"Undid action -- restored to: {snapshot.label}.")
+
+    def _app_redo(self) -> None:
+        """Re-apply the last major action reversed by app-wide undo."""
+        if self._is_translation_running():
+            self._warn_translation_running()
+            return
+        snapshot = self._app_history.redo()
+        if snapshot is None:
+            self._log("Nothing to redo.")
+            return
+        self._restore_app_snapshot(snapshot)
+        self._log(f"Redid action -- restored to: {snapshot.label}.")
+
+    def _restore_app_snapshot(self, snapshot) -> None:
+        """Apply a snapshot to the live state and refresh every page."""
+        self._restoring_snapshot = True
+        try:
+            restore_snapshot(self._state, snapshot)
+            # Clear the Phase 4 per-edit undo stack -- its commands point at a
+            # document that no longer matches after a coarse restore.
+            phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+            phase4._undo_stack.clear()
+            self._refresh_phase_badges()
+            self._update_sidebar_footer()
+            # Navigate to the snapshot's recorded phase and refresh its widgets.
+            target = self._state.current_phase
+            if not (0 <= target < len(self._pages)):
+                target = self._stack.currentIndex()
+            self._goto(target)
+        finally:
+            self._restoring_snapshot = False
+        self._refresh_app_history_actions()
+
+    def _refresh_app_history_actions(self) -> None:
+        """Update enabled state + dynamic labels for app-wide undo/redo."""
+        if not hasattr(self, "_app_undo_action"):
+            return
+        can_undo = self._app_history.can_undo
+        can_redo = self._app_history.can_redo
+        self._app_undo_action.setEnabled(can_undo)
+        self._app_redo_action.setEnabled(can_redo)
+        undo_label = self._app_history.undo_label()
+        redo_label = self._app_history.redo_label()
+        self._app_undo_action.setText(
+            f"Undo Last Action: {undo_label}" if can_undo and undo_label
+            else "Undo Last Action (App-wide)"
+        )
+        self._app_redo_action.setText(
+            f"Redo Last Action: {redo_label}" if can_redo and redo_label
+            else "Redo Last Action (App-wide)"
+        )
+
+    def _is_translation_running(self) -> bool:
+        return (
+            len(self._state.phase_status) > 2
+            and self._state.phase_status[2] == PhaseStatus.RUNNING
+        )
+
+    def _warn_translation_running(self) -> None:
+        QMessageBox.warning(
+            self,
+            "Translation Running",
+            "Cannot undo/redo app actions while translation is in progress.\n"
+            "Please wait for translation to complete or cancel it first.",
+        )
 
     # ------------------------------------------------------------------ recent files
 
@@ -754,6 +893,7 @@ class MainWindow(QMainWindow):
         self._state.set_phase(0, PhaseStatus.DONE)
         self._goto(1)
         self._log(f"Loaded {len(doc.entries):,} rows from {path.name}")
+        self._record_app_action(f"Load STF ({path.name})")
 
     def _load_xlsx(self, path: Path) -> None:
         self._log(f"Loading {path.name} ...")
@@ -796,6 +936,7 @@ class MainWindow(QMainWindow):
             self._state.set_phase(target_phase, PhaseStatus.DONE)
             self._goto(target_phase)
             self._log(f"Loaded {len(doc.entries):,} rows from {path.name}")
+            self._record_app_action(f"Load Excel ({path.name})")
 
         worker.finished_ok.connect(_loaded)
         worker.failed.connect(lambda msg: QMessageBox.critical(self, "Load failed", msg))
@@ -1020,6 +1161,10 @@ class MainWindow(QMainWindow):
         # Clear workflow context
         self._state.clear_workflow_context()
 
+        # Visually reset all phase pages
+        for page in self._pages:
+            page.reset_page()
+
         self._refresh_phase_badges()
         self._update_sidebar_footer()
         self._goto(0)
@@ -1049,4 +1194,5 @@ class MainWindow(QMainWindow):
         self._refresh_phase_badges()
         self._update_sidebar_footer()
         self._pages[current].on_enter()
+        self._pages[current].reset_page()
         self._log(f"Reset Phase {current + 1} and downstream phases.")
