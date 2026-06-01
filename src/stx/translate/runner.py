@@ -552,6 +552,13 @@ class _Runner:
             self._emit_progress(index, entry.key, sheet, status, entry.label, translation)
             return "done"
 
+        # Import bypass: if the imported translations dict has a match for
+        # this row's label, let it through to _translate_one() regardless of
+        # existing translation state.  This allows imported translations to
+        # override already-translated rows even when retranslate_existing=False.
+        if self.imported_translations and entry.label in self.imported_translations:
+            return "translate"
+
         if entry.translation.strip():
             if self.retranslate_existing:
                 # Row has an existing translation but user requested retranslation.
@@ -831,8 +838,10 @@ class _Runner:
                 self._imported_reuse += 1
             # Track retranslated rows: the entry originally had a non-empty
             # translation and retranslate_existing mode caused it to be
-            # re-translated (or served from imported/TM/dedup).
-            if self.retranslate_existing and entry.translation.strip():
+            # re-translated (or served from TM/dedup/network).  Imported
+            # translations are excluded because applying a known translation
+            # from a file is not "retranslating".
+            if self.retranslate_existing and entry.translation.strip() and not from_imported:
                 self._retranslated += 1
         # Persist to checkpoint after filling the slot.
         if self.checkpoint is not None:

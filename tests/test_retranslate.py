@@ -192,11 +192,13 @@ class TestImportedPriorityWithRetranslate:
         # k3 has no imported match, so it goes through the translator
         assert doc.entries[2].translation == "FOO"
         assert result.imported_reuse_count == 2
-        # All 3 had existing translations and were retranslated
-        assert result.retranslated_count == 3
+        # Only k3 counts as retranslated (it had existing translation and
+        # was retranslated via the translator).  k1 and k2 received imported
+        # translations, which are not counted as "retranslated".
+        assert result.retranslated_count == 1
 
     def test_imported_priority_without_retranslate(self) -> None:
-        """When retranslate_existing=False but row has no translation, imported still works."""
+        """Imported translations override already-translated rows even without retranslate_existing."""
         doc = _make_doc([
             Entry(key="k1", label="Hello", translation=""),
             Entry(key="k2", label="World", translation="Existing"),
@@ -213,12 +215,13 @@ class TestImportedPriorityWithRetranslate:
             retranslate_existing=False,
             imported_translations=imported,
         )
-        # k1 has no translation, so it goes through translate_one -> imported wins
+        # k1 has no translation, goes through translate_one -> imported wins
         assert doc.entries[0].translation == "Imported Hello"
-        # k2 is already translated and retranslate_existing=False, so it stays
-        assert doc.entries[1].translation == "Existing"
-        assert result.imported_reuse_count == 1
-        assert result.skipped_count == 1
+        # k2 is already translated but imported dict has a match, so it
+        # bypasses the skip gate and gets the imported translation
+        assert doc.entries[1].translation == "Imported World"
+        assert result.imported_reuse_count == 2
+        assert result.skipped_count == 0
 
 
 # ---------------------------------------------------------------------------

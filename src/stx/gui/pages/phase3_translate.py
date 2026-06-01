@@ -489,7 +489,17 @@ class Phase3TranslatePage(PhasePage):
                             f"Loaded {result.count:,} translations from imported file"
                         )
                 except Exception:  # noqa: BLE001
-                    pass
+                    import logging as _logging
+
+                    _logging.getLogger(__name__).warning(
+                        "Could not read import file: %s", import_path, exc_info=True
+                    )
+                    self._import_trans_label.setText(
+                        "\u26a0 Could not read import file"
+                    )
+                    self._import_trans_label.setStyleSheet(
+                        "color: #dc2626; font-size: 11px;"
+                    )
 
         # Show label if already loaded
         if self._state.imported_translations and self._state.imported_translations_enabled:

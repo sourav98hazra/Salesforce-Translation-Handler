@@ -271,6 +271,36 @@ class TestRunnerIntegration:
         assert doc.entries[1].translation == "Imported-World"
         assert doc.entries[2].translation == "<ja>NotImported</ja>"
 
+    def test_imported_overrides_already_translated_without_retranslate(self) -> None:
+        """Imported translations override already-translated rows even without retranslate_existing=True."""
+        doc = Document(entries=[
+            Entry(key="K1", label="Hello", translation="OldHello"),
+            Entry(key="K2", label="World", translation="OldWorld"),
+            Entry(key="K3", label="Foo", translation="OldFoo"),
+        ])
+
+        imported = {"Hello": "Imported-Hello", "World": "Imported-World"}
+        translator = CountingTranslator()
+
+        result = translate_document(
+            doc, translator,
+            source_lang="en", target_lang="ja",
+            workers=1, rate_limit_per_second=None,
+            prevent_system_sleep=False,
+            imported_translations=imported,
+            retranslate_existing=False,
+        )
+
+        # K1 and K2 have imported matches so they bypass the skip gate
+        assert doc.entries[0].translation == "Imported-Hello"
+        assert doc.entries[1].translation == "Imported-World"
+        # K3 has no imported match and retranslate_existing=False, so it stays
+        assert doc.entries[2].translation == "OldFoo"
+        assert result.imported_reuse_count == 2
+        assert result.skipped_count == 1
+        # Imported rows are not counted as retranslated
+        assert result.retranslated_count == 0
+
     def test_imported_none_means_no_effect(self) -> None:
         """When imported_translations is None, normal flow is used."""
         doc = Document(entries=[
