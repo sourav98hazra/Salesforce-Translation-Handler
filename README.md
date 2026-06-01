@@ -394,6 +394,21 @@ python installer/build_installer.py
 
 This produces `dist/installer/SalesforceTranslationHandler_Setup_2.0.0.exe`.
 
+### Building a secure installer (Windows)
+
+```bash
+python build_secure_setup.py
+```
+
+This creates an installer with SHA-256 verification:
+- `dist/installer/SalesforceTranslationHandler_Setup_2.0.0.exe`
+- `dist/installer/SalesforceTranslationHandler_Setup_2.0.0.exe.sha256`
+
+Users can verify the download integrity with:
+```bash
+certutil -hashfile SalesforceTranslationHandler_Setup_2.0.0.exe SHA256
+```
+
 ---
 
 ## License

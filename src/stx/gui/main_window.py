@@ -459,13 +459,17 @@ class MainWindow(QMainWindow):
         self._status_dock.visibilityChanged.connect(self._toggle_log_action.setChecked)
 
         help_menu = bar.addMenu("&Help")
-        guide_action = QAction("&User guide", self)
+        guide_action = QAction("User Guide (F1)", self)
         guide_action.setShortcut("F1")
         guide_action.triggered.connect(self._show_user_guide)
         help_menu.addAction(guide_action)
         about = QAction("&About", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
+        help_menu.addSeparator()
+        updates_action = QAction("Check for &Updates", self)
+        updates_action.triggered.connect(self._check_for_updates)
+        help_menu.addAction(updates_action)
 
     def _wire_shortcuts(self) -> None:
         # Ctrl+0..6 to switch phases.
@@ -846,6 +850,14 @@ class MainWindow(QMainWindow):
 
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def _check_for_updates(self) -> None:
+        """Open the GitHub releases page in the default browser."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        releases_url = "https://github.com/sourav98hazra/Salesforce-Translation-Handler/releases"
+        QDesktopServices.openUrl(QUrl(releases_url))
 
     # ------------------------------------------------------------------ session persistence
 

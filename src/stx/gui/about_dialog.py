@@ -192,8 +192,9 @@ class AboutDialog(QDialog):
         text_col.addWidget(version)
 
         tagline = QLabel(
-            "Professional desktop app for Salesforce Translation "
-            "Workbench (.stf) files."
+            "Professional desktop app for managing Salesforce Translation "
+            "Workbench (.stf) files with a six-phase pipeline, auto-translation, "
+            "validation, and one-click export."
         )
         tagline.setWordWrap(True)
         tagline.setStyleSheet(f"font-size: 12px; color: {_MUTED_COLOR};")
