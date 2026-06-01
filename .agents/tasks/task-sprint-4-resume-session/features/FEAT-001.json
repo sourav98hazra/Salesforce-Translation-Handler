@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Resume after crash/interrupt: implement a checkpoint store that persists translation progress to disk after each chunk, and modify the runner to detect and load partial runs on restart. Integrate with TM so cached translations are not billed again. Provide CLI --resume/--reset flags and GUI controls.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Create src/stx/checkpoint.py - a new module that provides a CheckpointStore class backed by JSON (one file per run). The store records: run_id (hash of source file path + target lang + timestamp), source_file path, target_lang, total_entries count, a list of completed entry indices with their translations, and run metadata (start_time, last_update_time, source_lang, target_lang, scope serialized). Use atomic writes (write to .tmp then rename) for crash safety.",
     "2. Add methods to CheckpointStore: save_progress(index, key, translation, status) - appends a row to the checkpoint; load() - reads existing checkpoint and returns a dict mapping entry index -> translation; exists() - checks if a checkpoint file exists for the given run parameters; clear() - removes the checkpoint file; default_checkpoint_dir() - returns ~/.cache/salesforce-translation-handler/checkpoints/.",
@@ -30,5 +30,5 @@
     "Run `pytest -q` and confirm all 219+ tests pass with no regressions"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 233 tests pass (219 original + 14 new). Checkpoint store uses JSON with atomic writes and version field. Runner skips checkpointed rows in _classify() before TM or translator are consulted. Checkpoint is cleared on successful completion. CLI gets --resume/--no-resume and --reset-checkpoint flags. GUI gets a Reset progress button."
 }
