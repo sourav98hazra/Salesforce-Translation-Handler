@@ -112,6 +112,11 @@ def detect_source_language(
     return normalized
 
 
+# Minimum confidence required to accept an auto-detection result.
+# Below this threshold callers should fall back to the default language.
+CONFIDENCE_THRESHOLD = 0.60
+
+
 def map_detected_to_salesforce(detected_code: str) -> Optional[str]:
     """Map an ISO 639-1 code from langdetect to the Salesforce language code.
 

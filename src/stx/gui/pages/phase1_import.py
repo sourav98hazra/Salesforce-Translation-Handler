@@ -251,7 +251,11 @@ class Phase1ImportPage(PhasePage):
     def _detect_source_language(self, doc) -> None:
         """Run language detection on labels and populate source language fields."""
         try:
-            from ...lang_detect import detect_source_language, map_detected_to_salesforce
+            from ...lang_detect import (
+                CONFIDENCE_THRESHOLD,
+                detect_source_language,
+                map_detected_to_salesforce,
+            )
             from ...languages import language_for_code
         except ImportError:
             return
@@ -263,6 +267,13 @@ class Phase1ImportPage(PhasePage):
             return
 
         iso_code, confidence = detected[0]
+        if confidence < CONFIDENCE_THRESHOLD:
+            self._source_detect_label.setText(
+                f"Low confidence detection: {iso_code} ({confidence * 100:.0f}%) "
+                "-- using default"
+            )
+            return
+
         sf_code = map_detected_to_salesforce(iso_code)
         if sf_code:
             lang_name = language_for_code(sf_code) or iso_code

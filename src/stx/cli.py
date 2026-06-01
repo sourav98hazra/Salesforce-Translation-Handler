@@ -42,7 +42,6 @@ Examples
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -205,11 +204,14 @@ def stf2xlsx(
     )
 
 
+_SOURCE_SENTINEL = "__auto__"
+
+
 @app.command("translate")
 def translate(
     xlsx_in: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
     xlsx_out: Path = typer.Argument(..., dir_okay=False),
-    source: str = typer.Option("en", "--source", "-s", help="Source language code."),
+    source: str = typer.Option(_SOURCE_SENTINEL, "--source", "-s", show_default="en", help="Source language code (default: en, or auto-detected)."),
     target: str = typer.Option("ja", "--target", "-t", help="Target language code."),
     language_name: Optional[str] = typer.Option(
         None, "--language", "-l", help="Human-readable language name."
@@ -260,33 +262,49 @@ def translate(
     if language_name is None:
         language_name = language_for_code(target) or target
 
-    # Auto-detect source language if enabled and --source was not explicitly set
-    source_explicitly_set = any(
-        arg in sys.argv for arg in ("--source", "-s")
-    )
-    if detect_source and not source_explicitly_set:
-        from .lang_detect import detect_source_language, map_detected_to_salesforce
+    # Determine whether --source was explicitly provided by checking for sentinel
+    source_explicitly_set = source != _SOURCE_SENTINEL
+    if not source_explicitly_set:
+        source = "en"  # default fallback
 
-        doc_for_detect = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
-        labels = [e.label for e in doc_for_detect.entries if e.label]
+    # Auto-detect source language if enabled and --source was not explicitly set
+    doc = None
+    if detect_source and not source_explicitly_set:
+        from .lang_detect import (
+            CONFIDENCE_THRESHOLD,
+            detect_source_language,
+            map_detected_to_salesforce,
+        )
+
+        doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
+        labels = [e.label for e in doc.entries if e.label]
         detected = detect_source_language(labels)
         if detected:
             iso_code, confidence = detected[0]
             sf_code = map_detected_to_salesforce(iso_code)
             lang_name = language_for_code(sf_code) if sf_code else iso_code
-            console.print(
-                f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
-                f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
-            )
-            if sf_code:
-                source = to_google_code(sf_code)
+            if confidence >= CONFIDENCE_THRESHOLD:
+                console.print(
+                    f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+                )
+                if sf_code:
+                    source = to_google_code(sf_code)
+            else:
+                console.print(
+                    f"[yellow]Low-confidence detection:[/yellow] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%] "
+                    f"-- using default source '{source}'"
+                )
 
     console.print(
         f"Translating [bold]{xlsx_in}[/bold] from [cyan]{source}[/cyan] -> "
         f"[cyan]{target}[/cyan] ({language_name}) via [bold]{backend}[/bold]"
     )
 
-    doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
+    # Reuse the document from detection if available; otherwise parse fresh
+    if doc is None:
+        doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
 
     backend_kwargs: dict = {}
     if api_key is not None:
@@ -377,7 +395,7 @@ def run_pipeline(
         "--targets",
         help="Comma-separated additional target codes for multi-language batch.",
     ),
-    source: str = typer.Option("en", "--source", "-s"),
+    source: str = typer.Option(_SOURCE_SENTINEL, "--source", "-s", show_default="en"),
     language_name: Optional[str] = typer.Option(None, "--language", "-l"),
     backend: str = typer.Option("google", "--backend", "-b"),
     api_key: Optional[str] = typer.Option(None, "--api-key"),
@@ -413,17 +431,23 @@ def run_pipeline(
     if language_name is None:
         language_name = language_for_code(target) or target
 
+    # Determine whether --source was explicitly provided by checking for sentinel
+    source_explicitly_set = source != _SOURCE_SENTINEL
+    if not source_explicitly_set:
+        source = "en"  # default fallback
+
     organised = output_dir / "01_organized.xlsx"
 
     console.rule("[bold]Phase 1+2: parse STF and export Excel[/bold]")
     doc = parse_stf(stf_in)
 
     # Auto-detect source language if enabled and --source was not explicitly set
-    source_explicitly_set = any(
-        arg in sys.argv for arg in ("--source", "-s")
-    )
     if detect_source and not source_explicitly_set:
-        from .lang_detect import detect_source_language, map_detected_to_salesforce
+        from .lang_detect import (
+            CONFIDENCE_THRESHOLD,
+            detect_source_language,
+            map_detected_to_salesforce,
+        )
 
         labels = [e.label for e in doc.entries if e.label]
         detected = detect_source_language(labels)
@@ -431,12 +455,19 @@ def run_pipeline(
             iso_code, confidence = detected[0]
             sf_code = map_detected_to_salesforce(iso_code)
             lang_name = language_for_code(sf_code) if sf_code else iso_code
-            console.print(
-                f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
-                f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
-            )
-            if sf_code:
-                source = to_google_code(sf_code)
+            if confidence >= CONFIDENCE_THRESHOLD:
+                console.print(
+                    f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+                )
+                if sf_code:
+                    source = to_google_code(sf_code)
+            else:
+                console.print(
+                    f"[yellow]Low-confidence detection:[/yellow] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%] "
+                    f"-- using default source '{source}'"
+                )
     if not doc.language:
         doc.language = language_name
     if not doc.language_code:

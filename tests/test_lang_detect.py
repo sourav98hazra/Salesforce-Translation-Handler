@@ -128,3 +128,27 @@ class TestMapDetectedToSalesforce:
     def test_case_insensitive(self):
         assert map_detected_to_salesforce("EN") == "en_US"
         assert map_detected_to_salesforce("JA") == "ja"
+
+
+class TestConfidenceThreshold:
+    """Tests for CONFIDENCE_THRESHOLD constant."""
+
+    def test_threshold_value(self):
+        from stx.lang_detect import CONFIDENCE_THRESHOLD
+        assert CONFIDENCE_THRESHOLD == 0.60
+
+    def test_high_confidence_detection_exceeds_threshold(self):
+        """Uniform language text should exceed the 60% threshold."""
+        from stx.lang_detect import CONFIDENCE_THRESHOLD
+
+        texts = [
+            "Hello, how are you today?",
+            "The quick brown fox jumps over the lazy dog.",
+            "Please save your changes before exiting.",
+            "This is a sample label for testing purposes.",
+            "Enter your username and password below.",
+        ]
+        results = detect_source_language(texts)
+        assert len(results) > 0
+        _, confidence = results[0]
+        assert confidence >= CONFIDENCE_THRESHOLD

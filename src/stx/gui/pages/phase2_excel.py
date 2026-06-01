@@ -234,7 +234,11 @@ class Phase2ExcelPage(PhasePage):
     def _detect_source_language(self, doc) -> None:
         """Run language detection on labels and update state with suggestion."""
         try:
-            from ...lang_detect import detect_source_language, map_detected_to_salesforce
+            from ...lang_detect import (
+                CONFIDENCE_THRESHOLD,
+                detect_source_language,
+                map_detected_to_salesforce,
+            )
             from ...languages import language_for_code
         except ImportError:
             return
@@ -245,6 +249,9 @@ class Phase2ExcelPage(PhasePage):
             return
 
         iso_code, confidence = detected[0]
+        if confidence < CONFIDENCE_THRESHOLD:
+            return
+
         sf_code = map_detected_to_salesforce(iso_code)
         if sf_code:
             lang_name = language_for_code(sf_code) or iso_code
