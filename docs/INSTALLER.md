@@ -3,6 +3,17 @@
 This document covers building, signing, and distributing the Windows installer
 for Salesforce Translation Handler.
 
+## Quick Start (no installer needed)
+
+Most users don't need to build an installer. Just double-click the launcher:
+- Windows: `setup_desktop_app.bat` (creates desktop shortcut) or `launch.bat`
+- macOS: `launch.command`
+- Linux: `launch.sh`
+
+The sections below are for creating a distributable Windows installer (.exe) for enterprise deployment.
+
+---
+
 ## Prerequisites
 
 | Tool | Version | Required for |

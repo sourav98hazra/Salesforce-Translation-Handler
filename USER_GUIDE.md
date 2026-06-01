@@ -4,29 +4,33 @@ A practical, end-to-end walkthrough of the desktop application.
 
 ---
 
-## 1. Install + launch
+## 1. Install and launch
 
-### Install
+### Quickest way
 
-You only need this once.  Pick the option that fits how you'll run the app.
-
-| You are... | Best option |
+| OS | What to do |
 |---|---|
-| A developer with Python on the machine | `pip install -e ".[gui]"` from the repo root |
-| A non-developer on Windows / macOS / Linux | Double-click `launch.bat` / `launch.command` / `launch.sh` (auto-creates a venv on first run) |
-| Distributing to people without Python | Build a standalone executable: `python build_exe.py` produces `dist/SalesforceTranslationHandler{.exe,.app,}` — ship that single file |
+| Windows | Double-click `setup_desktop_app.bat` (first time), then use the desktop shortcut |
+| macOS | Double-click `launch.command` |
+| Linux | Double-click `launch.sh` (run `chmod +x launch.sh` once first) |
 
-Full instructions and prerequisites are in [`README.md`](./README.md).
+Everything is automatic -- the launcher creates a virtual environment, installs dependencies, and starts the app on first run. Subsequent launches are instant.
 
-### Launch
+### Prerequisites
 
-After install, three equivalent ways to start:
+- **Python 3.9+** must be installed ([python.org](https://www.python.org/downloads/)).
+  On Windows, tick "Add Python to PATH" during installation.
 
-* **Double-click** the launcher (`launch.bat` / `launch.command` / `launch.sh`).
-* From a terminal: `stx-app`.
-* From a terminal: `stx gui`.
+### Alternative launch methods
 
-The Window opens on **Phase 1 -- Import STF**.
+| Method | When to use |
+|---|---|
+| `stx-app` from terminal | You already ran `pip install -e ".[gui]"` and prefer the command line |
+| `stx gui` from terminal | Same as above (alias) |
+| Desktop shortcut (Windows) | Created automatically by `setup_desktop_app.bat` |
+| Standalone `.exe` / `.app` | Distributing to users without Python -- see [README.md](./README.md) |
+
+Full installation options (pip install, developer setup, standalone builds) are in [`README.md`](./README.md).
 
 ### The sidebar
 

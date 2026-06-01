@@ -63,7 +63,29 @@ Phase 5 runs a structured validation report that flags:
 
 ---
 
-## Installation
+## Quick Start
+
+### Windows
+
+1. Install [Python 3.9+](https://www.python.org/downloads/) (tick "Add Python to PATH")
+2. Double-click **`setup_desktop_app.bat`** in the project folder
+3. A desktop shortcut appears -- double-click it to launch the app
+
+### macOS
+
+1. Install [Python 3.9+](https://www.python.org/downloads/) if not already present
+2. Double-click **`launch.command`** (right-click > Open the first time for Gatekeeper)
+
+### Linux
+
+1. Run `chmod +x launch.sh` once, then double-click **`launch.sh`**
+
+That's it. The launcher handles virtual environment creation, dependency installation, and app startup automatically on first run. Subsequent launches are instant.
+
+---
+
+<details>
+<summary><b>Advanced: Developer / CLI Installation</b></summary>
 
 ### Prerequisites
 
@@ -71,14 +93,14 @@ Phase 5 runs a structured validation report that flags:
   Check with `python --version` (Linux/Mac) or `py --version` (Windows).
 - An internet connection for the auto-translate phase.
 
-### 1. Clone the repository
+### Clone the repository
 
 ```bash
 git clone https://github.com/sourav98hazra/Salesforce-Translation-Handler.git
 cd Salesforce-Translation-Handler
 ```
 
-### 2. Create a virtual environment (recommended)
+### Create a virtual environment (recommended)
 
 #### Linux / macOS
 
@@ -94,7 +116,7 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Install
+### Install options
 
 #### Full install (GUI + CLI + library)
 
@@ -121,42 +143,15 @@ After install, two commands appear on your `PATH`:
 | `stx`     | Command line interface |
 | `stx-app` | Launch the desktop GUI |
 
----
+### Launch from terminal
 
-## Running the desktop GUI
+```bash
+stx-app
+```
 
-### Easiest (Windows): one-click setup → desktop icon
+(or `stx gui` -- both launch the same window.)
 
-If you're on Windows and just want the app running with the fewest steps:
-
-1. **Double-click `setup_desktop_app.bat`** in the project folder.
-2. Wait for it to finish (first run installs dependencies and builds the app — a few minutes).
-3. A **"Salesforce Translation Manager"** shortcut with the app logo appears on your Desktop.
-4. **Double-click that shortcut** to launch the app — from now on, that's the only step.
-
-`setup_desktop_app.bat` does everything for you: creates the virtual environment, installs the GUI dependencies + PyInstaller, builds the standalone `.exe`, and drops the Desktop shortcut. You only need Python 3.9+ installed (from [python.org](https://www.python.org/downloads/), with "Add Python to PATH" ticked). No terminal commands required.
-
-The manual options below are for macOS / Linux, or if you prefer to run the steps yourself.
-
----
-
-There are also three manual ways to launch the app — pick whichever fits your situation:
-
-### Option 1: Double-click launcher (easiest, after `pip install`)
-
-After running `pip install -e ".[gui]"` once, just **double-click** the launcher for your OS in the project folder:
-
-| OS | File to double-click | Notes |
-|---|---|---|
-| **Windows** | `launch.bat` | Auto-creates the venv on first run if needed |
-| **macOS**   | `launch.command` | Right-click → Open the first time (Gatekeeper) |
-| **Linux**   | `launch.sh` | Run `chmod +x launch.sh` once, then double-click in your file manager |
-
-These launchers detect the virtual environment, set it up automatically on first run if it doesn't exist, then start the GUI. They're safe to commit / share with non-technical users — they handle the install for them.
-
-For Linux desktop integration, the included `SalesforceTranslationHandler.desktop` file can be copied to `~/.local/share/applications/` after editing the `Exec=` path, giving you a Start Menu / launcher entry.
-
-### Option 2: Standalone executable (no Python needed on target machine)
+### Standalone executable (no Python needed on target machine)
 
 For distributing to non-technical users who don't have Python at all, build a single self-contained binary:
 
@@ -173,11 +168,9 @@ This produces:
 | macOS   | `dist/SalesforceTranslationHandler.app` |
 | Linux   | `dist/SalesforceTranslationHandler` (ELF binary) |
 
-The artifact is fully self-contained (~65MB on Linux): it bundles Python, all dependencies, and the application. End users just **double-click and go** — no installation, no Python, no terminal. PyInstaller does not cross-compile, so build on the OS you intend to ship to.
+The artifact is fully self-contained (~65MB on Linux): it bundles Python, all dependencies, and the application. End users just double-click and go. PyInstaller does not cross-compile, so build on the OS you intend to ship to.
 
-### Desktop shortcut / launcher
-
-After building the standalone executable (or if you prefer to use `launch.bat`), you can create a proper desktop shortcut so the app launches with a double-click, just like any installed application.
+### Desktop shortcut / launcher (manual)
 
 #### Windows
 
@@ -209,13 +202,7 @@ python scripts/create_shortcut.py --target bat   # always use launch.bat
 
 3. The app will now appear in your application launcher with its icon.
 
-### Option 3: Terminal command
-
-```bash
-stx-app
-```
-
-(or `stx gui` — both launch the same window.)
+</details>
 
 The window has six phases in the left sidebar; each one writes its own
 artifact to disk so you can independently verify it:
