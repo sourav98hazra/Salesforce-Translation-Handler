@@ -34,6 +34,7 @@ from typing import List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QDialog,
     QDockWidget,
     QFrame,
     QHBoxLayout,
@@ -65,6 +66,12 @@ from .pages.phase5_validate import Phase5ValidatePage
 from .pages.phase6_export import Phase6ExportPage
 from .state import AppState, PhaseStatus
 from .workers import ImportExcelWorker, ParseStfWorker
+from .dialogs.override_dialog import (
+    OverrideConfirmationDialog,
+    UnsavedChangesDialog,
+    UnsavedChangesResult,
+    _PHASE_NAMES,
+)
 
 _PHASES = [
     ("1. Import STF", "Pick the source .stf file"),
@@ -588,6 +595,78 @@ class MainWindow(QMainWindow):
                 return
         event.ignore()
 
+    # ------------------------------------------------------------------ workflow override
+
+    def _check_workflow_override(self, new_file_path: Path, target_phase: int) -> bool:
+        """Check if loading a new file should override the active workflow.
+
+        Returns True if the load should proceed, False if cancelled.
+        """
+        if not self._state.active_workflow:
+            return True
+
+        # Same file as current working path -- no override needed
+        if (
+            self._state.current_working_path is not None
+            and new_file_path.resolve() == self._state.current_working_path.resolve()
+        ):
+            return True
+
+        # Show unsaved changes dialog first if needed
+        if self._state.has_unsaved_changes:
+            unsaved_dlg = UnsavedChangesDialog(
+                self._state.current_working_path,
+                new_file_path,
+                parent=self,
+            )
+            unsaved_dlg.exec()
+            result = unsaved_dlg.result_action
+            if result == UnsavedChangesResult.CANCEL:
+                return False
+            save_first = result == UnsavedChangesResult.SAVE_AND_OVERRIDE
+            self._perform_workflow_override(save_first=save_first)
+            return True
+
+        # Show override confirmation dialog
+        current_phase_name = _PHASE_NAMES.get(
+            self._state.current_phase, f"Phase {self._state.current_phase}"
+        )
+        dlg = OverrideConfirmationDialog(
+            current_source=self._state.original_source_path,
+            current_working=self._state.current_working_path,
+            current_phase_name=current_phase_name,
+            new_file_path=new_file_path,
+            parent=self,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._perform_workflow_override(save_first=False)
+            return True
+        return False
+
+    def _perform_workflow_override(self, save_first: bool) -> None:
+        """Perform the override: optionally save, then clear stale state."""
+        if save_first:
+            self._action_save_current()
+
+        # Clear stale state
+        self._state.translation_summaries = []
+        self._state.translation_statuses = []
+        self._state.last_validation_report = None
+        self._state.last_export_paths = None
+        self._state.last_translation_progress = None
+        self._state.has_unsaved_changes = False
+
+        # Reset downstream phase statuses
+        current = self._state.current_phase
+        for i in range(current, len(self._state.phase_status)):
+            self._state.phase_status[i] = PhaseStatus.IDLE
+
+        # Refresh UI
+        self._refresh_phase_badges()
+        self._update_sidebar_footer()
+
+    # ------------------------------------------------------------------ file loading
+
     def _handle_dropped_file(self, path: str) -> None:
         path_obj = Path(path)
         if not path_obj.exists():
@@ -595,6 +674,26 @@ class MainWindow(QMainWindow):
             return
 
         suffix = path_obj.suffix.lower()
+
+        # Determine target phase for override check
+        target_phase = 0
+        if suffix == ".stf":
+            target_phase = 0
+        elif suffix == ".xlsx":
+            stem = path_obj.stem.lower()
+            if "translated" in stem:
+                target_phase = 3
+            elif "organized" in stem or "organised" in stem:
+                target_phase = 2
+            elif "reviewed" in stem or "fixed" in stem:
+                target_phase = 4
+            else:
+                target_phase = 3
+
+        # Check workflow override before proceeding
+        if not self._check_workflow_override(path_obj, target_phase):
+            return
+
         gui_settings.add_recent_file(path_obj)
         self._refresh_recent_menu()
 
@@ -624,6 +723,15 @@ class MainWindow(QMainWindow):
             self._state.target_language_name = doc.language
         if doc.language_code:
             self._state.target_language_code = doc.language_code
+        # Set workflow context
+        self._state.set_active_workflow_context(
+            document=doc,
+            original_source_path=path,
+            current_working_path=path,
+            current_working_artifact_type="stf",
+            start_phase=0,
+            current_phase=0,
+        )
         # Phase 0 (Import STF) is now complete -- jump to Phase 1 (STF -> Excel).
         self._state.set_phase(0, PhaseStatus.DONE)
         self._goto(1)
@@ -644,16 +752,29 @@ class MainWindow(QMainWindow):
             # 6-phase layout: 0=Import, 1=Excel, 2=Translate, 3=Review,
             # 4=Validate, 5=Export.
             target_phase = 3  # default to Review
+            artifact_type = "translated_excel"
             stem = path.stem.lower()
             if "translated" in stem:
                 self._state.translated_xlsx_path = path
                 target_phase = 3
+                artifact_type = "translated_excel"
             elif "organized" in stem or "organised" in stem:
                 self._state.organized_xlsx_path = path
                 target_phase = 2
+                artifact_type = "organized_excel"
             elif "reviewed" in stem or "fixed" in stem:
                 self._state.reviewed_xlsx_path = path
                 target_phase = 4
+                artifact_type = "reviewed_excel" if "reviewed" in stem else "fixed_excel"
+            # Set workflow context
+            self._state.set_active_workflow_context(
+                document=doc,
+                original_source_path=path,
+                current_working_path=path,
+                current_working_artifact_type=artifact_type,
+                start_phase=target_phase,
+                current_phase=target_phase,
+            )
             self._state.set_phase(target_phase, PhaseStatus.DONE)
             self._goto(target_phase)
             self._log(f"Loaded {len(doc.entries):,} rows from {path.name}")
@@ -850,6 +971,9 @@ class MainWindow(QMainWindow):
         self._state.target_language_name = "Japanese"
         from .state import PhaseStatus as PS
         self._state.phase_status = [PS.IDLE for _ in range(6)]
+
+        # Clear workflow context
+        self._state.clear_workflow_context()
 
         self._refresh_phase_badges()
         self._update_sidebar_footer()
