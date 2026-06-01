@@ -125,8 +125,21 @@ def _check_duplicate_keys(doc: Document, report: ValidationReport) -> None:
 
 
 def _check_entry(entry: Entry, report: ValidationReport) -> None:
+    # Completely empty (no translation at all) - not an issue
+    if not entry.translation:
+        return
+
+    # Whitespace-only translation - warn and return (no further checks needed)
     if not entry.translation.strip():
-        return  # untranslated rows are valid by definition
+        report.issues.append(
+            ValidationIssue(
+                category="empty_translation",
+                severity="warning",
+                key=entry.key,
+                message="Translation is whitespace-only; will re-import as untranslated.",
+            )
+        )
+        return
 
     # Length limit
     limit = _LENGTH_LIMITS.get(entry.component_type)
@@ -140,17 +153,6 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
                     f"Translation length {len(entry.translation)} exceeds limit {limit} "
                     f"for {entry.component_type}."
                 ),
-            )
-        )
-
-    # Empty translation that nevertheless made it into the file
-    if entry.translation and not entry.translation.strip():
-        report.issues.append(
-            ValidationIssue(
-                category="empty_translation",
-                severity="warning",
-                key=entry.key,
-                message="Translation is whitespace-only; will re-import as untranslated.",
             )
         )
 

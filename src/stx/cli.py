@@ -441,6 +441,9 @@ def validate(
     if len(report.issues) > 200:
         console.print(f"[yellow]... and {len(report.issues) - 200} more.[/yellow]")
 
+    if report.has_errors:
+        raise typer.Exit(code=1)
+
 
 # ---------------------------------------------------------------------------
 # Scope subcommands

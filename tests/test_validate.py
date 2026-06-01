@@ -67,3 +67,33 @@ def test_clean_document_has_no_issues() -> None:
     report = validate_document(doc)
     assert not report.has_errors
     assert len(report.warnings) == 0
+
+
+def test_whitespace_only_translation_emits_empty_translation_warning() -> None:
+    doc = Document(
+        entries=[
+            Entry(key="CustomLabel.X", label="Hello", translation="   "),
+        ]
+    )
+    report = validate_document(doc)
+    assert any(i.category == "empty_translation" for i in report.warnings)
+
+
+def test_empty_translation_no_issue() -> None:
+    doc = Document(
+        entries=[
+            Entry(key="CustomLabel.X", label="Hello", translation=""),
+        ]
+    )
+    report = validate_document(doc)
+    assert not report.issues  # completely untranslated is not an issue
+
+
+def test_tab_only_translation_emits_empty_translation_warning() -> None:
+    doc = Document(
+        entries=[
+            Entry(key="CustomLabel.X", label="Hello", translation="\t\n "),
+        ]
+    )
+    report = validate_document(doc)
+    assert any(i.category == "empty_translation" for i in report.warnings)
