@@ -400,7 +400,7 @@ Quick build:
 python installer/build_installer.py
 ```
 
-This produces `dist/installer/SalesforceTranslationHandler_Setup_1.5.0.exe`.
+This produces `dist/installer/SalesforceTranslationHandler_Setup_2.0.0.exe`.
 
 ---
 
@@ -803,4 +803,233 @@ The sidebar was `setFixedWidth(260)`, which combined with content minimums preve
 # Latest (v1.5)
 
 See the v1.5 section above for the full list.  In short: editor splitter now draggable, softer borders + rounder corners across all themes, screen-aware window sizing, resizable sidebar, tighter spacing, proper column padding around the Source / Translation editor.
+
+---
+
+# v2.0 -- Major feature release
+
+A large release adding fuzzy translation memory, find and replace, undo/redo, crash recovery, session persistence, source language auto-detection, translation import/reuse, retranslation control, secure credential storage, a Windows installer, and CI automation.
+
+## New features
+
+### 1. Fuzzy Translation Memory
+
+Translation memory now supports **fuzzy matching** via the `rapidfuzz` library.  When an exact TM hit is not found, the system searches for similar source strings above a configurable threshold and can auto-accept high-confidence matches.
+
+CLI flags (on `stx translate` and `stx run`):
+
+```bash
+stx translate input.xlsx output.xlsx --target ja \
+    --fuzzy-threshold 75 \
+    --fuzzy-max-results 5 \
+    --fuzzy-auto-accept 90
+```
+
+- `--fuzzy-threshold` (0-100): minimum similarity score to consider a match.  0 = disabled (default).
+- `--fuzzy-max-results`: how many fuzzy candidates to evaluate (default: 5).
+- `--fuzzy-auto-accept` (0-100): matches above this score are used without confirmation (default: 90).
+
+In the GUI, configure fuzzy matching in `Edit -> Settings -> Translation`.
+
+### 2. Find and Replace
+
+A global find-and-replace facility available in Phase 4 (Browse and Review) via `Ctrl+H` and on the CLI via `stx replace`.
+
+GUI dialog features:
+- Case-sensitive matching toggle
+- Regular expression support
+- Scope selection: Translation, Label, Key, or All fields
+- Live match count preview
+- Replace one / Replace all
+
+CLI usage:
+
+```bash
+# Simple text replacement in translations
+stx replace input.xlsx --find "old text" --replace "new text"
+
+# Regex replacement, case-sensitive, in all fields
+stx replace input.xlsx --find "v\d+" --replace "v2" --regex --case-sensitive --scope all
+```
+
+### 3. Undo / Redo
+
+Phase 4 (Browse and Review) now has a full undo/redo stack:
+
+- `Ctrl+Z` -- undo the last edit
+- `Ctrl+Y` -- redo
+
+The stack tracks individual cell edits, bulk replacements, and apply/reset operations.  Stack depth is unlimited within a session.
+
+### 4. Resume after crash (checkpoint persistence)
+
+Translation runs are checkpointed automatically.  If the application crashes or is interrupted mid-translation, the next run resumes from where it left off instead of restarting from scratch.
+
+CLI flags:
+
+```bash
+# Resume is enabled by default
+stx translate input.xlsx output.xlsx --target ja
+
+# Disable resume for a fresh start
+stx translate input.xlsx output.xlsx --target ja --no-resume
+
+# Explicitly clear the checkpoint before starting
+stx translate input.xlsx output.xlsx --target ja --reset-checkpoint
+```
+
+Checkpoints are stored per source-file and target-language combination.
+
+### 5. Session persistence
+
+The application auto-saves its full state (loaded document, translation progress, phase status) to a `.stxproj` project file.  On next launch with the same source file, the session is restored automatically.
+
+CLI subcommands:
+
+```bash
+# Inspect a saved session
+stx session info project.stxproj
+
+# Clear the auto-saved session for a source file
+stx session reset input.stf
+```
+
+In the GUI, session save/restore is automatic.  Manual controls are available under `File -> Save Session` and `File -> Restore Session`.
+
+### 6. Auto-detect source language
+
+The application uses the `langdetect` library to analyse source labels and suggest the source language automatically.  This runs in Phase 1/2 (import) and during CLI translation.
+
+CLI flag:
+
+```bash
+# Auto-detection is on by default (falls back to 'en' if low confidence)
+stx translate input.xlsx output.xlsx --target ja --detect-source
+
+# Disable auto-detection
+stx translate input.xlsx output.xlsx --target ja --no-detect-source
+
+# Explicit --source always overrides detection
+stx translate input.xlsx output.xlsx --target ja --source fr
+```
+
+### 7. Import existing translations
+
+Reuse translations from a previously translated Excel workbook.  Matching is by key: if a key in the current document has a translation in the import file, it is applied before the translation run starts.
+
+```bash
+stx translate input.xlsx output.xlsx --target ja \
+    --import-translations previous_translated.xlsx
+```
+
+In the GUI, use the "Import Translations" button in Phase 3 to select the source workbook.
+
+### 8. Retranslation control
+
+By default, rows that already have a translation are skipped.  The new `--retranslate-existing` flag forces re-translation of all rows, including those with existing content.
+
+```bash
+# Skip existing translations (default)
+stx translate input.xlsx output.xlsx --target ja
+
+# Force retranslation of everything
+stx translate input.xlsx output.xlsx --target ja --retranslate-existing
+```
+
+In the GUI, a "Retranslate existing" checkbox is available in Phase 3.
+
+### 9. Secure credential storage
+
+API keys for paid translator backends (DeepL, Azure, OpenAI) can be stored securely in the OS keyring instead of plain-text configuration.  The GUI Settings dialog offers a "Save to keyring" option next to the API key field.
+
+Backed by the `keyring` library, which uses:
+- macOS Keychain
+- Windows Credential Locker
+- Linux Secret Service (GNOME Keyring / KDE Wallet)
+
+### 10. Windows installer
+
+A professional Windows installer built with Inno Setup, featuring:
+- Start Menu and Desktop shortcuts
+- Uninstaller with clean removal
+- Optional code signing
+- File associations for `.stf` and `.stxproj`
+
+Build with:
+
+```bash
+python installer/build_installer.py
+```
+
+Full documentation: [`docs/INSTALLER.md`](docs/INSTALLER.md).
+
+### 11. CI workflow (GitHub Actions)
+
+Automated testing and build verification on every push and pull request:
+
+- Runs the full test suite (344 tests) on Python 3.9, 3.10, 3.11, and 3.12
+- Linting with ruff
+- Type checking with mypy
+- Installer build verification
+
+See `.github/workflows/ci.yml` and `.github/workflows/build-installer.yml`.
+
+## New CLI commands and flags summary
+
+| Command / Flag | Description |
+|---|---|
+| `stx replace` | Find and replace across entries |
+| `stx session info` | Display session project file metadata |
+| `stx session reset` | Clear auto-saved session |
+| `--fuzzy-threshold` | Fuzzy TM minimum score (0-100) |
+| `--fuzzy-max-results` | Max fuzzy candidates to evaluate |
+| `--fuzzy-auto-accept` | Auto-accept score threshold |
+| `--import-translations` | Path to pre-translated xlsx for reuse |
+| `--retranslate-existing` | Force retranslation of existing content |
+| `--detect-source / --no-detect-source` | Auto-detect source language |
+| `--resume / --no-resume` | Resume from checkpoint (default: on) |
+| `--reset-checkpoint` | Clear checkpoint before starting |
+
+## New dependencies
+
+| Package | Purpose |
+|---|---|
+| `rapidfuzz` | Fuzzy string matching for translation memory |
+| `langdetect` | Source language auto-detection |
+| `keyring` | Secure OS-level credential storage |
+
+## Updated project layout
+
+```
+src/stx/
+├── checkpoint.py              # Crash-recovery checkpoint persistence
+├── session.py                 # Session save/restore (.stxproj format)
+├── fuzzy.py                   # Fuzzy TM matching (rapidfuzz)
+├── find_replace.py            # Find and replace engine
+├── import_translations.py     # Import translations from existing Excel
+├── lang_detect.py             # Source language auto-detection
+├── report.py                  # Validation report export (CSV/JSON/HTML)
+├── gui/
+│   ├── undo.py                # Undo/redo stack for Phase 4
+│   ├── secrets.py             # Keyring-based credential storage
+│   └── find_replace_dialog.py # Find and Replace dialog (Ctrl+H)
+installer/
+├── build_installer.py         # Windows installer build script
+├── stx_installer.iss          # Inno Setup script
+└── sign_executable.ps1        # Optional code-signing helper
+.github/workflows/
+├── ci.yml                     # Automated test + lint CI
+└── build-installer.yml        # Installer build workflow
+docs/
+└── INSTALLER.md               # Windows installer documentation
+```
+
+## Test suite
+
+The test suite now contains **344 tests** covering all new and existing features.
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
 

@@ -226,12 +226,15 @@ All three are UTF-8 with LF line endings (no BOM), byte-compatible with Salesfor
 The Settings dialog has three tabs that group all advanced configuration:
 
 ### Translation tab
-- **Translator backend** — Choose between Google Translate (free, default), DeepL, Microsoft Azure Translator, or OpenAI. The free tier (Google) requires no setup. Paid backends require an API key.
-- **API key** — Required for paid backends. Either paste it here or set the corresponding environment variable (e.g. `DEEPL_API_KEY`, `AZURE_TRANSLATOR_KEY`, `OPENAI_API_KEY`).
-- **Workers** — Number of concurrent translation requests. 4 is a safe default. Increase to 8 or higher if your backend has high quotas; reduce to 1 for very rate-limited backends.
-- **Rate limit** — Max requests per second. 8 is safe for Google free tier. Set to 0 (unlimited) for paid backends.
-- **Prevent system sleep** — Prevents your laptop from sleeping during a long translation run. Recommended on for runs >5 minutes.
-- **Multi-language batch** — Translate to multiple target languages in one run. Comma-separated codes (e.g. `fr, de, es`).
+- **Translator backend** -- Choose between Google Translate (free, default), DeepL, Microsoft Azure Translator, or OpenAI. The free tier (Google) requires no setup. Paid backends require an API key.
+- **API key** -- Required for paid backends. Either paste it here or set the corresponding environment variable (e.g. `DEEPL_API_KEY`, `AZURE_TRANSLATOR_KEY`, `OPENAI_API_KEY`). Use "Save to keyring" to store the key securely in your OS credential store (see Section 21).
+- **Workers** -- Number of concurrent translation requests. 4 is a safe default. Increase to 8 or higher if your backend has high quotas; reduce to 1 for very rate-limited backends.
+- **Rate limit** -- Max requests per second. 8 is safe for Google free tier. Set to 0 (unlimited) for paid backends.
+- **Prevent system sleep** -- Prevents your laptop from sleeping during a long translation run. Recommended on for runs >5 minutes.
+- **Multi-language batch** -- Translate to multiple target languages in one run. Comma-separated codes (e.g. `fr, de, es`).
+- **Fuzzy TM threshold** -- Minimum similarity score (0-100) for fuzzy translation memory matches. 0 disables fuzzy matching. See Section 15.
+- **Fuzzy auto-accept** -- Score above which fuzzy matches are used automatically without confirmation. Default: 90.
+- **Session persistence** -- Toggle auto-save of application state to `.stxproj` files. Enabled by default. See Section 17.
 
 ### Resources tab
 - **Glossary** — Optional CSV file with three columns: `source, target, do_not_translate`.
@@ -331,6 +334,9 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 | `Ctrl+0..5` | Switch to phase N |
 | `Ctrl+O` | Open file (auto-routes by extension) |
 | `Ctrl+S` | Save current phase artifact |
+| `Ctrl+H` | Find and Replace (Phase 4) |
+| `Ctrl+Z` | Undo (Phase 4) |
+| `Ctrl+Y` | Redo (Phase 4) |
 | `Ctrl+,` | Open Settings |
 | `F1` | This user guide |
 | `Ctrl+Q` | Quit |
@@ -435,3 +441,261 @@ The **Approved** status marks individual translations as reviewed and accepted. 
 ---
 
 That's it.  The CLI (`stx --help`) mirrors every phase for scripting / CI use; see [`README.md`](./README.md) for command-line examples.
+
+---
+
+## 13. Find and Replace
+
+Phase 4 (Browse and Review) includes a Find and Replace dialog, accessible via `Ctrl+H` or from the Edit menu.
+
+### GUI usage
+
+1. Press `Ctrl+H` while in Phase 4.
+2. Enter the text to find in the **Find** field.
+3. Enter the replacement in the **Replace** field.
+4. Configure options:
+   - **Case sensitive** -- match exact case only.
+   - **Regex** -- treat the find pattern as a regular expression.
+   - **Scope** -- which fields to search: Translation (default), Label, Key, or All.
+5. The dialog shows a live match count as you type.
+6. Click **Replace** to replace the current match, or **Replace All** to replace every occurrence.
+
+All replacements are tracked in the undo stack (see Section 14).
+
+### CLI usage
+
+```bash
+# Replace text in translations (default scope)
+stx replace workbook.xlsx --find "old term" --replace "new term"
+
+# Case-sensitive regex replacement in all fields
+stx replace workbook.xlsx --find "Rev\d+" --replace "Revision" \
+    --regex --case-sensitive --scope all
+
+# Works with STF files too
+stx replace input.stf --find "deprecated" --replace "legacy"
+```
+
+Available scope values: `translation`, `label`, `key`, `all`.
+
+---
+
+## 14. Undo / Redo
+
+Phase 4 (Browse and Review) maintains a full undo/redo history for the current session.
+
+| Action | Shortcut |
+|---|---|
+| Undo | `Ctrl+Z` |
+| Redo | `Ctrl+Y` |
+
+### What is tracked
+
+- Individual cell edits (Apply button in the side-by-side editor)
+- Reset-to-source operations
+- Bulk find-and-replace operations
+- Approval status changes
+
+The undo stack has unlimited depth within a session. Closing the application or loading a new file resets the history.
+
+---
+
+## 15. Fuzzy Translation Memory
+
+When the translation memory does not contain an exact match for a source string, the fuzzy matching engine (powered by `rapidfuzz`) searches for similar entries above a configurable similarity threshold.
+
+### How it works
+
+1. A source string is looked up in the TM.
+2. If no exact hit is found and fuzzy matching is enabled, the TM is searched for entries with similarity above the threshold.
+3. If a match scores above the auto-accept threshold, it is used directly.
+4. Otherwise the match is logged but the string is sent to the translation backend.
+
+### Configuration
+
+In `Edit -> Settings -> Translation`:
+
+- **Fuzzy TM threshold** -- minimum similarity (0-100). Set to 0 to disable. Recommended: 70-80.
+- **Fuzzy auto-accept** -- score above which matches are applied without confirmation. Default: 90.
+- **Fuzzy max results** -- number of candidates to evaluate per lookup. Default: 5.
+
+### CLI flags
+
+```bash
+stx translate input.xlsx output.xlsx --target ja \
+    --fuzzy-threshold 75 \
+    --fuzzy-max-results 5 \
+    --fuzzy-auto-accept 90
+```
+
+### Live feed indicators
+
+During translation, fuzzy-matched entries appear in the live feed with a `FM` (Fuzzy Match) indicator and the match score:
+
+```
+[42/1000 | T:30 TM:5 FM:3 D:7] EN: Hello world -> JA: ...
+```
+
+---
+
+## 16. Resume after crash
+
+Translation runs are automatically checkpointed so that interrupted runs can resume from the last saved position rather than restarting from scratch.
+
+### How it works
+
+- After every batch of rows is translated, the current position and results are saved to a checkpoint file.
+- Checkpoints are keyed by source file path and target language.
+- On the next run with the same source and target, the checkpoint is detected and the run resumes from the last completed row.
+
+### GUI behaviour
+
+- If a checkpoint exists when you click "Start translation" in Phase 3, a prompt asks whether to resume or start fresh.
+- Translation progress shows "resumed N rows" in the status.
+
+### CLI flags
+
+```bash
+# Resume is enabled by default
+stx translate input.xlsx output.xlsx --target ja
+
+# Start fresh (ignore any existing checkpoint)
+stx translate input.xlsx output.xlsx --target ja --no-resume
+
+# Explicitly delete the checkpoint before starting
+stx translate input.xlsx output.xlsx --target ja --reset-checkpoint
+```
+
+---
+
+## 17. Session persistence
+
+The application automatically saves its full state to a `.stxproj` project file.  When you reopen the same source file, the session is restored -- including the loaded document, translation results, phase completion status, and settings.
+
+### Automatic behaviour
+
+- After every significant action (phase completion, translation finish, file save), the session is written.
+- On launch, if a session exists for the opened file, it is restored silently.
+- The `.stxproj` file is stored alongside the source file by default.
+
+### Manual controls
+
+- `File -> Save Session` -- force-save the current session.
+- `File -> Restore Session` -- reload from the last saved session.
+
+### CLI subcommands
+
+```bash
+# Inspect a session file
+stx session info project.stxproj
+
+# Clear the auto-saved session for a source file
+stx session reset input.stf
+```
+
+### Settings
+
+Session persistence can be toggled in `Edit -> Settings -> Translation`.  When disabled, no `.stxproj` files are written.
+
+---
+
+## 18. Auto-detect source language
+
+The application uses the `langdetect` library to analyse source labels and automatically suggest the source language, eliminating the need to manually specify it for non-English source files.
+
+### GUI behaviour
+
+- In Phase 1 (Import STF), after parsing the file, the detected language is displayed in the metadata grid with a confidence percentage.
+- In Phase 3 (Translate), the Source language field is pre-filled with the detected language.
+- You can always override the detection by selecting a different language manually.
+
+### CLI behaviour
+
+```bash
+# Auto-detection is on by default
+stx translate input.xlsx output.xlsx --target ja
+# Output: "Detected source language: French (fr) [confidence: 95%]"
+
+# Disable auto-detection (use default 'en')
+stx translate input.xlsx output.xlsx --target ja --no-detect-source
+
+# Explicit --source always takes priority
+stx translate input.xlsx output.xlsx --target ja --source fr
+```
+
+Detection requires at least a few non-empty labels.  If confidence is below the threshold, the system falls back to `en` with a warning.
+
+---
+
+## 19. Import existing translations
+
+Reuse translations from a previously translated Excel workbook.  This is useful when you have a partially translated file from a colleague or a prior run and want to apply those translations before starting a new translation pass.
+
+### How it works
+
+1. The import file is parsed and a key-to-translation mapping is built.
+2. Before the translation run starts, entries whose keys exist in the import mapping receive the imported translation.
+3. Imported entries are counted separately in the results (`imported` count in the live feed).
+4. Remaining untranslated entries proceed to the translation backend as normal.
+
+### GUI usage
+
+In Phase 3, click the **"Import Translations..."** button and select a previously translated `.xlsx` file.
+
+### CLI usage
+
+```bash
+stx translate input.xlsx output.xlsx --target ja \
+    --import-translations previous_translated.xlsx
+```
+
+---
+
+## 20. Retranslation control
+
+By default, entries that already have a non-empty translation are skipped during the translation run.  The retranslation control lets you choose to re-translate those entries instead.
+
+### When to use it
+
+- You changed the translator backend and want fresh translations from the new engine.
+- Source labels were updated and existing translations are stale.
+- You imported translations (Section 19) but want to override some with fresh API results.
+
+### GUI usage
+
+In Phase 3, check the **"Retranslate existing"** checkbox before starting translation.
+
+### CLI usage
+
+```bash
+# Default: skip rows that already have translations
+stx translate input.xlsx output.xlsx --target ja
+
+# Force re-translation of all rows
+stx translate input.xlsx output.xlsx --target ja --retranslate-existing
+```
+
+---
+
+## 21. Secure credential storage
+
+API keys for paid translation backends can be stored in your operating system's secure credential store instead of in plain text configuration files.
+
+### Supported keystores
+
+| OS | Backend |
+|---|---|
+| macOS | Keychain |
+| Windows | Credential Locker |
+| Linux | Secret Service (GNOME Keyring / KDE Wallet) |
+
+### How to use
+
+1. Open `Edit -> Settings -> Translation`.
+2. Enter your API key in the key field.
+3. Click **"Save to keyring"** next to the field.
+4. On subsequent launches, the key is loaded from the keyring automatically.
+
+To remove a stored key, clear the field and click "Save to keyring" again, or use your OS keyring manager directly.
+
+The `keyring` library is included in the `[gui]` install extra.
