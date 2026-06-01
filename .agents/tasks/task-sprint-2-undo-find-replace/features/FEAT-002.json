@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement Find & Replace across all translations with a modal dialog in Phase 4, integration with the undo stack from FEAT-001, and a CLI 'stx replace' command for batch operations.",
+  "status": "pending",
+  "steps": [
+    "Create src/stx/gui/find_replace_dialog.py with a FindReplaceDialog(QDialog) class that has: (1) Find QLineEdit, (2) Replace QLineEdit, (3) Match Case checkbox, (4) Regex checkbox, (5) Scope combo (Translations Only / Labels / Keys / All Fields), (6) a preview count label showing how many matches exist, (7) Replace All button, (8) Cancel button. The dialog should accept the Document and return a list of (row_index, old_value, new_value) tuples when Replace All is clicked.",
+    "Add a 'Global Replace...' QPushButton to the Phase4ReviewPage toolbar (after the 'Load reviewed Excel...' button). Clicking opens the FindReplaceDialog modally.",
+    "In Phase4ReviewPage, implement _on_find_replace() that: (1) opens the dialog, (2) if accepted, iterates the returned replacements, (3) for each replacement pushes an UndoCommand onto the undo stack and applies the change via the model, (4) calls _update_counters() and _run_auto_validation() after all replacements are done, (5) shows a status message like 'Replaced N occurrences'.",
+    "Add a menu entry 'Find && Replace...' (Ctrl+H) to the Edit menu in main_window.py that triggers the same dialog when Phase 4 is active.",
+    "In the inline editor at the bottom of Phase 4, add an 'Apply to all rows' checkbox. When checked and the user clicks 'Apply', the current edit is treated as a find-replace: the OLD translation of the selected row is searched across all rows, and any matching translations are replaced with the new text. This uses the same undo-stack-aware replacement logic.",
+    "Add a CLI command 'stx replace' in src/stx/cli.py that accepts: source file (.stf or .xlsx), --find TEXT, --replace TEXT, --case-sensitive flag, --regex flag, --scope (translation/label/key/all). It loads the document, performs the replacement, saves back, and prints how many replacements were made.",
+    "Add tests in tests/gui/test_find_replace.py: (1) test FindReplaceDialog construction, (2) test replacement logic with plain text, (3) test replacement with regex, (4) test case-sensitive vs case-insensitive matching, (5) test scope filtering (translations only vs all fields), (6) test that replacements integrate with undo stack (can be undone as a batch).",
+    "Add CLI tests in tests/test_cli.py: test_replace_plain, test_replace_regex, test_replace_case_sensitive."
+  ],
+  "acceptance_criteria": [
+    "FindReplaceDialog exists and can be opened from the Phase 4 toolbar",
+    "Find & Replace correctly replaces text across all matching translations",
+    "Match Case and Regex options work correctly",
+    "Scope control limits replacements to the chosen field(s)",
+    "Preview count updates as the user types in Find field",
+    "All replacements from a single Find & Replace operation can be undone with a single Ctrl+Z (or multiple Ctrl+Z one per row)",
+    "Apply to all rows checkbox in inline editor performs global replacement",
+    "CLI 'stx replace' command works for batch operations on .stf and .xlsx files",
+    "Edit menu has Find & Replace (Ctrl+H) entry",
+    "All new tests pass"
+  ],
+  "verification": [
+    "QT_QPA_PLATFORM=offscreen pytest tests/gui/test_find_replace.py -v",
+    "QT_QPA_PLATFORM=offscreen pytest tests/test_cli.py -v -k replace",
+    "QT_QPA_PLATFORM=offscreen pytest -q (all tests pass)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

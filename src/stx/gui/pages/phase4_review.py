@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
 from ...model import Document, Entry
 from ...validate import validate_document
 from ..state import AppState, PhaseStatus
+from ..undo import UndoCommand, UndoStack
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
@@ -64,9 +65,11 @@ _APPROVED_COL = 6
 class _EntriesModel(QAbstractTableModel):
     edited = Signal(int)
 
-    def __init__(self, doc: Document, parent=None) -> None:
+    def __init__(self, doc: Document, parent=None, undo_stack: "UndoStack | None" = None) -> None:
         super().__init__(parent)
         self._doc = doc
+        self._undo_stack: UndoStack | None = undo_stack
+        self._applying_undo = False  # guard to avoid pushing during undo/redo
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self._doc.entries)
@@ -119,11 +122,30 @@ class _EntriesModel(QAbstractTableModel):
         if index.column() == _APPROVED_COL and role == Qt.ItemDataRole.CheckStateRole:
             row = index.row()
             old = self._doc.entries[row]
-            new_approved = value == Qt.CheckState.Checked.value if isinstance(value, int) else value == Qt.CheckState.Checked
-            self._doc.entries[row] = Entry(
-                key=old.key, label=old.label, translation=old.translation, approved=new_approved,
+            new_approved = (
+                value == Qt.CheckState.Checked.value
+                if isinstance(value, int)
+                else value == Qt.CheckState.Checked
             )
-            self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole, Qt.ItemDataRole.DisplayRole])
+            # Push undo command (unless we are replaying an undo/redo)
+            if not self._applying_undo and self._undo_stack is not None:
+                self._undo_stack.push(
+                    UndoCommand(
+                        row=row,
+                        column=_APPROVED_COL,
+                        old_value=old.approved,
+                        new_value=new_approved,
+                    )
+                )
+            self._doc.entries[row] = Entry(
+                key=old.key,
+                label=old.label,
+                translation=old.translation,
+                approved=new_approved,
+            )
+            self.dataChanged.emit(
+                index, index, [Qt.ItemDataRole.CheckStateRole, Qt.ItemDataRole.DisplayRole]
+            )
             status_idx = self.index(row, 3)
             self.dataChanged.emit(status_idx, status_idx, [Qt.ItemDataRole.DisplayRole])
             self.edited.emit(row)
@@ -133,12 +155,61 @@ class _EntriesModel(QAbstractTableModel):
         row = index.row()
         old = self._doc.entries[row]
         text = "" if value is None else str(value)
-        self._doc.entries[row] = Entry(key=old.key, label=old.label, translation=text, approved=old.approved)
-        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
+        # Push undo command (unless we are replaying an undo/redo)
+        if not self._applying_undo and self._undo_stack is not None:
+            self._undo_stack.push(
+                UndoCommand(
+                    row=row,
+                    column=_TRANSLATION_COL,
+                    old_value=old.translation,
+                    new_value=text,
+                )
+            )
+        self._doc.entries[row] = Entry(
+            key=old.key, label=old.label, translation=text, approved=old.approved
+        )
+        self.dataChanged.emit(
+            index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
+        )
         status_idx = self.index(row, 3)
         self.dataChanged.emit(status_idx, status_idx, [Qt.ItemDataRole.DisplayRole])
         self.edited.emit(row)
         return True
+
+    # ------------------------------------------------------------------ undo / redo
+
+    def undo(self) -> None:
+        """Undo the last edit by restoring old_value."""
+        if self._undo_stack is None:
+            return
+        cmd = self._undo_stack.undo()
+        if cmd is None:
+            return
+        self._apply_command_value(cmd.row, cmd.column, cmd.old_value)
+
+    def redo(self) -> None:
+        """Redo a previously undone edit by re-applying new_value."""
+        if self._undo_stack is None:
+            return
+        cmd = self._undo_stack.redo()
+        if cmd is None:
+            return
+        self._apply_command_value(cmd.row, cmd.column, cmd.new_value)
+
+    def _apply_command_value(self, row: int, column: int, value) -> None:
+        """Apply a value from an undo/redo command without pushing to stack."""
+        self._applying_undo = True
+        try:
+            idx = self.index(row, column)
+            if column == _APPROVED_COL:
+                check = (
+                    Qt.CheckState.Checked if value else Qt.CheckState.Unchecked
+                )
+                self.setData(idx, check, Qt.ItemDataRole.CheckStateRole)
+            else:
+                self.setData(idx, value, Qt.ItemDataRole.EditRole)
+        finally:
+            self._applying_undo = False
 
 
 class _ComponentStatusFilter(QSortFilterProxyModel):
@@ -204,6 +275,9 @@ class Phase4ReviewPage(PhasePage):
     # ------------------------------------------------------------------ build
 
     def _build(self) -> None:
+        # ---------- Undo stack (shared with model + menu)
+        self._undo_stack = UndoStack(self)
+
         # ---------- Compact toolbar (status pill + counters + actions)
         toolbar = QFrame()
         toolbar.setProperty("role", "card")
@@ -226,6 +300,21 @@ class Phase4ReviewPage(PhasePage):
         tb_layout.addWidget(self._stat_issues["frame"])
 
         tb_layout.addStretch(1)
+
+        # Undo / Redo toolbar buttons
+        self._undo_btn = QPushButton("Undo")
+        self._undo_btn.setToolTip("Undo the last edit (Ctrl+Z)")
+        self._undo_btn.setEnabled(False)
+        self._undo_btn.clicked.connect(self._on_undo)
+        tb_layout.addWidget(self._undo_btn)
+
+        self._redo_btn = QPushButton("Redo")
+        self._redo_btn.setToolTip("Redo the last undone edit (Ctrl+Y)")
+        self._redo_btn.setEnabled(False)
+        self._redo_btn.clicked.connect(self._on_redo)
+        tb_layout.addWidget(self._redo_btn)
+
+        self._undo_stack.stack_changed.connect(self._refresh_undo_buttons)
 
         self._load_btn = QPushButton("Load reviewed Excel...")
         self._load_btn.setToolTip(
@@ -416,6 +505,25 @@ class Phase4ReviewPage(PhasePage):
         layout.addWidget(val)
         return {"frame": frame, "value": val}
 
+    # ------------------------------------------------------------------ undo / redo UI
+
+    def _refresh_undo_buttons(self) -> None:
+        """Enable/disable undo and redo buttons based on stack state."""
+        self._undo_btn.setEnabled(self._undo_stack.can_undo)
+        self._redo_btn.setEnabled(self._undo_stack.can_redo)
+
+    def _on_undo(self) -> None:
+        if self._model is not None:
+            self._model.undo()
+            self._update_counters()
+            self._run_auto_validation()
+
+    def _on_redo(self) -> None:
+        if self._model is not None:
+            self._model.redo()
+            self._update_counters()
+            self._run_auto_validation()
+
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
@@ -439,7 +547,9 @@ class Phase4ReviewPage(PhasePage):
             QApplication.processEvents()
 
         if self._model is None:
-            self._model = _EntriesModel(self._state.document, self)
+            self._model = _EntriesModel(
+                self._state.document, self, undo_stack=self._undo_stack
+            )
             self._model.edited.connect(lambda _row: self._update_counters())
             self._proxy.setSourceModel(self._model)
             self._table.selectionModel().currentChanged.connect(self._on_selection_changed)
@@ -447,6 +557,8 @@ class Phase4ReviewPage(PhasePage):
             self._model.beginResetModel()
             self._model._doc = self._state.document  # noqa: SLF001
             self._model.endResetModel()
+            # Clear undo history when document is reloaded
+            self._undo_stack.clear()
 
         components = sorted({e.component_type for e in self._state.document.entries})
         self._component_combo.blockSignals(True)

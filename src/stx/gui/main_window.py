@@ -367,12 +367,31 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
-        # Edit menu: only Settings for now -- everything advanced lives there.
+        # Edit menu: Undo/Redo (delegated to Phase 4) then Settings.
         edit_menu = bar.addMenu("&Edit")
+
+        self._undo_action = QAction("&Undo", self)
+        self._undo_action.setShortcut("Ctrl+Z")
+        self._undo_action.setEnabled(False)
+        self._undo_action.triggered.connect(self._action_undo)
+        edit_menu.addAction(self._undo_action)
+
+        self._redo_action = QAction("&Redo", self)
+        self._redo_action.setShortcut("Ctrl+Y")
+        self._redo_action.setEnabled(False)
+        self._redo_action.triggered.connect(self._action_redo)
+        edit_menu.addAction(self._redo_action)
+
+        edit_menu.addSeparator()
+
         settings_action = QAction("&Settings...", self)
         settings_action.setShortcut("Ctrl+,")
         settings_action.triggered.connect(self._action_open_settings)
         edit_menu.addAction(settings_action)
+
+        # Wire Phase 4 undo stack to the edit menu actions
+        phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+        phase4._undo_stack.stack_changed.connect(self._refresh_undo_actions)
 
         view_menu = bar.addMenu("&View")
         themes = [
@@ -424,6 +443,9 @@ class MainWindow(QMainWindow):
         self._pages[index].on_enter()
         self._refresh_phase_badges()
         self._update_sidebar_footer()
+        # Refresh undo/redo menu state when switching pages
+        if hasattr(self, "_undo_action"):
+            self._refresh_undo_actions()
 
     def _jump_to_row(self, key: str) -> None:
         # Phase 4 (Review) is now at index 3 in the simplified flow.
@@ -460,6 +482,27 @@ class MainWindow(QMainWindow):
                 getattr(page, slot_name)()
                 return
         self._log("No save action on the current phase.")
+
+    # ------------------------------------------------------------------ undo / redo delegation
+
+    def _action_undo(self) -> None:
+        """Delegate Ctrl+Z to Phase 4 when it is the active page."""
+        if self._stack.currentIndex() == 3:
+            phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+            phase4._on_undo()
+
+    def _action_redo(self) -> None:
+        """Delegate Ctrl+Y to Phase 4 when it is the active page."""
+        if self._stack.currentIndex() == 3:
+            phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+            phase4._on_redo()
+
+    def _refresh_undo_actions(self) -> None:
+        """Enable/disable Edit menu undo/redo based on stack + active page."""
+        is_phase4 = self._stack.currentIndex() == 3
+        phase4: Phase4ReviewPage = self._pages[3]  # type: ignore[assignment]
+        self._undo_action.setEnabled(is_phase4 and phase4._undo_stack.can_undo)
+        self._redo_action.setEnabled(is_phase4 and phase4._undo_stack.can_redo)
 
     # ------------------------------------------------------------------ recent files
 

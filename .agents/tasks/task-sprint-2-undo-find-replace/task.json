@@ -1,0 +1,7 @@
+{
+  "task_id": "task-sprint-2-undo-find-replace",
+  "task_description": "Implement Sprint 2 features: (1) Undo/Redo in Phase 4 Editor with custom undo stack, menu integration, toolbar buttons, and validation refresh; (2) Find & Replace across all translations with modal dialog, scope control, undo integration, inline editor convenience, and CLI equivalent.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}
