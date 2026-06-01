@@ -618,7 +618,7 @@ class Phase5ValidatePage(PhasePage):
 
     def _on_download_report(self) -> None:
         """Export the current validation report to CSV, JSON, or HTML."""
-        if self._report is None or not self._report.issues:
+        if self._report is None:
             self.status_message.emit("No validation report available. Run validation first.")
             return
         path = self.pick_save_file(
