@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Resume after crash/interrupt: implement a checkpoint store that persists translation progress to disk after each chunk, and modify the runner to detect and load partial runs on restart. Integrate with TM so cached translations are not billed again. Provide CLI --resume/--reset flags and GUI controls.",
+  "status": "in_progress",
+  "steps": [
+    "1. Create src/stx/checkpoint.py - a new module that provides a CheckpointStore class backed by JSON (one file per run). The store records: run_id (hash of source file path + target lang + timestamp), source_file path, target_lang, total_entries count, a list of completed entry indices with their translations, and run metadata (start_time, last_update_time, source_lang, target_lang, scope serialized). Use atomic writes (write to .tmp then rename) for crash safety.",
+    "2. Add methods to CheckpointStore: save_progress(index, key, translation, status) - appends a row to the checkpoint; load() - reads existing checkpoint and returns a dict mapping entry index -> translation; exists() - checks if a checkpoint file exists for the given run parameters; clear() - removes the checkpoint file; default_checkpoint_dir() - returns ~/.cache/salesforce-translation-handler/checkpoints/.",
+    "3. Modify src/stx/translate/runner.py translate_document() to accept an optional checkpoint: Optional[CheckpointStore] parameter. In _Runner.__init__, if checkpoint is provided and checkpoint.exists(), load previously completed translations. In _classify(), if the entry index is in the loaded checkpoint data, fill the slot immediately with the checkpointed translation (status='Resumed from checkpoint') and skip it. After each _fill_translated() call in _translate_one(), call checkpoint.save_progress() to persist that row. On successful completion of the entire run, call checkpoint.clear() to remove the checkpoint file.",
+    "4. Modify src/stx/translate/runner.py _Runner._fill_translated() to call self._checkpoint.save_progress(index, entry.key, translation, status) after filling the slot, if self._checkpoint is not None.",
+    "5. Add a 'resumed_count' field to TranslationResult dataclass to track how many rows were loaded from checkpoint rather than translated fresh.",
+    "6. Update src/stx/cli.py translate and run commands to add --resume/--no-resume flag (default True) and --reset-checkpoint flag. When --resume is True, construct a CheckpointStore from the input file path + target lang and pass it to translate_document(). When --reset-checkpoint is passed, call checkpoint.clear() before starting. Display resumed count in the final summary.",
+    "7. Update src/stx/gui/pages/phase3_translate.py _on_start() to create a CheckpointStore and pass it to the TranslationWorker. Add a 'Reset progress' button next to Start that calls checkpoint.clear(). Show resumed count in the final summary feed line.",
+    "8. Update src/stx/gui/workers.py TranslationWorker to accept and forward a checkpoint parameter to translate_document().",
+    "9. Write tests/test_checkpoint.py with tests: test checkpoint save/load round-trip, test checkpoint clear removes file, test runner resumes from checkpoint (skips already-translated rows), test runner clears checkpoint on successful completion, test checkpoint atomic write safety (write to partial file then rename), test checkpoint integrates with TM (TM hits are also checkpointed so no re-billing).",
+    "10. Ensure the checkpoint file format includes a version field (version: 1) for future migration compatibility."
+  ],
+  "acceptance_criteria": [
+    "Running `pytest tests/test_checkpoint.py -q` passes all new tests",
+    "Running `pytest -q` passes all tests (existing 219 + new checkpoint tests)",
+    "A translation run that is interrupted mid-way creates a checkpoint file in the default directory",
+    "Restarting the same translation (same file + target lang) resumes from where it left off, skipping already-checkpointed rows",
+    "Rows loaded from checkpoint are not sent to the translator backend (no billing)",
+    "On successful completion of a full run, the checkpoint file is automatically removed",
+    "The CLI --reset-checkpoint flag removes any existing checkpoint before starting fresh",
+    "The checkpoint file format includes a version field for forward compatibility"
+  ],
+  "verification": [
+    "Run `pytest tests/test_checkpoint.py -q` and confirm all tests pass",
+    "Run `pytest -q` and confirm all 219+ tests pass with no regressions"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

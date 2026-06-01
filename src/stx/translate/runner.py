@@ -36,6 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, asdict
 from typing import Callable, Dict, List, Optional, Tuple
 
+from ..checkpoint import CheckpointStore
 from ..glossary import Glossary
 from ..memory import TranslationMemory
 from ..model import Document, Entry
@@ -144,6 +145,7 @@ class TranslationResult:
     cached_count: int = 0   # from persistent translation memory
     deduped_count: int = 0  # from in-run dedup cache
     fuzzy_accepted_count: int = 0  # from fuzzy TM matching
+    resumed_count: int = 0  # from checkpoint resume
     target_lang: str = ""
     elapsed_seconds: float = 0.0
 
@@ -178,6 +180,7 @@ def translate_document(
     scope: Optional[Scope] = None,
     memory: Optional[TranslationMemory] = None,
     glossary: Optional[Glossary] = None,
+    checkpoint: Optional[CheckpointStore] = None,
     workers: int = DEFAULT_WORKERS,
     rate_limit_per_second: Optional[float] = 8.0,
     prevent_system_sleep: bool = True,
@@ -235,6 +238,7 @@ def translate_document(
         scope=scope,
         memory=memory,
         glossary=glossary,
+        checkpoint=checkpoint,
         workers=max(1, int(workers)),
         rate_limit_per_second=rate_limit_per_second,
         fuzzy_threshold=fuzzy_threshold,
@@ -340,6 +344,7 @@ class _Runner:
         scope: Optional[Scope],
         memory: Optional[TranslationMemory],
         glossary: Optional[Glossary],
+        checkpoint: Optional[CheckpointStore] = None,
         workers: int,
         rate_limit_per_second: Optional[float] = None,
         fuzzy_threshold: Optional[float] = None,
@@ -355,6 +360,7 @@ class _Runner:
         self.scope = scope
         self.memory = memory
         self.glossary = glossary
+        self.checkpoint = checkpoint
         self.workers = workers
         self.fuzzy_threshold = fuzzy_threshold
         self.fuzzy_max_results = fuzzy_max_results
@@ -365,6 +371,11 @@ class _Runner:
             else None
         )
 
+        # Checkpoint data: loaded once at init for O(1) lookups during classify.
+        self._checkpoint_data: Dict[int, dict] = {}
+        if self.checkpoint is not None and self.checkpoint.exists():
+            self._checkpoint_data = self.checkpoint.load()
+
         # Run-time state
         self._summaries: Dict[str, SheetSummary] = {}
         self._statuses: List[Optional[StatusEntry]] = [None] * len(doc.entries)
@@ -374,6 +385,7 @@ class _Runner:
         self._cached = 0
         self._deduped = 0
         self._fuzzy_accepted = 0
+        self._resumed = 0
         self._completed_for_eta = 0
         self._started = time.monotonic()
 
@@ -450,6 +462,12 @@ class _Runner:
         self.doc.entries = [e for e in self._new_entries if e is not None]
 
         statuses = [s for s in self._statuses if s is not None]
+
+        # Clear checkpoint on successful completion (no gaps, no cancel).
+        cancelled = self.cancel is not None and self.cancel()
+        if self.checkpoint is not None and not cancelled:
+            self.checkpoint.clear()
+
         return TranslationResult(
             document=self.doc,
             summaries=list(self._summaries.values()),
@@ -459,6 +477,7 @@ class _Runner:
             cached_count=self._cached,
             deduped_count=self._deduped,
             fuzzy_accepted_count=self._fuzzy_accepted,
+            resumed_count=self._resumed,
             target_lang=self.target_lang,
         )
 
@@ -483,6 +502,28 @@ class _Runner:
             self._fill(index, entry, sheet, "Skipped (out of scope)", summary)
             summary.skipped_rows += 1
             self._skipped += 1
+            return "done"
+
+        # Checkpoint resume: if this index was previously translated, restore
+        # from checkpoint data and skip re-translation entirely.
+        if index in self._checkpoint_data:
+            cp = self._checkpoint_data[index]
+            translation = cp.get("translation", "")
+            new_entry = Entry(key=entry.key, label=entry.label, translation=translation)
+            self._new_entries[index] = new_entry
+            status = "Resumed from checkpoint"
+            self._statuses[index] = StatusEntry(
+                sheet_name=sheet,
+                row_index=index + 2,
+                key=entry.key,
+                label=entry.label,
+                translation=translation,
+                status=status,
+            )
+            summary.translated_rows += 1
+            self._translated += 1
+            self._resumed += 1
+            self._emit_progress(index, entry.key, sheet, status, entry.label, translation)
             return "done"
 
         if entry.translation.strip():
@@ -743,6 +784,12 @@ class _Runner:
                 self._deduped += 1
             if from_fuzzy:
                 self._fuzzy_accepted += 1
+        # Persist to checkpoint after filling the slot.
+        if self.checkpoint is not None:
+            try:
+                self.checkpoint.save_progress(index, entry.key, translation, status)
+            except Exception:  # noqa: BLE001
+                LOGGER.debug("Checkpoint save failed for index %d", index, exc_info=True)
         self._emit_progress(
             index, entry.key, sheet, status, entry.label, translation, from_fuzzy=from_fuzzy
         )

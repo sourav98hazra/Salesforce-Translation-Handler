@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Session persistence across sessions: enable users to save and restore the entire application state (project file) so they can close the app and resume exactly where they left off. Provide a versioned JSON project file format, a toggle in settings, reset/restart controls, and session isolation by file path.",
+  "status": "pending",
+  "steps": [
+    "1. Create src/stx/session.py - a new module with a SessionManager class. The project file format is a versioned JSON file (.stxproj) containing: version (int, starts at 1), source_file_path, document state (serialized entries as list of dicts with key/label/translation/approved), target_language_code, target_language_name, source_language_code, backend_key, scope (serialized), glossary_path, memory_path, translation_summaries (list of dicts), translation_statuses (list of dicts), phase_status (list of ints), undo_stack (list of UndoCommand dicts), pending_edits, and a file_hash (SHA256 of original source file for session isolation).",
+    "2. Add SessionManager methods: save(state: AppState, path: Path) - serializes AppState to the project file format; load(path: Path) -> AppState - deserializes a project file back into an AppState; auto_save_path(source_path: Path) -> Path - returns the auto-save location (~/.cache/salesforce-translation-handler/sessions/<hash>.stxproj); has_session(source_path: Path) -> bool - checks if an auto-save exists for this source; clear_session(source_path: Path) - removes the auto-save; clear_all_sessions() - wipes the sessions directory; validate_version(data: dict) -> bool - checks the version field is compatible.",
+    "3. Add settings keys to src/stx/gui/settings.py: session_persistence_enabled (bool, default False) under 'session/enabled'. This is the user toggle.",
+    "4. Update src/stx/gui/settings_dialog.py to add a 'Session persistence' checkbox in the General section. When enabled, the app auto-saves state on exit and restores on launch. Include a tooltip explaining the behavior.",
+    "5. Update src/stx/gui/main_window.py closeEvent() to auto-save the session (if persistence is enabled and a document is loaded). Add a 'Restart session' action to the File menu that calls SessionManager.clear_session() for the current source and resets AppState to Phase 1 defaults. On __init__(), if persistence is enabled and a session exists for the last-opened file, offer to restore it (or auto-restore silently).",
+    "6. Add a 'Reset session' / 'New project' button or File menu entry that clears any saved state and returns to Phase 1 with a fresh AppState.",
+    "7. Ensure session isolation: the auto-save path is derived from the SHA256 hash of the source file's absolute path. Loading a different STF/Excel starts a fresh session. The project file stores the original source path and verifies it still matches on restore.",
+    "8. Add CLI commands: 'stx session save <source> <project-file>' to manually save a project snapshot, 'stx session load <project-file>' to display info about a saved session, 'stx session reset <source>' to clear any auto-saved session for a file.",
+    "9. Write tests/test_session.py with tests: test save/load round-trip preserves document entries and state fields, test session isolation (different source files get different sessions), test clear_session removes the file, test version validation rejects unknown versions, test auto_save_path is deterministic for the same source, test settings toggle controls whether persistence is active.",
+    "10. Ensure the serialization handles the frozen Entry dataclass correctly (convert to/from dict), handles Optional fields gracefully (None values), and includes the UndoStack commands if available (or empty list if no undo history)."
+  ],
+  "acceptance_criteria": [
+    "Running `pytest tests/test_session.py -q` passes all new tests",
+    "Running `pytest -q` passes all tests (existing + new session + checkpoint tests)",
+    "SessionManager.save() produces a valid JSON .stxproj file with version: 1",
+    "SessionManager.load() restores document entries, language settings, phase status, and translation audit data",
+    "Session isolation works: auto-save paths differ for different source files",
+    "The settings toggle controls whether auto-save happens on close",
+    "Reset session clears saved state and returns to Phase 1",
+    "The project file format includes a version field for future migration"
+  ],
+  "verification": [
+    "Run `pytest tests/test_session.py -q` and confirm all tests pass",
+    "Run `pytest -q` and confirm all tests pass with no regressions"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

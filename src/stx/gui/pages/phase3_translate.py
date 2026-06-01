@@ -37,6 +37,7 @@ from ...languages import (
     supported_language_names,
 )
 from ...memory import TranslationMemory, default_tm_path
+from ...checkpoint import CheckpointStore
 from ...scope import Scope, StatusFilter
 from .. import settings as gui_settings
 from .. import secrets as gui_secrets
@@ -377,6 +378,12 @@ class Phase3TranslatePage(PhasePage):
             "Progress and live source/translation pairs appear in the feed below."
         )
         self._start_btn.clicked.connect(self._on_start)
+        self._reset_checkpoint_btn = QPushButton("Reset progress")
+        self._reset_checkpoint_btn.setToolTip(
+            "Clear any saved checkpoint so the next run starts fresh "
+            "instead of resuming from the last interrupted position."
+        )
+        self._reset_checkpoint_btn.clicked.connect(self._on_reset_checkpoint)
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.setToolTip(
@@ -404,6 +411,7 @@ class Phase3TranslatePage(PhasePage):
 
         self.add_layout(make_action_row(
             self._start_btn,
+            self._reset_checkpoint_btn,
             self._cancel_btn,
             self._save_copy_btn,
             self._load_btn,
@@ -599,6 +607,7 @@ class Phase3TranslatePage(PhasePage):
             scope=scope,
             memory=memory,
             glossary=glossary,
+            checkpoint=self._build_checkpoint(),
             workers=workers,
             rate_limit_per_second=rate_limit,
             prevent_system_sleep=prevent_sleep,
@@ -678,6 +687,7 @@ class Phase3TranslatePage(PhasePage):
         self._log.appendPlainText(
             f"Translated: {done.translated_count} | TM hits: {done.cached_count} | "
             f"Deduped: {done.deduped_count} | Skipped: {done.skipped_count}"
+            + (f" | Resumed: {done.resumed_count}" if done.resumed_count else "")
         )
         self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
 
@@ -688,6 +698,7 @@ class Phase3TranslatePage(PhasePage):
             f"Translation complete -- click 'Save copy to...' to save the translated file.  "
             f"Translated {done.translated_count:,} "
             f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
+            f"resumed {done.resumed_count:,}, "
             f"skipped {done.skipped_count:,}) in {elapsed:.1f}s."
         )
         self._eta_label.setText(msg)
@@ -833,6 +844,26 @@ class Phase3TranslatePage(PhasePage):
         worker.start()
 
     # ------------------------------------------------------------------ helpers
+
+    def _build_checkpoint(self) -> Optional[CheckpointStore]:
+        """Create a CheckpointStore for the current document and target language."""
+        source_path = self._state.organized_xlsx_path or self._state.source_stf_path
+        if source_path is None:
+            return None
+        target_code = self._state.target_language_code or "ja"
+        return CheckpointStore(
+            source_file=str(Path(source_path).resolve()),
+            target_lang=target_code,
+        )
+
+    def _on_reset_checkpoint(self) -> None:
+        """Clear any existing checkpoint file so the next run starts fresh."""
+        cp = self._build_checkpoint()
+        if cp is not None and cp.exists():
+            cp.clear()
+            self.status_message.emit("Checkpoint cleared -- next run will start fresh.")
+        else:
+            self.status_message.emit("No checkpoint to clear.")
 
     def _get_fuzzy_threshold(self) -> Optional[float]:
         """Read fuzzy threshold from settings; returns None if disabled (0)."""

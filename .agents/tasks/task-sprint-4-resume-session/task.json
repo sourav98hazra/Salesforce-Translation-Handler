@@ -1,0 +1,7 @@
+{
+  "task_id": "task-sprint-4-resume-session",
+  "task_description": "Sprint 4: Implement resume-after-crash (checkpoint-based translation progress persistence) and full session persistence across app sessions. Feature 3 (checkpoint/resume) must be implemented first as Feature 7 (session persistence) builds on it.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

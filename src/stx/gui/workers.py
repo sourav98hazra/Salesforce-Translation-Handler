@@ -25,6 +25,8 @@ from ..model import Document
 from ..stf import parse_stf, write_stf_files
 from ..translate import TranslationProgress, make_backend, translate_document
 
+from ..checkpoint import CheckpointStore
+
 
 # ---------------------------------------------------------------------------
 # Generic "run a callable in a thread" worker
@@ -128,6 +130,7 @@ class TranslationDone:
     cached_count: int = 0
     deduped_count: int = 0
     fuzzy_accepted_count: int = 0
+    resumed_count: int = 0
     elapsed_seconds: float = 0.0
 
 
@@ -170,6 +173,7 @@ class TranslationWorker(QThread):
         scope=None,
         memory=None,
         glossary=None,
+        checkpoint: Optional[CheckpointStore] = None,
         workers: int = 4,
         rate_limit_per_second=8.0,
         prevent_system_sleep: bool = True,
@@ -187,6 +191,7 @@ class TranslationWorker(QThread):
         self._scope = scope
         self._memory = memory
         self._glossary = glossary
+        self._checkpoint = checkpoint
         self._workers = workers
         self._rate_limit = rate_limit_per_second
         self._prevent_sleep = prevent_system_sleep
@@ -247,6 +252,7 @@ class TranslationWorker(QThread):
                 scope=self._scope,
                 memory=self._memory,
                 glossary=self._glossary,
+                checkpoint=self._checkpoint,
                 workers=self._workers,
                 rate_limit_per_second=self._rate_limit,
                 prevent_system_sleep=self._prevent_sleep,
@@ -269,6 +275,7 @@ class TranslationWorker(QThread):
                 cached_count=result.cached_count,
                 deduped_count=result.deduped_count,
                 fuzzy_accepted_count=result.fuzzy_accepted_count,
+                resumed_count=result.resumed_count,
                 elapsed_seconds=result.elapsed_seconds,
             )
         )

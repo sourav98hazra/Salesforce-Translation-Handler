@@ -60,6 +60,7 @@ from rich.progress import (
 from rich.table import Table
 
 from . import __version__
+from .checkpoint import CheckpointStore
 from .excel import (
     export_document_to_excel,
     import_document_from_excel,
@@ -236,6 +237,12 @@ def translate(
     fuzzy_auto_accept: float = typer.Option(
         90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
     ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="Resume from checkpoint if available."
+    ),
+    reset_checkpoint: bool = typer.Option(
+        False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
+    ),
 ) -> None:
     """Phase 3: translate every untranslated row in an organised Excel workbook."""
 
@@ -262,9 +269,20 @@ def translate(
     google_target = to_google_code(target)
     rate = rate_limit if rate_limit > 0 else None
 
+    # Checkpoint setup
+    checkpoint: Optional[CheckpointStore] = None
+    if resume:
+        checkpoint = CheckpointStore(
+            source_file=str(xlsx_in.resolve()),
+            target_lang=google_target,
+        )
+        if reset_checkpoint:
+            checkpoint.clear()
+
     result = _run_translation_with_progress(
         doc, translator, google_source, google_target,
         scope=scope, memory=memory, glossary=glossary,
+        checkpoint=checkpoint,
         workers=workers, rate_limit_per_second=rate,
         fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
         fuzzy_max_results=fuzzy_max_results,
@@ -278,10 +296,11 @@ def translate(
         status_rows=[s.as_audit_row() for s in result.statuses],
     )
 
+    resumed_info = f", resumed {result.resumed_count:,}" if result.resumed_count else ""
     console.print(
         f"[green]OK[/green] Translated {result.translated_count:,} "
         f"(TM hits {result.cached_count:,}, fuzzy {result.fuzzy_accepted_count:,}, "
-        f"dedup {result.deduped_count:,}); "
+        f"dedup {result.deduped_count:,}{resumed_info}); "
         f"skipped {result.skipped_count:,}; "
         f"elapsed {result.elapsed_seconds:.1f}s; output: [bold]{xlsx_out}[/bold]"
     )
@@ -345,6 +364,12 @@ def run_pipeline(
     fuzzy_auto_accept: float = typer.Option(
         90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
     ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="Resume from checkpoint if available."
+    ),
+    reset_checkpoint: bool = typer.Option(
+        False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
+    ),
 ) -> None:
     """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF."""
 
@@ -384,10 +409,22 @@ def run_pipeline(
             console.rule(f"[bold]Phase 3: translate -> {target_code}[/bold]")
             per_lang_doc = parse_stf(stf_in)
             translated_xlsx = output_dir / f"02_translated_{target_code}.xlsx"
+
+            # Checkpoint setup per target language
+            checkpoint: Optional[CheckpointStore] = None
+            if resume:
+                checkpoint = CheckpointStore(
+                    source_file=str(stf_in.resolve()),
+                    target_lang=to_google_code(target_code),
+                )
+                if reset_checkpoint:
+                    checkpoint.clear()
+
             result = _run_translation_with_progress(
                 per_lang_doc, translator,
                 to_google_code(source), to_google_code(target_code),
                 scope=scope, memory=memory, glossary=glossary,
+                checkpoint=checkpoint,
                 workers=workers, rate_limit_per_second=rate,
                 fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
                 fuzzy_max_results=fuzzy_max_results,
@@ -405,6 +442,7 @@ def run_pipeline(
                 f"TM hits={result.cached_count:,}, "
                 f"fuzzy={result.fuzzy_accepted_count:,}, "
                 f"dedup={result.deduped_count:,}, "
+                f"resumed={result.resumed_count:,}, "
                 f"skipped={result.skipped_count:,})"
             )
 
@@ -748,6 +786,7 @@ def _run_translation_with_progress(
     doc, translator, source: str, target: str,
     *,
     scope=None, memory=None, glossary=None,
+    checkpoint=None,
     workers: int = 4, rate_limit_per_second=8.0,
     fuzzy_threshold=None, fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
@@ -778,6 +817,7 @@ def _run_translation_with_progress(
             source_lang=source, target_lang=target,
             progress=on_progress,
             scope=scope, memory=memory, glossary=glossary,
+            checkpoint=checkpoint,
             workers=workers, rate_limit_per_second=rate_limit_per_second,
             fuzzy_threshold=fuzzy_threshold,
             fuzzy_max_results=fuzzy_max_results,
