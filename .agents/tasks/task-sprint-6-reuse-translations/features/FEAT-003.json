@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Feature 11: Implement retranslation control - allow users to decide whether existing translations in an STF/Excel file should be kept or retranslated. Add CLI flag --retranslate-existing. Provide row-level retranslation control in Phase 4 review. Modify the runner to support a 'retranslate_existing' mode that clears existing translations before sending to backend.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Modify src/stx/translate/runner.py: add retranslate_existing: bool = False parameter to translate_document() and _Runner.__init__(). When True, the _classify() method should NOT skip rows that already have translations (remove the 'already translated' skip logic for those rows). Track retranslated_count in TranslationResult.",
     "Modify src/stx/cli.py: add --retranslate-existing flag (bool, default False) to the translate and run commands. When set, pass retranslate_existing=True to translate_document(). Print info about retranslating existing translations in the output summary.",
@@ -28,5 +28,5 @@
     "pytest -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 343 tests pass (329 existing + 14 new). The retranslate_existing parameter is threaded through translate_document, translate_document_multi, _Runner, CLI (translate and run commands), GUI workers, and Phase 3 page. Imported translations still take highest priority even with retranslate_existing=True. The retranslated_count field tracks how many rows with pre-existing translations were retranslated. Phase 4 has a context menu action 'Clear for retranslation' that sets translation to empty string."
 }
