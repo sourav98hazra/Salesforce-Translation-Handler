@@ -55,6 +55,20 @@ The sidebar status badges show which phases have been completed (`✓`), are run
 
 Drag-and-drop also works: drop an `.stf` or `.xlsx` anywhere in the window and the app routes to the right phase.
 
+### Active workflow context
+
+The app maintains one **active workflow context** at a time. When you load a file in any phase, a workflow begins from that phase. The app tracks both the original source path and the current working artifact, so every subsequent phase uses the correct file automatically.
+
+**Key behaviours:**
+
+- **Continue buttons** pass the same active document forward without reloading.
+- If you load a **different file** while a workflow is already active, an **override confirmation dialog** appears asking whether to replace the current workflow.
+- If you have **unsaved changes**, you are offered three choices: Save and Override, Discard and Override, or Cancel.
+- On override, all stale state is cleared (translation progress, validation reports, audit data, export paths, filters) so downstream phases never mix old data with the new file.
+- Cancelling the override leaves the current workflow unchanged.
+
+This prevents accidental data loss and ensures that the export in Phase 6 always matches the file you are actually working with.
+
 ---
 
 ## 3. The six phases

@@ -233,6 +233,10 @@ Every phase has a **Load existing ...** button so you can re-enter the
 workflow from any saved artifact (e.g. drop in an Excel a colleague
 edited externally and continue from phase 4).
 
+The app maintains one **active workflow context** at a time. Loading a
+different file while a workflow is active shows an override confirmation
+dialog, preventing accidental data loss or mixing old state with a new file.
+
 ---
 
 ## Running from the command line
