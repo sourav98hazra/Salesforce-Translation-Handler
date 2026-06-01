@@ -383,9 +383,10 @@ before import (the validator surfaces all of them with their keys).
 ## Legacy scripts
 
 The original PowerShell + Python scripts (`stftoexcel_v2.ps1`,
-`translate_excel_fixed.py`, `ExcelToSTFV2.ps1`) are retained at the repo
-root for reference. The new application produces output that those
-scripts can still consume, and vice versa.
+`translate_excel_fixed.py`, `ExcelToSTFV2.ps1`) that this application
+replaces are no longer included in the repository.  The application
+produces output that is byte-compatible with those scripts' formats,
+so existing Salesforce import workflows continue to work unchanged.
 
 ---
 
