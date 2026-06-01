@@ -1,7 +1,14 @@
 {
   "task_id": "task-sprint-4-resume-session",
   "task_description": "Sprint 4: Implement resume-after-crash (checkpoint-based translation progress persistence) and full session persistence across app sessions. Feature 3 (checkpoint/resume) must be implemented first as Feature 7 (session persistence) builds on it.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 264 tests pass (219 original + 14 checkpoint + 27 session + 4 review-fix tests). Code reviewed and critical race condition fixed. No regressions."
+  }
 }
