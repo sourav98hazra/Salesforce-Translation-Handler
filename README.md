@@ -389,6 +389,21 @@ scripts can still consume, and vice versa.
 
 ---
 
+## Windows Installer
+
+For creating a distributable Windows installer (with Start Menu shortcuts,
+uninstaller, and optional code-signing), see [`docs/INSTALLER.md`](docs/INSTALLER.md).
+
+Quick build:
+
+```bash
+python installer/build_installer.py
+```
+
+This produces `dist/installer/SalesforceTranslationHandler_Setup_1.5.0.exe`.
+
+---
+
 ## License
 
 MIT
