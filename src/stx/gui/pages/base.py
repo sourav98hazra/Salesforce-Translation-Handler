@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import date as _date
 from pathlib import Path
 from typing import Optional
 
@@ -19,6 +21,90 @@ from PySide6.QtWidgets import (
 )
 
 from ..state import AppState
+
+# Stage tokens previously appended to artifact filenames.  Stripped from a
+# stem before building a fresh professional name so re-saving never stacks
+# suffixes like ``file_Organized_Translated_ja_...``.
+_STAGE_TOKENS = (
+    "organized",
+    "organised",
+    "translated",
+    "reviewed",
+    "validated",
+    "fixed",
+    "copy",
+)
+
+_STAGE_LABELS = {
+    "organized": ("Organized", False),
+    "translated": ("Translated", True),
+    "reviewed": ("Reviewed", True),
+    "validated": ("Validated", True),
+}
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_CODE_RE = re.compile(r"^[a-z]{2,3}(_[a-z]{2,4})?$")
+
+
+def clean_source_stem(stem: str) -> str:
+    """Strip previously-appended stage / date / language-code tokens.
+
+    Keeps re-saving a derived workbook from producing names like
+    ``file_Organized_Translated_ja_2024-01-01`` -- we always rebuild from
+    the original source stem.
+    """
+    parts = stem.split("_")
+    changed = True
+    while changed and len(parts) > 1:
+        changed = False
+        last = parts[-1]
+        low = last.lower()
+        if _DATE_RE.match(last):
+            parts.pop()
+            changed = True
+            continue
+        if low in _STAGE_TOKENS:
+            parts.pop()
+            changed = True
+            continue
+        # A short language code is only stripped when it directly follows a
+        # stage word (e.g. ``..._Translated_ja``), never a normal stem word.
+        if (
+            _CODE_RE.match(low)
+            and len(parts) >= 2
+            and parts[-2].lower() in _STAGE_TOKENS
+        ):
+            parts.pop()
+            changed = True
+            continue
+    return "_".join(parts) if parts else stem
+
+
+def default_output_filename(
+    source_stem: str,
+    stage: str,
+    target_code: Optional[str] = None,
+    *,
+    today: Optional[_date] = None,
+    suffix: str = ".xlsx",
+) -> str:
+    """Build a professional, dated default save filename.
+
+    Patterns (``<stem>`` is the cleaned original source stem)::
+
+        organized   -> <stem>_Organized_<YYYY-MM-DD>.xlsx
+        translated  -> <stem>_Translated_<code>_<YYYY-MM-DD>.xlsx
+        reviewed    -> <stem>_Reviewed_<code>_<YYYY-MM-DD>.xlsx
+        validated   -> <stem>_Validated_<code>_<YYYY-MM-DD>.xlsx
+    """
+    label, needs_code = _STAGE_LABELS.get(stage, (stage.capitalize(), False))
+    stem = clean_source_stem(source_stem) or "workbook"
+    day = (today or _date.today()).strftime("%Y-%m-%d")
+    parts = [stem, label]
+    if needs_code and target_code:
+        parts.append(target_code)
+    parts.append(day)
+    return "_".join(parts) + suffix
 
 
 class PhasePage(QWidget):
@@ -182,6 +268,30 @@ class PhasePage(QWidget):
             str(start_dir or self._state.output_dir or Path.cwd()),
         )
         return Path(path_str) if path_str else None
+
+    # ------------------------------------------------------------------ default save names
+
+    def default_save_name(self, stage: str, suffix: str = ".xlsx") -> str:
+        """Build a professional dated default filename for a save dialog.
+
+        Derives the stem from the original source artifact (falling back to
+        any organised / translated / reviewed path) and appends the stage
+        label, target language code (where relevant), and today's date.
+        See :func:`default_output_filename`.
+        """
+        base = (
+            self._state.source_stf_path
+            or self._state.organized_xlsx_path
+            or self._state.translated_xlsx_path
+            or self._state.reviewed_xlsx_path
+        )
+        stem = Path(base).stem if base else "workbook"
+        return default_output_filename(
+            stem,
+            stage,
+            self._state.target_language_code,
+            suffix=suffix,
+        )
 
     # ------------------------------------------------------------------ workflow override
 

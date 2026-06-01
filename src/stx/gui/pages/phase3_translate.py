@@ -872,13 +872,8 @@ class Phase3TranslatePage(PhasePage):
         if self.is_busy:
             return
 
-        # Suggest a default filename based on the source/organised file.
-        suggested_path = self._state.translated_xlsx_path
-        if suggested_path is None:
-            base = self._state.organized_xlsx_path or self._state.source_stf_path
-            if base is not None:
-                suggested_path = Path(str(Path(base).with_suffix("")) + "_translated.xlsx")
-        suggested_name = suggested_path.name if suggested_path else "translated.xlsx"
+        # Suggest a professional, dated default filename based on the source.
+        suggested_name = self.default_save_name("translated")
 
         path = self.pick_save_file(
             "Save translated workbook as",

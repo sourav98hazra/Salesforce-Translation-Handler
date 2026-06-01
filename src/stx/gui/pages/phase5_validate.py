@@ -587,7 +587,7 @@ class Phase5ValidatePage(PhasePage):
     def _on_save(self) -> None:
         if self._state.document is None or self.is_busy:
             return
-        path = self.pick_save_file("Save fixed workbook as", "Excel files (*.xlsx)", "fixed.xlsx")
+        path = self.pick_save_file("Save fixed workbook as", "Excel files (*.xlsx)", self.default_save_name("validated"))
         if not path:
             return
         if path.suffix.lower() != ".xlsx":

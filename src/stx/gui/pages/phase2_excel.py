@@ -120,14 +120,14 @@ class Phase2ExcelPage(PhasePage):
         if self._state.document is None:
             self.warn("Load an STF file in Phase 1 first.")
             return
-        # Auto-generate output path: source stem + "_organized.xlsx" in same folder
-        src = self._state.source_stf_path
-        if src is not None:
-            path = Path(str(src.with_suffix("")) + "_organized.xlsx")
+        # Auto-generate output path: professional dated name in the source folder.
+        name = self.default_save_name("organized")
+        if self._state.source_stf_path is not None:
+            path = self._state.source_stf_path.parent / name
         elif self._state.output_dir:
-            path = self._state.output_dir / "organized.xlsx"
+            path = Path(self._state.output_dir) / name
         else:
-            path = Path("organized.xlsx")
+            path = Path(name)
         if path.suffix.lower() != ".xlsx":
             path = path.with_suffix(".xlsx")
 
@@ -177,9 +177,7 @@ class Phase2ExcelPage(PhasePage):
         if self._state.document is None:
             self.warn("Convert the document first before saving a copy.")
             return
-        suggested_name = "organized_copy.xlsx"
-        if self._state.organized_xlsx_path is not None:
-            suggested_name = self._state.organized_xlsx_path.name
+        suggested_name = self.default_save_name("organized")
         path = self.pick_save_file(
             "Save additional copy as", "Excel files (*.xlsx)", suggested_name
         )

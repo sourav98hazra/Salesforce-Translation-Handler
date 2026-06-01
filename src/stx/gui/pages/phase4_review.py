@@ -964,7 +964,7 @@ class Phase4ReviewPage(PhasePage):
         if self._state.document is None or self.is_busy:
             return
         path = self.pick_save_file(
-            "Save reviewed workbook as", "Excel files (*.xlsx)", "reviewed.xlsx"
+            "Save reviewed workbook as", "Excel files (*.xlsx)", self.default_save_name("reviewed")
         )
         if not path:
             return
