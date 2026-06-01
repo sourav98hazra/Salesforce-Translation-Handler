@@ -570,7 +570,7 @@ class Phase3TranslatePage(PhasePage):
         self._deduped_count = 0
         self._skipped_count = 0
         self._current_row = 0
-        self._total_rows = scope.estimate_count(self._state.document)
+        self._total_rows = len(self._state.document.entries)
         self._start_time = time.time()
         self._log.clear()
 

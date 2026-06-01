@@ -52,13 +52,21 @@ def make_backend(key: str, **kwargs) -> Translator:
     return factory(**kwargs)
 
 
-def check_backend_available(key: str) -> tuple[bool, str]:
+def check_backend_available(key: str, api_key: Optional[str] = None) -> tuple[bool, str]:
     """Check whether a backend is ready to use.
 
     Returns a ``(available, reason)`` tuple.  If the backend is ready,
     ``available`` is True and ``reason`` is an empty string.  Otherwise,
     ``reason`` describes what is missing (SDK not installed, API key not
     configured, etc.).
+
+    Parameters
+    ----------
+    key:
+        Backend identifier (e.g. ``"deepl"``).
+    api_key:
+        Optional API key to consider available (e.g. from keyring or the
+        settings field).  If provided, the env-var check is skipped.
     """
     if key not in _REGISTRY:
         available_keys = ", ".join(_REGISTRY.keys())
@@ -87,6 +95,9 @@ def check_backend_available(key: str) -> tuple[bool, str]:
 
     # Check API key availability for backends that require one.
     if info.requires_api_key:
+        # If a key was explicitly provided (from keyring or UI field), that counts.
+        if api_key:
+            return True, ""
         import os
         env_value = os.environ.get(info.env_var or "", "")
         if not env_value:

@@ -308,8 +308,14 @@ class SettingsDialog(QDialog):
         backend = self._backend_combo.currentData() or "google"
         api_key = self._api_key_field.text().strip()
         if self._remember_key_check.isChecked() and api_key:
-            gui_secrets.store_api_key(backend, api_key)
-            gui_settings.set_str(f"translation/remember_api_key_{backend}", "1")
+            stored = gui_secrets.store_api_key(backend, api_key)
+            if stored:
+                gui_settings.set_str(f"translation/remember_api_key_{backend}", "1")
+            else:
+                # Storage failed -- don't set the remember flag so next launch
+                # doesn't expect to find a key in keyring.
+                gui_settings.set_str(f"translation/remember_api_key_{backend}", "0")
+                self._remember_key_check.setChecked(False)
         else:
             gui_secrets.delete_api_key(backend)
             gui_settings.set_str(f"translation/remember_api_key_{backend}", "0")
@@ -375,7 +381,10 @@ class SettingsDialog(QDialog):
             self._backend_status.setText("\u2705 Ready (API key provided in field above)")
             self._backend_status.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
             return
-        available, reason = check_backend_available(key)
+        # Also check keyring for a stored key so the status is accurate
+        # on dialog open before the user types anything.
+        stored_key = gui_secrets.retrieve_api_key(key) if (info and info.requires_api_key) else None
+        available, reason = check_backend_available(key, api_key=stored_key)
         if available:
             self._backend_status.setText("\u2705 Ready")
             self._backend_status.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
