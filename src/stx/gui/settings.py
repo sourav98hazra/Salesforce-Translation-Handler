@@ -45,6 +45,7 @@ class SettingsKeys:
     fuzzy_threshold: str = "translation/fuzzy_threshold"
     fuzzy_max_results: str = "translation/fuzzy_max_results"
     fuzzy_auto_accept: str = "translation/fuzzy_auto_accept"
+    session_enabled: str = "session/enabled"
 
 
 KEYS = SettingsKeys()
@@ -134,3 +135,18 @@ def remembered_output_dir(default: str = "") -> str:
 
 def remember_output_dir(path: str | Path) -> None:
     set_str(KEYS.output_dir, str(path))
+
+
+# ---------------------------------------------------------------------------
+# Session persistence helpers
+# ---------------------------------------------------------------------------
+
+def get_session_enabled() -> bool:
+    """Return True if session persistence is enabled."""
+    val = settings().value(KEYS.session_enabled, "false")
+    return str(val).lower() in {"1", "true"}
+
+
+def set_session_enabled(value: bool) -> None:
+    """Set whether session persistence is enabled."""
+    settings().setValue(KEYS.session_enabled, "true" if value else "false")

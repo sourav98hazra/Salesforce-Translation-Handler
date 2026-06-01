@@ -52,6 +52,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__
+from ..session import SessionManager
 from ..stf import parse_stf
 from . import settings as gui_settings
 from . import theme
@@ -159,6 +160,10 @@ class MainWindow(QMainWindow):
         # ---- restore window geometry / theme from settings
         self._apply_remembered_theme()
         self._restore_geometry()
+
+        # ---- session persistence: attempt restore
+        self._session_manager = SessionManager()
+        self._try_restore_session()
 
         self._goto(0)
 
@@ -360,6 +365,25 @@ class MainWindow(QMainWindow):
         self._recent_menu = QMenu("Recent files", self)
         file_menu.addMenu(self._recent_menu)
         self._refresh_recent_menu()
+
+        file_menu.addSeparator()
+
+        save_project_action = QAction("Save &project...", self)
+        save_project_action.setToolTip("Save the full session state to a .stxproj file")
+        save_project_action.triggered.connect(self._action_save_project)
+        file_menu.addAction(save_project_action)
+
+        open_project_action = QAction("Open p&roject...", self)
+        open_project_action.setToolTip("Open a previously saved .stxproj project file")
+        open_project_action.triggered.connect(self._action_open_project)
+        file_menu.addAction(open_project_action)
+
+        file_menu.addSeparator()
+
+        restart_action = QAction("Restart session", self)
+        restart_action.setToolTip("Clear saved session and reset to defaults")
+        restart_action.triggered.connect(self._action_restart_session)
+        file_menu.addAction(restart_action)
 
         file_menu.addSeparator()
         quit_action = QAction("&Quit", self)
@@ -685,6 +709,16 @@ class MainWindow(QMainWindow):
             self.restoreState(state)
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        # Auto-save session if persistence is enabled and a document is loaded
+        if gui_settings.get_session_enabled() and self._state.document is not None:
+            source = self._state.source_stf_path
+            if source is not None:
+                try:
+                    save_path = self._session_manager.auto_save_path(source)
+                    self._session_manager.save(self._state, save_path)
+                except Exception:  # noqa: BLE001
+                    pass  # best effort -- do not block window close
+
         s = gui_settings.settings()
         s.setValue(gui_settings.KEYS.window_geometry, self.saveGeometry())
         s.setValue(gui_settings.KEYS.window_state, self.saveState())
@@ -695,3 +729,122 @@ class MainWindow(QMainWindow):
 
         dialog = AboutDialog(self)
         dialog.exec()
+
+    # ------------------------------------------------------------------ session persistence
+
+    def _try_restore_session(self) -> None:
+        """Attempt to restore session state from auto-save on startup."""
+        if not gui_settings.get_session_enabled():
+            return
+
+        # Check the most recent file to see if a session exists
+        recent = gui_settings.get_recent_files()
+        if not recent:
+            return
+
+        last_path = Path(recent[0])
+        if not self._session_manager.has_session(last_path):
+            return
+
+        try:
+            save_path = self._session_manager.auto_save_path(last_path)
+            session_data = self._session_manager.load(save_path)
+            self._apply_session_data(session_data)
+        except Exception:  # noqa: BLE001
+            pass  # silently skip restore on failure
+
+    def _apply_session_data(self, data: dict) -> None:
+        """Apply loaded session data to the current AppState."""
+        if data.get("document") is not None:
+            self._state.document = data["document"]
+
+        source_path = data.get("source_file_path")
+        if source_path:
+            self._state.source_stf_path = Path(source_path)
+
+        self._state.target_language_code = data.get("target_language_code", "ja")
+        self._state.target_language_name = data.get("target_language_name", "Japanese")
+        self._state.source_language_code = data.get("source_language_code", "en")
+        self._state.backend_key = data.get("backend_key", "google")
+
+        scope_path = data.get("scope_path")
+        self._state.scope_path = Path(scope_path) if scope_path else None
+
+        glossary_path = data.get("glossary_path")
+        self._state.glossary_path = Path(glossary_path) if glossary_path else None
+
+        memory_path = data.get("memory_path")
+        self._state.memory_path = Path(memory_path) if memory_path else None
+
+        self._state.translation_summaries = data.get("translation_summaries", [])
+        self._state.translation_statuses = data.get("translation_statuses", [])
+
+        phase_status = data.get("phase_status", [0] * 6)
+        from .state import PhaseStatus as PS
+        for i, val in enumerate(phase_status):
+            if i < len(self._state.phase_status):
+                self._state.phase_status[i] = PS(val)
+
+    def _action_save_project(self) -> None:
+        """Save the current session to a user-chosen .stxproj file."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path_str, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save project",
+            "",
+            "STX Project (*.stxproj);;All files (*)",
+        )
+        if path_str:
+            try:
+                self._session_manager.save(self._state, Path(path_str))
+                self._log(f"Project saved to {Path(path_str).name}")
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "Save failed", str(exc))
+
+    def _action_open_project(self) -> None:
+        """Open a .stxproj project file and restore its state."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open project",
+            "",
+            "STX Project (*.stxproj);;All files (*)",
+        )
+        if path_str:
+            try:
+                data = self._session_manager.load(Path(path_str))
+                self._apply_session_data(data)
+                self._refresh_phase_badges()
+                self._update_sidebar_footer()
+                self._goto(0)
+                self._log(f"Project restored from {Path(path_str).name}")
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "Load failed", str(exc))
+
+    def _action_restart_session(self) -> None:
+        """Clear the current session and reset to defaults."""
+        # Clear auto-save
+        if self._state.source_stf_path is not None:
+            self._session_manager.clear_session(self._state.source_stf_path)
+
+        # Reset state
+        self._state.document = None
+        self._state.source_stf_path = None
+        self._state.organized_xlsx_path = None
+        self._state.translated_xlsx_path = None
+        self._state.reviewed_xlsx_path = None
+        self._state.output_dir = None
+        self._state.translation_summaries = []
+        self._state.translation_statuses = []
+        self._state.source_language_code = "en"
+        self._state.target_language_code = "ja"
+        self._state.target_language_name = "Japanese"
+        from .state import PhaseStatus as PS
+        self._state.phase_status = [PS.IDLE for _ in range(6)]
+
+        self._refresh_phase_badges()
+        self._update_sidebar_footer()
+        self._goto(0)
+        self._log("Session reset to defaults.")

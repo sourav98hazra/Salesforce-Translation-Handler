@@ -296,6 +296,24 @@ class SettingsDialog(QDialog):
         theme_form.addRow("", note)
         outer.addWidget(theme_box)
 
+        # Session persistence
+        session_box = QGroupBox("Session persistence")
+        session_form = QFormLayout(session_box)
+        self._session_check = QCheckBox("Enable session persistence")
+        self._session_check.setToolTip(
+            "When enabled, the application automatically saves your session on exit "
+            "and restores it when you re-open the same source file."
+        )
+        session_form.addRow(self._session_check)
+        session_note = QLabel(
+            "Auto-saves project state (document, translation progress, phase status) "
+            "on close and restores it on next launch."
+        )
+        session_note.setWordWrap(True)
+        session_note.setStyleSheet("color: #64748b; font-size: 11px;")
+        session_form.addRow(session_note)
+        outer.addWidget(session_box)
+
         outer.addStretch(1)
         return widget
 
@@ -359,6 +377,9 @@ class SettingsDialog(QDialog):
                 self._theme_combo.setCurrentIndex(i)
                 break
 
+        # Session persistence
+        self._session_check.setChecked(gui_settings.get_session_enabled())
+
     def _save_values(self) -> None:
         gui_settings.set_str(gui_settings.KEYS.backend, self._backend_combo.currentData())
 
@@ -397,6 +418,7 @@ class SettingsDialog(QDialog):
             gui_settings.KEYS.fuzzy_auto_accept, str(self._fuzzy_auto_accept_spin.value())
         )
         gui_settings.set_theme(self._theme_combo.currentData())
+        gui_settings.set_session_enabled(self._session_check.isChecked())
 
     def _on_accept(self) -> None:
         self._save_values()
@@ -421,6 +443,7 @@ class SettingsDialog(QDialog):
         self._fuzzy_max_results_spin.setValue(5)
         self._fuzzy_auto_accept_spin.setValue(90.0)
         self._theme_combo.setCurrentIndex(0)
+        self._session_check.setChecked(False)
 
     # ------------------------------------------------------------------ helpers
 

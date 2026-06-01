@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Session persistence across sessions: enable users to save and restore the entire application state (project file) so they can close the app and resume exactly where they left off. Provide a versioned JSON project file format, a toggle in settings, reset/restart controls, and session isolation by file path.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "1. Create src/stx/session.py - a new module with a SessionManager class. The project file format is a versioned JSON file (.stxproj) containing: version (int, starts at 1), source_file_path, document state (serialized entries as list of dicts with key/label/translation/approved), target_language_code, target_language_name, source_language_code, backend_key, scope (serialized), glossary_path, memory_path, translation_summaries (list of dicts), translation_statuses (list of dicts), phase_status (list of ints), undo_stack (list of UndoCommand dicts), pending_edits, and a file_hash (SHA256 of original source file for session isolation).",
     "2. Add SessionManager methods: save(state: AppState, path: Path) - serializes AppState to the project file format; load(path: Path) -> AppState - deserializes a project file back into an AppState; auto_save_path(source_path: Path) -> Path - returns the auto-save location (~/.cache/salesforce-translation-handler/sessions/<hash>.stxproj); has_session(source_path: Path) -> bool - checks if an auto-save exists for this source; clear_session(source_path: Path) - removes the auto-save; clear_all_sessions() - wipes the sessions directory; validate_version(data: dict) -> bool - checks the version field is compatible.",

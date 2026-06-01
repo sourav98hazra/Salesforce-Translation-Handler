@@ -94,6 +94,13 @@ scope_app = typer.Typer(
 )
 app.add_typer(scope_app)
 
+session_app = typer.Typer(
+    name="session",
+    help="Manage saved session files (.stxproj).",
+    no_args_is_help=True,
+)
+app.add_typer(session_app)
+
 console = Console()
 
 
@@ -755,6 +762,63 @@ def replace_cmd(
         f"[green]OK[/green] Replaced {len(replacements)} occurrence(s) "
         f"in [bold]{source}[/bold]."
     )
+
+
+# ---------------------------------------------------------------------------
+# Session subcommands
+# ---------------------------------------------------------------------------
+
+@session_app.command("info")
+def session_info(
+    project_file: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+) -> None:
+    """Display metadata from a saved session project file (.stxproj)."""
+    from .session import SessionManager
+
+    mgr = SessionManager()
+    try:
+        data = mgr.load(project_file)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("Version", str(data.get("version", "?")))
+    table.add_row("Source file", data.get("source_file_path", "(unknown)"))
+    table.add_row("File hash", data.get("file_hash", "")[:16] + "...")
+    table.add_row("Target language", f"{data.get('target_language_name', '')} ({data.get('target_language_code', '')})")
+    table.add_row("Source language", data.get("source_language_code", ""))
+    table.add_row("Backend", data.get("backend_key", ""))
+
+    doc = data.get("document")
+    if doc is not None:
+        table.add_row("Document entries", f"{len(doc.entries):,}")
+    else:
+        table.add_row("Document entries", "(no document)")
+
+    table.add_row("Summaries", str(len(data.get("translation_summaries", []))))
+    table.add_row("Statuses", str(len(data.get("translation_statuses", []))))
+    table.add_row("Phase status", str(data.get("phase_status", [])))
+    table.add_row("Created", data.get("created_at", ""))
+    table.add_row("Updated", data.get("updated_at", ""))
+    console.print(table)
+
+
+@session_app.command("reset")
+def session_reset(
+    source_file: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+) -> None:
+    """Clear any auto-saved session for a source file."""
+    from .session import SessionManager
+
+    mgr = SessionManager()
+    if mgr.has_session(source_file):
+        mgr.clear_session(source_file)
+        console.print(f"[green]OK[/green] Session cleared for [bold]{source_file}[/bold].")
+    else:
+        console.print(f"[yellow]No session found for[/yellow] [bold]{source_file}[/bold].")
 
 
 # ---------------------------------------------------------------------------
