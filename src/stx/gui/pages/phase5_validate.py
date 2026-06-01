@@ -344,7 +344,9 @@ class Phase5ValidatePage(PhasePage):
     def _update_banner(self) -> None:
         if self._report is None:
             return
-        if not self._report.issues:
+        errors = self._report.errors
+        warnings = self._report.warnings
+        if not errors and not warnings:
             self._banner.setText(
                 "\u2713  All clear \u2014 no validation issues.  "
                 "You can proceed to export."
@@ -353,10 +355,10 @@ class Phase5ValidatePage(PhasePage):
                 "padding: 10px; border-radius: 6px; font-weight: 600; "
                 "background-color: #dcfce7; color: #166534; border: 1px solid #86efac;"
             )
-        elif self._report.has_errors:
+        elif errors:
             self._banner.setText(
-                f"\u26a0  {len(self._report.errors)} error(s) must be fixed "
-                f"before Salesforce import.  {len(self._report.warnings)} warning(s) "
+                f"\u26a0  {len(errors)} error(s) must be fixed "
+                f"before Salesforce import.  {len(warnings)} warning(s) "
                 f"are advisory.  Use 'Auto-fix all' or edit rows below."
             )
             self._banner.setStyleSheet(
@@ -365,7 +367,7 @@ class Phase5ValidatePage(PhasePage):
             )
         else:
             self._banner.setText(
-                f"\u26a0  {len(self._report.warnings)} warning(s) found (advisory).  "
+                f"\u26a0  {len(warnings)} warning(s) found (advisory).  "
                 f"No errors.  Safe to export."
             )
             self._banner.setStyleSheet(
@@ -536,7 +538,8 @@ class Phase5ValidatePage(PhasePage):
         for i, e in enumerate(self._state.document.entries):
             if e.key == issue.key:
                 self._state.document.entries[i] = Entry(
-                    key=e.key, label=e.label, translation=new_translation
+                    key=e.key, label=e.label, translation=new_translation,
+                    approved=e.approved,
                 )
                 break
         # Update the table cell visually.

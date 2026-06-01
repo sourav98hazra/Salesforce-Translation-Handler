@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from stx.cli import app
 from stx.excel import export_document_to_excel, import_document_from_excel
 from stx.model import Document, Entry
-from stx.stf import parse_stf_text, render_full_stf
+from stx.stf import parse_stf_text, render_full_stf, render_translated_only_stf
 from stx.validate import validate_document
 
 runner = CliRunner()
@@ -118,6 +118,25 @@ def test_stf_approved_marker_only_for_translated():
     )
     text = render_full_stf(doc)
     assert "# APPROVED" not in text
+
+
+def test_render_translated_only_stf_preserves_approved_marker():
+    """render_translated_only_stf should emit # APPROVED for approved entries."""
+    doc = Document(
+        language="Japanese",
+        language_code="ja",
+        entries=[
+            Entry(key="CustomLabel.A", label="Hello", translation="Konnichiwa", approved=True),
+            Entry(key="CustomLabel.B", label="World", translation="Sekai", approved=False),
+            Entry(key="CustomLabel.C", label="Bye"),
+        ],
+    )
+    text = render_translated_only_stf(doc)
+    lines = text.split("\n")
+    # First data line (approved) should have the marker
+    assert "# APPROVED" in lines[1]
+    # Second data line (not approved) should not
+    assert "# APPROVED" not in lines[2]
 
 
 # ---------------------------------------------------------------------------

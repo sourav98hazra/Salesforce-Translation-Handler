@@ -87,7 +87,10 @@ def render_translated_only_stf(doc: Document) -> str:
 
     lines: list[str] = [_FULL_HEADER_COLUMNS]
     for entry in doc.translated():
-        lines.append(f"{entry.key}\t{entry.label}\t{entry.translation.strip()}\t-")
+        line = f"{entry.key}\t{entry.label}\t{entry.translation.strip()}\t-"
+        if entry.approved:
+            line += "\t# APPROVED"
+        lines.append(line)
     return "\n".join(lines)
 
 
