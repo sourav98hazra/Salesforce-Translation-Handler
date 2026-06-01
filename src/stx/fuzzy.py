@@ -68,8 +68,14 @@ class FuzzyMatcher:
         if not query or not candidates:
             return []
 
-        # Build lookup: source -> translation (for duplicates, last wins)
-        source_to_translation = {src: trans for src, trans in candidates}
+        # Build lookup: source -> translation.  When duplicate source
+        # strings exist (e.g., same source with different translations from
+        # re-imports), keep the *first* translation encountered (most recent
+        # TM entry by default SQL ordering).
+        source_to_translation: dict[str, str] = {}
+        for src, trans in candidates:
+            if src not in source_to_translation:
+                source_to_translation[src] = trans
         sources = list(source_to_translation.keys())
 
         if not sources:

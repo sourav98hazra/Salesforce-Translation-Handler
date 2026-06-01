@@ -146,14 +146,23 @@ class TranslationMemory:
         target_lang: str,
         threshold: float = 75.0,
         max_results: int = 5,
+        candidates: "Optional[List[Tuple[str, str]]]" = None,
     ) -> "List[FuzzyMatch]":
         """Search the TM for fuzzy matches against *source*.
+
+        Parameters
+        ----------
+        candidates:
+            Optional pre-loaded list of (source, translation) tuples.
+            When provided, skips the ``all_sources()`` query (useful for
+            caching across multiple calls in a single run).
 
         Returns matches sorted by score descending, filtered by threshold.
         """
         from .fuzzy import FuzzyMatch, FuzzyMatcher
 
-        candidates = self.all_sources(source_lang, target_lang)
+        if candidates is None:
+            candidates = self.all_sources(source_lang, target_lang)
         if not candidates:
             return []
         matcher = FuzzyMatcher(threshold=threshold, max_results=max_results)

@@ -620,7 +620,7 @@ class Phase3TranslatePage(PhasePage):
     def _on_progress(self, percent: int, message: str) -> None:
         self._progress.setValue(percent)
 
-    def _on_row_translated(self, source: str, translation: str, status: str) -> None:
+    def _on_row_translated(self, source: str, translation: str, status: str, from_fuzzy: bool) -> None:
         self._current_row += 1
 
         # Update running counters from status keywords.
@@ -641,9 +641,9 @@ class Phase3TranslatePage(PhasePage):
             f"T:{self._translated_count} TM:{self._cached_count} D:{self._deduped_count}]"
         )
 
-        # Show [FUZZY] prefix for fuzzy TM matches
+        # Show [FUZZY] prefix for fuzzy TM matches using structured flag
         fuzzy_prefix = ""
-        if "fuzzy" in status.lower():
+        if from_fuzzy:
             fuzzy_prefix = "[FUZZY] "
 
         if translation:

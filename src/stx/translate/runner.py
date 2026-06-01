@@ -125,6 +125,7 @@ class TranslationProgress:
     translation_text: str = ""
     eta_seconds: Optional[float] = None
     rows_per_second: Optional[float] = None
+    from_fuzzy: bool = False
 
     @property
     def percent(self) -> int:
@@ -264,6 +265,9 @@ def translate_document_multi(
     glossary: Optional[Glossary] = None,
     workers: int = DEFAULT_WORKERS,
     rate_limit_per_second: Optional[float] = 8.0,
+    fuzzy_threshold: Optional[float] = None,
+    fuzzy_max_results: int = 5,
+    fuzzy_auto_accept_threshold: float = 90.0,
 ) -> MultiTargetResult:
     """Translate ``doc`` to multiple target languages in sequence.
 
@@ -303,6 +307,9 @@ def translate_document_multi(
             glossary=glossary,
             workers=workers,
             rate_limit_per_second=rate_limit_per_second,
+            fuzzy_threshold=fuzzy_threshold,
+            fuzzy_max_results=fuzzy_max_results,
+            fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
         )
         multi.by_target[target] = result
 
@@ -376,6 +383,10 @@ class _Runner:
         self._dedup: Dict[str, str] = {}
         self._dedup_lock = threading.Lock()
         self._completion_lock = threading.Lock()
+
+        # Cached fuzzy candidates (loaded once per run to avoid repeated
+        # full-table scans of the TM on every row miss).
+        self._fuzzy_candidates: Optional[List[Tuple[str, str]]] = None
 
         # Single-shot guard: the runner is one-use.  Attempting to call
         # ``run()`` twice on the same instance raises rather than corrupting
@@ -605,12 +616,17 @@ class _Runner:
         # ---- fuzzy TM matching
         if self.fuzzy_threshold is not None and self.memory is not None:
             try:
+                if self._fuzzy_candidates is None:
+                    self._fuzzy_candidates = self.memory.all_sources(
+                        self.source_lang, self.target_lang
+                    )
                 fuzzy_matches = self.memory.fuzzy_search(
                     entry.label,
                     self.source_lang,
                     self.target_lang,
                     threshold=self.fuzzy_threshold,
                     max_results=self.fuzzy_max_results,
+                    candidates=self._fuzzy_candidates,
                 )
             except Exception:  # noqa: BLE001
                 fuzzy_matches = []
@@ -623,6 +639,18 @@ class _Runner:
                     index, final, "Translated (fuzzy TM)", from_fuzzy=True
                 )
                 return
+            elif fuzzy_matches:
+                # Log suggestions that scored between threshold and auto-accept
+                # so users can see near-matches even though the network
+                # translator is still invoked.
+                best = fuzzy_matches[0]
+                LOGGER.info(
+                    "Fuzzy suggestion for %r: %r (score=%.1f) -- below auto-accept (%.1f)",
+                    entry.label,
+                    best.source,
+                    best.score,
+                    self.fuzzy_auto_accept_threshold,
+                )
 
         # ---- glossary DNT protection
         glossary_text = entry.label
@@ -715,7 +743,9 @@ class _Runner:
                 self._deduped += 1
             if from_fuzzy:
                 self._fuzzy_accepted += 1
-        self._emit_progress(index, entry.key, sheet, status, entry.label, translation)
+        self._emit_progress(
+            index, entry.key, sheet, status, entry.label, translation, from_fuzzy=from_fuzzy
+        )
 
     def _mark_failed(self, index: int, status: str) -> None:
         entry = self.doc.entries[index]
@@ -763,6 +793,7 @@ class _Runner:
         status: str,
         source_text: str,
         translation_text: str,
+        from_fuzzy: bool = False,
     ) -> None:
         if self.progress is None:
             return
@@ -788,6 +819,7 @@ class _Runner:
                     translation_text=translation_text,
                     eta_seconds=eta,
                     rows_per_second=rate,
+                    from_fuzzy=from_fuzzy,
                 )
             )
         except Exception:  # noqa: BLE001

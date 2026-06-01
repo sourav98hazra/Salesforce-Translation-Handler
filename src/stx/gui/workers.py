@@ -144,7 +144,7 @@ class TranslationWorker(QThread):
         original text -- the audit sheets still capture that detail).
     failed(str)
         On unexpected error.
-    row_translated(str source, str translation, str status)
+    row_translated(str source, str translation, str status, bool from_fuzzy)
         Live "EN -> JA" feed for the GUI status panel.
 
     Multi-click safety:
@@ -159,7 +159,7 @@ class TranslationWorker(QThread):
     progress = Signal(int, str)
     finished_ok = Signal(object)
     failed = Signal(str)
-    row_translated = Signal(str, str, str)  # source, translation, status
+    row_translated = Signal(str, str, str, bool)  # source, translation, status, from_fuzzy
 
     def __init__(
         self,
@@ -233,6 +233,7 @@ class TranslationWorker(QThread):
                     event.source_text or "",
                     event.translation_text or "",
                     event.status,
+                    event.from_fuzzy,
                 )
 
         try:
