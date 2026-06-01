@@ -1,0 +1,14 @@
+{
+  "task_id": "task-sprint-1-features",
+  "task_description": "Implement Sprint 1 features: Feature 5 (Export Validation Report in CSV/JSON/HTML with CLI flag and GUI button) and Feature 9 (Row-level Approved Status with Entry model extension, Phase 4 UI, Phase 5 skip logic, Excel/STF persistence, and CLI commands)",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 148 tests pass (114 original + 17 for FEAT-001 + 16 for FEAT-002 + 1 fix test). GUI tests pass with offscreen platform. Two semantic review iterations resolved all confirmed issues."
+  }
+}
