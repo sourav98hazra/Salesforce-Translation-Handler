@@ -41,7 +41,25 @@ if not defined PY (
     exit /b 1
 )
 
-REM --- 2. Create the virtual environment if missing --------------------------
+REM Check Python version
+%PY% -c "import sys; exit(0 if sys.version_info >= (3, 9) else 1)" 2>nul
+if errorlevel 1 (
+    echo ERROR: Python 3.9 or newer is required.
+    echo Download from https://www.python.org/downloads/
+    pause
+    exit /b 1
+)
+
+REM --- 2. Check for existing setup ---
+if exist "dist\SalesforceTranslationHandler.exe" (
+    echo [1/4] Existing installation detected. Upgrading dependencies...
+    if exist ".venv\Scripts\python.exe" (
+        set "VENV_PY=.venv\Scripts\python.exe"
+        "%VENV_PY%" -m pip install --upgrade pip >nul 2>nul
+        "%VENV_PY%" -m pip install -e ".[gui]" pyinstaller
+        goto :build_step
+    )
+)
 if not exist ".venv\Scripts\python.exe" (
     echo [1/4] Creating virtual environment...
     %PY% -m venv .venv
@@ -66,6 +84,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:build_step
 REM --- 4. Build the standalone executable -----------------------------------
 echo [3/4] Building the standalone application ^(this can take a minute^)...
 "%VENV_PY%" build_exe.py

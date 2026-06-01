@@ -2,7 +2,7 @@
   "id": "FEAT-008",
   "type": "fix",
   "description": "Installer and launcher polish: fix the .desktop Exec and Icon paths to be absolute or generate the desktop entry with a script; improve launch.bat and setup_desktop_app.bat to detect existing venvs, handle upgrades, and provide clearer error messages.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create scripts/install_desktop_entry.sh that: (1) resolves the repo root to an absolute path, (2) generates a .desktop file with absolute Exec and Icon paths pointing into the repo, (3) copies it to ~/.local/share/applications/, (4) prints success message",
     "Update SalesforceTranslationHandler.desktop to use placeholders that the script replaces, or make the script generate it fresh. The Exec should be: bash -c 'cd \"/absolute/path\" && exec ./launch.sh' and Icon should be /absolute/path/src/stx/gui/assets/logo.png",
