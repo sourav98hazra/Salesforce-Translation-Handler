@@ -102,7 +102,7 @@ class FailingTranslator(Translator):
         raise RuntimeError("Simulated failure")
 
 
-def test_failed_rows_count_as_skipped() -> None:
+def test_failed_rows_count_as_failed() -> None:
     doc = Document(
         language="Japanese", language_code="ja",
         entries=[
@@ -116,11 +116,9 @@ def test_failed_rows_count_as_skipped() -> None:
         source_lang="en", target_lang="ja",
         workers=1, rate_limit_per_second=None, prevent_system_sleep=False,
     )
-    assert result.skipped_count == 2
+    assert result.failed_count == 2
+    assert result.skipped_count == 0
     assert result.translated_count == 0
-    assert result.translated_count + result.skipped_count == len(doc.entries)
-    # Per-sheet skipped_rows should also be 2
-    assert sum(s.skipped_rows for s in result.summaries) == 2
 
 
 def test_cancelled_rows_count_as_skipped() -> None:

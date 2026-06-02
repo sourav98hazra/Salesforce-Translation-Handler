@@ -605,6 +605,12 @@ class _Runner:
             self._emit_progress(index, entry.key, sheet, status, entry.label, infile_value)
             return "done"
 
+        if not entry.label.strip():
+            self._fill(index, entry, sheet, "Skipped (blank label)", summary)
+            summary.skipped_rows += 1
+            self._skipped += 1
+            return "done"
+
         if entry.translation.strip():
             if self.retranslate_existing:
                 # Row has an existing translation but user requested retranslation.
@@ -612,12 +618,6 @@ class _Runner:
                 # can still take priority.
                 return "translate"
             self._fill(index, entry, sheet, "Skipped (already translated)", summary)
-            summary.skipped_rows += 1
-            self._skipped += 1
-            return "done"
-
-        if not entry.label.strip():
-            self._fill(index, entry, sheet, "Skipped (blank label)", summary)
             summary.skipped_rows += 1
             self._skipped += 1
             return "done"
@@ -917,8 +917,6 @@ class _Runner:
                 translation=fallback_translation,
                 status=status,
             )
-            summary.skipped_rows += 1
-            self._skipped += 1
             self._failed += 1
         # Checkpoint permanent failures so they are not retried on resume.
         # Transient errors (network timeouts, rate limits) are left un-checkpointed
