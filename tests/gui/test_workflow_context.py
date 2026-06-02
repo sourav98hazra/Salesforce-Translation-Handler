@@ -548,3 +548,34 @@ def test_integration_current_phase_advances(qtbot):
 
     win._goto(0)
     assert win._state.current_phase == 0
+
+
+
+# ============================================================
+# Issue 6: test_reset_phase_clears_downstream_pages
+# ============================================================
+
+
+def test_reset_phase_clears_downstream_pages(qtbot):
+    """_action_reset_current_phase resets ALL downstream phase statuses to IDLE."""
+    from stx.gui.main_window import MainWindow
+    from stx.gui.state import PhaseStatus
+
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    # Navigate to phase index 1 (Phase 2) and mark some downstream phases DONE
+    win._goto(1)
+    for i in range(1, 6):
+        win._state.phase_status[i] = PhaseStatus.DONE
+
+    # Call reset current phase (current = 1 = Phase 2)
+    win._action_reset_current_phase()
+
+    # All phases from index 1 onwards should be IDLE after reset
+    for i in range(1, 6):
+        assert win._state.phase_status[i] == PhaseStatus.IDLE, (
+            f"Expected phase_status[{i}] == IDLE, got {win._state.phase_status[i]}"
+        )
+
+    win.close()
