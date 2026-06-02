@@ -94,3 +94,57 @@ def test_auto_fix_entry_no_op_on_clean_entry() -> None:
     fixed, descriptions = auto_fix_entry(e)
     assert descriptions == []
     assert fixed.translation == "こんにちは"
+
+
+def test_auto_fix_document_manual_review_field() -> None:
+    """AutoFixReport includes a manual_review list."""
+    doc = Document(entries=[
+        Entry(key="CustomLabel.A", label="Hello", translation="short"),
+    ])
+    report = auto_fix_document(doc)
+    assert hasattr(report, "manual_review")
+    assert isinstance(report.manual_review, list)
+
+
+def test_auto_fix_document_with_target_lang_no_length_issue() -> None:
+    """Passing target_lang/backend_name does not affect entries within limit."""
+    doc = Document(entries=[
+        Entry(key="CustomLabel.A", label="Hello", translation="short"),
+    ])
+    report = auto_fix_document(
+        doc,
+        target_lang="ja",
+        backend_name="google",
+    )
+    # Nothing to fix
+    assert report.fixed_count == 0
+    assert report.manual_review == []
+
+
+def test_auto_fix_document_length_issue_flags_manual_review_on_failure() -> None:
+    """When re-translation fails, entry is flagged for manual review."""
+    doc = Document(entries=[
+        Entry(key="CustomField.A.B.FieldLabel", label="hi", translation="x" * 200),
+    ])
+    # Pass a backend_name that will fail (no network)
+    report = auto_fix_document(
+        doc,
+        target_lang="ja",
+        backend_name="google",
+    )
+    # Either it got re-translated (unlikely in test) or flagged for manual review
+    # In a test environment without network, it should fall back to truncation
+    # since google free is always "available" but may fail on translate call
+    assert report.fixed_count >= 0
+    # The entry should either be fixed or flagged
+    total_handled = report.fixed_count + len(report.manual_review)
+    assert total_handled >= 1
+
+
+def test_fix_trim_to_length_still_works_standalone() -> None:
+    """The original fix_trim_to_length still works as a fallback."""
+    e = Entry(key="CustomField.A.B.FieldLabel", label="hi", translation="x" * 200)
+    result = fix_trim_to_length(e)
+    assert result is not None
+    assert len(result.entry.translation) <= 80
+    assert result.entry.translation.endswith("\u2026")

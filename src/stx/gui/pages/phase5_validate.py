@@ -473,7 +473,7 @@ class Phase5ValidatePage(PhasePage):
         if not self.confirm(
             "Auto-fix will attempt to:\n"
             "  \u2022 Restore missing placeholders / MessageFormat tokens\n"
-            "  \u2022 Trim translations exceeding length limits\n"
+            "  \u2022 Re-translate length-limit violations with shorter constraint\n"
             "  \u2022 Remove duplicate keys (keeps last occurrence)\n"
             "  \u2022 Clear whitespace-only translations\n"
             "  \u2022 Restore missing HTML tags\n\n"
@@ -485,10 +485,30 @@ class Phase5ValidatePage(PhasePage):
         for entry in self._state.document.entries:
             before_translations[entry.key] = (entry.label, entry.translation)
 
-        report = auto_fix_document(self._state.document)
-        self.status_message.emit(
-            f"Auto-fix complete: {report.fixed_count} fix(es) applied."
+        # Gather backend info from settings for smart length-limit fixing
+        target_lang = self._state.target_language_code or None
+        backend_name = None
+        api_key = None
+        try:
+            from .. import settings as gui_settings
+            backend_name = gui_settings.get_str(gui_settings.KEYS.backend, "google")
+        except Exception:  # noqa: BLE001
+            pass
+
+        report = auto_fix_document(
+            self._state.document,
+            target_lang=target_lang,
+            backend_name=backend_name,
+            api_key=api_key,
         )
+
+        # Build status message including manual review count
+        status_parts = [f"Auto-fix complete: {report.fixed_count} fix(es) applied."]
+        if report.manual_review:
+            status_parts.append(
+                f"{len(report.manual_review)} item(s) flagged for manual review."
+            )
+        self.status_message.emit(" ".join(status_parts))
 
         # Record applied fixes with before/after details
         if report.fixed_count > 0:
@@ -514,10 +534,25 @@ class Phase5ValidatePage(PhasePage):
             self.info(
                 f"Applied {report.fixed_count} fix(es).\n\n"
                 + "\n".join(f"  \u2022 {key}: {desc}" for key, desc in report.details[:20])
-                + ("\n  ..." if len(report.details) > 20 else ""),
+                + ("\n  ..." if len(report.details) > 20 else "")
+                + (
+                    "\n\nManual review needed:\n"
+                    + "\n".join(f"  \u26a0 {key}: {desc}" for key, desc in report.manual_review[:10])
+                    + ("\n  ..." if len(report.manual_review) > 10 else "")
+                    if report.manual_review else ""
+                ),
                 "Auto-fix results",
             )
             self.action_recorded.emit(f"Auto-fix all ({report.fixed_count} fixes)")
+        elif report.manual_review:
+            # No fixes applied but some items need manual review
+            self.info(
+                f"No automatic fixes applied.\n\n"
+                f"Manual review needed ({len(report.manual_review)} item(s)):\n"
+                + "\n".join(f"  \u26a0 {key}: {desc}" for key, desc in report.manual_review[:10])
+                + ("\n  ..." if len(report.manual_review) > 10 else ""),
+                "Auto-fix results",
+            )
         # Re-validate to update the table.
         self._on_validate()
 

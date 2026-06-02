@@ -64,10 +64,13 @@ class AutoFixReport:
     fixed_count: int = 0
     unfixable_count: int = 0
     details: List[Tuple[str, str]] = None  # (key, description)
+    manual_review: List[Tuple[str, str]] = None  # (key, reason)
 
     def __post_init__(self) -> None:
         if self.details is None:
             self.details = []
+        if self.manual_review is None:
+            self.manual_review = []
 
 
 # ---------------------------------------------------------------------------
@@ -112,14 +115,18 @@ def fix_restore_message_format(entry: Entry) -> Optional[FixResult]:
 
 
 def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
-    """Truncate the translation to the Salesforce length limit for its component."""
+    """Truncate the translation to the Salesforce length limit for its component.
+
+    This is the fallback fixer used when no translator backend is available.
+    It truncates at a word boundary and appends an ellipsis character.
+    """
     limit = _LENGTH_LIMITS.get(entry.component_type)
     if limit is None or not entry.translation.strip():
         return None
     if len(entry.translation) <= limit:
         return None
     # Truncate at a word boundary, leaving room for the ellipsis.
-    target_len = limit - 1  # room for "…"
+    target_len = limit - 1  # room for "..."
     truncated = entry.translation[:target_len]
     # Find the last space so we don't chop mid-word.
     last_space = truncated.rfind(" ")
@@ -131,6 +138,105 @@ def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
         entry=Entry(key=entry.key, label=entry.label, translation=truncated, approved=entry.approved),
         description=f"Trimmed from {len(entry.translation)} to {len(truncated)} chars (limit {limit}).",
     )
+
+
+def fix_length_with_retranslation(
+    entry: Entry,
+    *,
+    target_lang: str,
+    backend_name: str = "google",
+    api_key: Optional[str] = None,
+) -> FixResult:
+    """Attempt to fix a length_limit issue by re-translating with a length constraint.
+
+    Step 1: Call the configured translator backend with an instruction to
+    produce a shorter translation that fits within the character limit.
+
+    Step 2: If re-translation still exceeds the limit or fails, flag the
+    entry for manual review (do not truncate).
+
+    Parameters
+    ----------
+    entry:
+        The entry whose translation exceeds the length limit.
+    target_lang:
+        Target language code (e.g. "ja", "fr").
+    backend_name:
+        Translator backend key (e.g. "google", "deepl", "openai").
+    api_key:
+        Optional API key for backends that require one.
+
+    Returns
+    -------
+    FixResult
+        Either a successfully shortened translation or a manual-review flag.
+    """
+    limit = _LENGTH_LIMITS.get(entry.component_type)
+    if limit is None:
+        return FixResult(fixed=False, entry=entry, description="")
+
+    # Build a constrained translation prompt
+    prompt = (
+        f"Translate the following text into {target_lang} using no more than "
+        f"{limit} characters: {entry.label}"
+    )
+
+    try:
+        from .translate.factory import make_backend, check_backend_available
+
+        available, reason = check_backend_available(backend_name, api_key=api_key)
+        if not available:
+            # Backend not available - fall back to word-boundary truncation
+            fallback = fix_trim_to_length(entry)
+            if fallback is not None:
+                fallback.description += " (backend unavailable: " + reason + ")"
+                return fallback
+            return FixResult(fixed=False, entry=entry, description="")
+
+        kwargs = {}
+        if api_key:
+            kwargs["api_key"] = api_key
+
+        translator = make_backend(backend_name, **kwargs)
+        new_translation = translator.translate(prompt, "en", target_lang)
+
+        # Check if the re-translated text fits within the limit
+        if new_translation and len(new_translation.strip()) <= limit:
+            return FixResult(
+                fixed=True,
+                entry=Entry(
+                    key=entry.key,
+                    label=entry.label,
+                    translation=new_translation.strip(),
+                    approved=entry.approved,
+                ),
+                description=(
+                    f"Re-translated with length constraint "
+                    f"({len(new_translation.strip())}/{limit} chars)."
+                ),
+            )
+        else:
+            # Re-translation still exceeds limit - flag for manual review
+            return FixResult(
+                fixed=False,
+                entry=entry,
+                description=(
+                    f"Re-translation still exceeds limit "
+                    f"({len(new_translation.strip()) if new_translation else 0}/{limit} chars). "
+                    f"Requires manual review."
+                ),
+            )
+    except Exception:  # noqa: BLE001
+        # Any failure (network, import, etc.) - flag for manual review
+        return FixResult(
+            fixed=False,
+            entry=entry,
+            description=(
+                f"Re-translation failed. "
+                f"Translation length {len(entry.translation)} exceeds limit {limit}. "
+                f"Requires manual review."
+            ),
+        )
 
 
 def fix_strip_whitespace_translation(entry: Entry) -> Optional[FixResult]:
@@ -221,7 +327,14 @@ _ENTRY_FIXERS: List[Callable[[Entry], Optional[FixResult]]] = [
 ]
 
 
-def auto_fix_document(doc: Document, *, fix_duplicates: bool = True) -> AutoFixReport:
+def auto_fix_document(
+    doc: Document,
+    *,
+    fix_duplicates: bool = True,
+    target_lang: Optional[str] = None,
+    backend_name: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> AutoFixReport:
     """Apply every safe fixer to ``doc`` in place.
 
     Parameters
@@ -230,11 +343,20 @@ def auto_fix_document(doc: Document, *, fix_duplicates: bool = True) -> AutoFixR
         Document to fix.  Modified in place.
     fix_duplicates:
         If ``True``, also deduplicate keys (keeps last occurrence).
+    target_lang:
+        Target language code for re-translation of length-limit issues.
+        If not provided, falls back to simple truncation.
+    backend_name:
+        Translator backend key (e.g. "google", "deepl").
+        If not provided, falls back to simple truncation.
+    api_key:
+        Optional API key for backends that require one.
 
     Returns
     -------
     AutoFixReport
-        Summary of what was fixed and what couldn't be.
+        Summary of what was fixed, what couldn't be, and what needs
+        manual review.
     """
     report = AutoFixReport()
 
@@ -244,18 +366,39 @@ def auto_fix_document(doc: Document, *, fix_duplicates: bool = True) -> AutoFixR
         report.fixed_count += dedup_report.fixed_count
         report.details.extend(dedup_report.details)
 
+    # Determine whether smart length fixing is available.
+    use_smart_length = bool(target_lang and backend_name)
+
     # Per-entry fixes.
     new_entries: list[Entry] = []
     for entry in doc.entries:
-        fixed_this_row = False
         current = entry
         for fixer in _ENTRY_FIXERS:
+            if fixer is fix_trim_to_length and use_smart_length:
+                # Use smart re-translation for length issues instead of truncation
+                limit = _LENGTH_LIMITS.get(current.component_type)
+                if limit is not None and current.translation.strip() and len(current.translation) > limit:
+                    result = fix_length_with_retranslation(
+                        current,
+                        target_lang=target_lang,
+                        backend_name=backend_name,
+                        api_key=api_key,
+                    )
+                    if result.fixed:
+                        current = result.entry
+                        report.fixed_count += 1
+                        report.details.append((current.key, result.description))
+                    else:
+                        # Flag for manual review
+                        report.unfixable_count += 1
+                        report.manual_review.append((current.key, result.description))
+                continue
+
             result = fixer(current)
             if result is not None and result.fixed:
                 current = result.entry
                 report.fixed_count += 1
                 report.details.append((current.key, result.description))
-                fixed_this_row = True
         new_entries.append(current)
 
     doc.entries = new_entries
