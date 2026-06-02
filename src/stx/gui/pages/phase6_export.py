@@ -174,6 +174,9 @@ class Phase6ExportPage(PhasePage):
         )
         if not path:
             return
+        # If another workflow is already active, ask the user before overriding.
+        if not self.check_workflow_override(path):
+            return
         self.set_busy(True)
         self.status_message.emit(f"Loading {path.name} for direct export ...")
         worker = ImportExcelWorker(
@@ -190,6 +193,17 @@ class Phase6ExportPage(PhasePage):
         self._state.document = doc
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
+        # Set the active workflow context so future loads trigger the override dialog.
+        self._state.set_active_workflow_context(
+            document=doc,
+            original_source_path=path,
+            current_working_path=path,
+            current_working_artifact_type="reviewed_excel",
+            start_phase=5,
+            current_phase=5,
+            override_existing=False,
+            reset_downstream=False,
+        )
         self.set_busy(False)
         self.on_enter()
         self.status_message.emit(

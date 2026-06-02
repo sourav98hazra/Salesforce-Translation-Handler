@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
             if index < len(_PHASE_TOOLTIPS):
                 item.setToolTip(_PHASE_TOOLTIPS[index])
             self._phase_list.addItem(item)
-        self._phase_list.currentRowChanged.connect(self._goto)
+        self._phase_list.currentRowChanged.connect(self._on_sidebar_row_changed)
         v.addWidget(self._phase_list)
         v.addStretch(1)
 
@@ -529,17 +529,29 @@ class MainWindow(QMainWindow):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{index}"), self)
             shortcut.activated.connect(lambda i=index: self._goto(i))
 
-    # ------------------------------------------------------------------ navigation
+    def _on_sidebar_row_changed(self, index: int) -> None:
+        """Called when the user clicks a phase in the sidebar list.
 
-    def _goto(self, index: int) -> None:
+        If navigation is blocked (e.g. translation is running), the sidebar
+        highlight is moved back to the currently active phase so it never
+        shows the user on a phase they haven't actually navigated to.
+        """
         if index < 0 or index >= len(self._pages):
             return
-        # Block navigation away from Phase 3 while translation is running
+
+        # Block during active translation
         if (
             len(self._state.phase_status) > 2
             and self._state.phase_status[2] == PhaseStatus.RUNNING
             and index != 2
         ):
+            # Snap the sidebar highlight back to the current page BEFORE
+            # showing the warning, so the user sees the highlight stay put.
+            current = self._stack.currentIndex()
+            self._phase_list.blockSignals(True)
+            self._phase_list.setCurrentRow(current)
+            self._phase_list.blockSignals(False)
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(
                 self,
                 "Translation Running",
@@ -547,6 +559,24 @@ class MainWindow(QMainWindow):
                 "Please wait for translation to complete or cancel it first.",
             )
             return
+
+        # Proceed normally
+        self._goto(index)
+
+    # ------------------------------------------------------------------ navigation
+
+    def _goto(self, index: int) -> None:
+        if index < 0 or index >= len(self._pages):
+            return
+        # Block programmatic navigation during active translation
+        # (sidebar clicks are already blocked by _on_sidebar_row_changed).
+        if (
+            len(self._state.phase_status) > 2
+            and self._state.phase_status[2] == PhaseStatus.RUNNING
+            and index != 2
+            and index != self._stack.currentIndex()
+        ):
+            return  # silently ignore — the warning was already shown by the sidebar handler
         self._state.current_phase = index
         self._stack.setCurrentIndex(index)
         self._phase_list.blockSignals(True)

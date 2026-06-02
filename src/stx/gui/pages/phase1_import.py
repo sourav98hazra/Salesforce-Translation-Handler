@@ -194,6 +194,9 @@ class Phase1ImportPage(PhasePage):
         )
         if not path:
             return
+        # If another workflow is already active, ask the user before overriding.
+        if not self.check_workflow_override(path):
+            return
         self._parse(path)
 
     def _on_reparse(self) -> None:
@@ -233,6 +236,20 @@ class Phase1ImportPage(PhasePage):
         self._populate_preview(doc)
         self._save_stf_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
+
+        # Set the active workflow context so every subsequent load-in-any-phase
+        # will trigger the override confirmation dialog.
+        if self._state.source_stf_path:
+            self._state.set_active_workflow_context(
+                document=doc,
+                original_source_path=self._state.source_stf_path,
+                current_working_path=self._state.source_stf_path,
+                current_working_artifact_type="stf",
+                start_phase=0,
+                current_phase=0,
+                override_existing=False,
+                reset_downstream=False,
+            )
 
         # Persist this file in the recent files list and mark phase 1 done.
         try:
