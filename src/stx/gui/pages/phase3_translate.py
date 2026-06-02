@@ -974,6 +974,8 @@ class Phase3TranslatePage(PhasePage):
         # Breakdown of how rows were translated
         self._log.appendPlainText(f"  \u251c\u2500 Translated via API:       {done.translated_count:>5,}")
         self._log.appendPlainText(f"  \u251c\u2500 From Translation Memory:  {done.cached_count:>5,}")
+        if done.fuzzy_accepted_count:
+            self._log.appendPlainText(f"  \u2502    (of which fuzzy match: {done.fuzzy_accepted_count:>5,})")
         self._log.appendPlainText(f"  \u251c\u2500 Deduplicated (reused):    {done.deduped_count:>5,}")
         if done.imported_reuse_count:
             self._log.appendPlainText(f"  \u251c\u2500 From imported file:       {done.imported_reuse_count:>5,}")
