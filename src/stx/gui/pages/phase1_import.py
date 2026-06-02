@@ -116,12 +116,32 @@ class Phase1ImportPage(PhasePage):
             "color: #2563eb; font-size: 11px; font-weight: 700;"
         )
 
-        # ---- Other stat fields
-        self._stf_type_field = QLineEdit(); self._stf_type_field.setReadOnly(True)
-        self._total_field = QLineEdit(); self._total_field.setReadOnly(True)
-        self._translated_field = QLineEdit(); self._translated_field.setReadOnly(True)
-        self._untranslated_field = QLineEdit(); self._untranslated_field.setReadOnly(True)
-        self._components_field = QLineEdit(); self._components_field.setReadOnly(True)
+        # ---- Code display labels (inline next to dropdowns, no input border)
+        _code_style = "font-weight: 700; color: #1e293b; font-size: 12px; padding: 2px 4px;"
+        self._stf_lang_code_label = QLabel("")
+        self._stf_lang_code_label.setStyleSheet(_code_style)
+        self._stf_lang_code_label.setToolTip("Salesforce language code for the translation language.")
+
+        self._source_language_code_label = QLabel("")
+        self._source_language_code_label.setStyleSheet(_code_style)
+        self._source_language_code_label.setToolTip("Salesforce code for the label language.")
+
+        # ---- Stat display labels — plain text, no input box
+        _stat_style = "font-weight: 600; color: #1e293b; font-size: 12px; padding: 1px 0;"
+        self._stf_type_label = QLabel("")
+        self._stf_type_label.setStyleSheet(_stat_style)
+        self._total_label = QLabel("")
+        self._total_label.setStyleSheet(_stat_style)
+        self._translated_label = QLabel("")
+        self._translated_label.setStyleSheet("font-weight: 600; color: #16a34a; font-size: 12px; padding: 1px 0;")
+        self._untranslated_label = QLabel("")
+        self._untranslated_label.setStyleSheet("font-weight: 600; color: #d97706; font-size: 12px; padding: 1px 0;")
+        self._components_label = QLabel("")
+        self._components_label.setStyleSheet("color: #64748b; font-size: 11px; padding: 1px 0;")
+
+        # Aliases so existing _set_field / reset_page code works unchanged
+        self._stf_lang_code_field = self._stf_lang_code_label   # type: ignore[assignment]
+        self._source_language_code_field = self._source_language_code_label  # type: ignore[assignment]
 
         meta_box = QGroupBox("Parsed metadata")
         meta_grid = QGridLayout(meta_box)
@@ -129,47 +149,55 @@ class Phase1ImportPage(PhasePage):
         meta_grid.setHorizontalSpacing(12)
         meta_grid.setVerticalSpacing(4)
 
-        # Row 0 — Translation language (STF target)
+        # Row 0 — Translation language + code (interactive)
         lbl0a = QLabel("Translation language:")
         lbl0a.setToolTip("The language this STF translates into (from STF header).")
         meta_grid.addWidget(lbl0a, 0, 0, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._stf_lang_combo, 0, 1)
-        lbl0b = QLabel("Language code:")
+        lbl0b = QLabel("Code:")
         lbl0b.setToolTip("Salesforce code for the translation language.")
         meta_grid.addWidget(lbl0b, 0, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._stf_lang_code_field, 0, 3)
+        meta_grid.addWidget(self._stf_lang_code_label, 0, 3)
 
-        # Row 1 — Source / label language
+        # Row 1 — Label language + code (interactive)
         lbl1a = QLabel("Label language:")
         lbl1a.setToolTip("Language the labels are written in (usually English). Auto-detected.")
         meta_grid.addWidget(lbl1a, 1, 0, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._source_language_combo, 1, 1)
-        lbl1b = QLabel("Label code:")
+        lbl1b = QLabel("Code:")
         lbl1b.setToolTip("Salesforce code for the label language.")
         meta_grid.addWidget(lbl1b, 1, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._source_language_code_field, 1, 3)
+        meta_grid.addWidget(self._source_language_code_label, 1, 3)
 
         # Row 2 — detection info
         meta_grid.addWidget(self._source_detect_label, 2, 1, 1, 3)
 
-        # Row 3 — STF type + total rows
-        meta_grid.addWidget(QLabel("STF type:"), 3, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._stf_type_field, 3, 1)
-        meta_grid.addWidget(QLabel("Total rows:"), 3, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._total_field, 3, 3)
+        # Row 3 — compact stats bar (all read-only info on one line)
+        stats_row_widget = QWidget()
+        stats_row = QHBoxLayout(stats_row_widget)
+        stats_row.setContentsMargins(0, 2, 0, 0)
+        stats_row.setSpacing(16)
 
-        # Row 4 — translated + untranslated
-        meta_grid.addWidget(QLabel("Translated:"), 4, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._translated_field, 4, 1)
-        meta_grid.addWidget(QLabel("Untranslated:"), 4, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._untranslated_field, 4, 3)
+        def _stat(prefix: str, label_widget: QLabel) -> QHBoxLayout:
+            h = QHBoxLayout()
+            h.setSpacing(4)
+            prefix_lbl = QLabel(prefix)
+            prefix_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
+            h.addWidget(prefix_lbl)
+            h.addWidget(label_widget)
+            return h
 
-        # Row 5 — component types
-        meta_grid.addWidget(QLabel("Component types:"), 5, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._components_field, 5, 1, 1, 3)
+        stats_row.addLayout(_stat("Type:", self._stf_type_label))
+        stats_row.addLayout(_stat("Total:", self._total_label))
+        stats_row.addLayout(_stat("Translated:", self._translated_label))
+        stats_row.addLayout(_stat("Untranslated:", self._untranslated_label))
+        stats_row.addLayout(_stat("Components:", self._components_label))
+        stats_row.addStretch(1)
+
+        meta_grid.addWidget(stats_row_widget, 3, 0, 1, 4)
 
         meta_grid.setColumnStretch(1, 1)
-        meta_grid.setColumnStretch(3, 1)
+        meta_grid.setColumnStretch(3, 0)   # code column — just wide enough for the code
         self.add_widget(meta_box)
 
         # ---------- Preview table
@@ -291,13 +319,13 @@ class Phase1ImportPage(PhasePage):
                 self._stf_lang_combo.setCurrentIndex(-1)
                 self._stf_lang_combo.setEditText(stf_lang_name) if hasattr(self._stf_lang_combo, 'setEditText') else None
             self._stf_lang_combo.blockSignals(False)
-        self._stf_lang_code_field.setText(doc.language_code or "")
+        self._stf_lang_code_label.setText(doc.language_code or "")
 
-        self._set_field(self._stf_type_field, doc.stf_type)
-        self._set_field(self._total_field, f"{stats['total']:,}")
-        self._set_field(self._translated_field, f"{stats['translated']:,}")
-        self._set_field(self._untranslated_field, f"{stats['untranslated']:,}")
-        self._set_field(self._components_field, str(stats["components"]))
+        self._stf_type_label.setText(doc.stf_type or "—")
+        self._total_label.setText(f"{stats['total']:,}")
+        self._translated_label.setText(f"{stats['translated']:,}")
+        self._untranslated_label.setText(f"{stats['untranslated']:,}")
+        self._components_label.setText(str(stats["components"]))
 
         # Auto-detect label language (source language)
         self._detect_source_language(doc)
@@ -474,15 +502,15 @@ class Phase1ImportPage(PhasePage):
         """Called by Reset Session to clear all displayed widgets back to defaults."""
         self._path_label.setText("No file selected.")
         self._stf_lang_combo.setCurrentIndex(-1)
-        self._stf_lang_code_field.clear()
+        self._stf_lang_code_label.clear()
         self._source_language_combo.setCurrentIndex(-1)
-        self._source_language_code_field.clear()
+        self._source_language_code_label.clear()
         self._source_detect_label.setText("")
-        self._stf_type_field.clear()
-        self._total_field.clear()
-        self._translated_field.clear()
-        self._untranslated_field.clear()
-        self._components_field.clear()
+        self._stf_type_label.setText("")
+        self._total_label.setText("")
+        self._translated_label.setText("")
+        self._untranslated_label.setText("")
+        self._components_label.setText("")
         self._preview.setRowCount(0)
         self._save_stf_btn.setEnabled(False)
         self._next_btn.setEnabled(False)
