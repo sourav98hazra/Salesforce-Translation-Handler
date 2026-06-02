@@ -132,6 +132,7 @@ class TranslationDone:
     fuzzy_accepted_count: int = 0
     resumed_count: int = 0
     imported_reuse_count: int = 0
+    failed_count: int = 0
     elapsed_seconds: float = 0.0
 
 
@@ -287,6 +288,7 @@ class TranslationWorker(QThread):
                 fuzzy_accepted_count=result.fuzzy_accepted_count,
                 resumed_count=result.resumed_count,
                 imported_reuse_count=result.imported_reuse_count,
+                failed_count=result.failed_count,
                 elapsed_seconds=result.elapsed_seconds,
             )
         )

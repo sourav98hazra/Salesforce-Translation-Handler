@@ -945,13 +945,18 @@ class Phase3TranslatePage(PhasePage):
         # Detect if this completion was from a cancellation
         was_cancelled = self._worker is not None and self._worker.is_cancelled
 
-        # Append formatted summary block to the live feed
-        total_processed = (
+        # Compute summary numbers
+        # "Rows processed successfully" = all rows that ended up with a valid
+        # translation (regardless of method).  This includes API translations,
+        # TM hits, dedup reuse, imported file reuse, and already-translated rows
+        # that were kept as-is.
+        rows_successful = (
             done.translated_count + done.cached_count
             + done.deduped_count + done.skipped_count
         )
+        rows_failed = done.failed_count
         elapsed_str = _format_eta(elapsed)
-        rate = done.translated_count / elapsed if elapsed > 0 else 0
+        rate = rows_successful / elapsed if elapsed > 0 else 0
 
         sep = "\u2550" * 43
         self._log.appendPlainText("")
@@ -959,23 +964,29 @@ class Phase3TranslatePage(PhasePage):
             self._log.appendPlainText(sep)
             self._log.appendPlainText("  TRANSLATION CANCELLED")
             self._log.appendPlainText(sep)
-            self._log.appendPlainText(f"  Completed before stop: {total_processed:>7,}")
+            self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
         else:
             self._log.appendPlainText(sep)
             self._log.appendPlainText("  TRANSLATION COMPLETE")
             self._log.appendPlainText(sep)
-            self._log.appendPlainText(f"  Total rows processed:  {total_processed:>7,}")
-        self._log.appendPlainText(f"  Translated (API):      {done.translated_count:>7,}")
-        self._log.appendPlainText(f"  From Translation Memory:{done.cached_count:>6,}")
-        self._log.appendPlainText(f"  Deduplicated:          {done.deduped_count:>7,}")
+            self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
+
+        # Breakdown of how rows were translated
+        self._log.appendPlainText(f"  \u251c\u2500 Translated via API:       {done.translated_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 From Translation Memory:  {done.cached_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Deduplicated (reused):    {done.deduped_count:>5,}")
         if done.imported_reuse_count:
-            self._log.appendPlainText(f"  From imported file:    {done.imported_reuse_count:>7,}")
+            self._log.appendPlainText(f"  \u251c\u2500 From imported file:       {done.imported_reuse_count:>5,}")
         if done.resumed_count:
-            self._log.appendPlainText(f"  Resumed from checkpoint:{done.resumed_count:>6,}")
-        self._log.appendPlainText(f"  Skipped (existing):    {done.skipped_count:>7,}")
-        self._log.appendPlainText(f"  Elapsed time:          {elapsed_str:>7}")
+            self._log.appendPlainText(f"  \u251c\u2500 Resumed from checkpoint:  {done.resumed_count:>5,}")
+        self._log.appendPlainText(f"  \u2514\u2500 Already translated (kept):{done.skipped_count:>5,}")
+
+        self._log.appendPlainText("")
+        self._log.appendPlainText(f"  Rows failed:                 {rows_failed:>5,}")
+        self._log.appendPlainText("")
+        self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:
-            self._log.appendPlainText(f"  Rate:                  {rate:>5.1f} rows/s")
+            self._log.appendPlainText(f"  Rate:                    {rate:>5.1f} rows/s")
         self._log.appendPlainText(sep)
 
         if was_cancelled:
@@ -987,12 +998,13 @@ class Phase3TranslatePage(PhasePage):
             # The translated document is held in memory (self._state.document).
             # Don't auto-save: surface the "Save copy to..." button instead so
             # the user picks where to save.
+            failed_note = f", {rows_failed:,} failed" if rows_failed else ""
             msg = (
-                f"Translation complete - click 'Save a Copy...' to save the translated file.  "
-                f"Translated {done.translated_count:,} "
-                f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
-                f"resumed {done.resumed_count:,}, "
-                f"skipped {done.skipped_count:,}) in {elapsed_str}."
+                f"Translation complete - {rows_successful:,} rows processed successfully{failed_note}.  "
+                f"Click 'Save a Copy...' to save.  "
+                f"[API: {done.translated_count:,} | TM: {done.cached_count:,} | "
+                f"Dedup: {done.deduped_count:,} | Kept: {done.skipped_count:,}] "
+                f"in {elapsed_str}."
             )
 
         self._eta_label.setText(msg)

@@ -148,6 +148,7 @@ class TranslationResult:
     resumed_count: int = 0  # from checkpoint resume
     imported_reuse_count: int = 0  # from imported translations file
     retranslated_count: int = 0  # rows that had existing translations and were retranslated
+    failed_count: int = 0  # rows where _mark_failed was called (fallbacks)
     target_lang: str = ""
     elapsed_seconds: float = 0.0
 
@@ -404,6 +405,7 @@ class _Runner:
         self._new_entries: List[Optional[Entry]] = [None] * len(doc.entries)
         self._translated = 0
         self._skipped = 0
+        self._failed = 0
         self._cached = 0
         self._deduped = 0
         self._fuzzy_accepted = 0
@@ -504,6 +506,7 @@ class _Runner:
             resumed_count=self._resumed,
             imported_reuse_count=self._imported_reuse,
             retranslated_count=self._retranslated,
+            failed_count=self._failed,
             target_lang=self.target_lang,
         )
 
@@ -913,6 +916,7 @@ class _Runner:
             )
             summary.skipped_rows += 1
             self._skipped += 1
+            self._failed += 1
         # Checkpoint permanent failures so they are not retried on resume.
         # Transient errors (network timeouts, rate limits) are left un-checkpointed
         # so they get a fresh attempt on the next run.
