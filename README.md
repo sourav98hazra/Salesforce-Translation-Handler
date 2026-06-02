@@ -214,7 +214,7 @@ artifact to disk so you can independently verify it:
 | 3. Translate | Auto-translate untranslated rows | `*_translated.xlsx` (with audit sheets) |
 | 4. Review | Inline edit translations with filters | `*_reviewed.xlsx` |
 | 5. Validate & Fix | Auto-fix errors, manual correction | `*_fixed.xlsx` |
-| 6. Export STF | Validate + emit final files | `Super_STF_<code>.stf` + 2 more |
+| 6. Export STF | Validate + emit final files | `Bilingual_<code>.stf` + 2 more |
 
 Every phase has a **Load existing ...** button so you can re-enter the
 workflow from any saved artifact (e.g. drop in an Excel a colleague
@@ -275,9 +275,9 @@ Three files per export, all UTF-8 with LF line endings (no BOM):
 
 | File | Contents |
 |---|---|
-| `Super_STF_<code>.stf`         | Bilingual full file (translated + untranslated sections) |
-| `TranslatedOnly_STF_<code>.stf` | Translated rows only |
-| `UntranslatedOnly_STF_<code>.stf` | Untranslated rows only |
+| `Bilingual_<code>.stf`         | Bilingual full file (translated + untranslated sections) |
+| `Translated_<code>.stf` | Translated rows only |
+| `Untranslated_<code>.stf` | Untranslated rows only |
 
 The section separators (`------------------TRANSLATED-------------------`
 and `------------------OUTDATED AND UNTRANSLATED-----------------`) are

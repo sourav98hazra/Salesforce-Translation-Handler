@@ -7,9 +7,9 @@ The output format is byte-compatible with the legacy
 * ``LF`` line endings (no CRLF, no BOM).
 * Three files emitted per run:
 
-    - ``Super_STF_<code>.stf``         -- bilingual full file.
-    - ``TranslatedOnly_STF_<code>.stf`` -- translated rows only.
-    - ``UntranslatedOnly_STF_<code>.stf`` -- untranslated rows only.
+    - ``Bilingual_<code>.stf``         -- bilingual full file.
+    - ``Translated_<code>.stf`` -- translated rows only.
+    - ``Untranslated_<code>.stf`` -- untranslated rows only.
 
 The section separator lines (``------------------TRANSLATED-------------------``
 and ``------------------OUTDATED AND UNTRANSLATED-----------------``) are
@@ -51,7 +51,7 @@ class STFWriteResult:
 # ---------------------------------------------------------------------------
 
 def render_full_stf(doc: Document) -> str:
-    """Render the bilingual ``Super_STF`` file content as a string.
+    """Render the bilingual ``Bilingual_<code>`` file content as a string.
 
     The produced text terminates without a trailing newline, matching the
     legacy script's ``-join "`n"`` behaviour exactly.
@@ -145,9 +145,9 @@ def write_stf_files(
         )
 
     code = doc.language_code or "xx"
-    full_path = target_dir / f"Super_STF_{code}.stf"
-    trans_path = target_dir / f"TranslatedOnly_STF_{code}.stf"
-    untrans_path = target_dir / f"UntranslatedOnly_STF_{code}.stf"
+    full_path = target_dir / f"Bilingual_{code}.stf"
+    trans_path = target_dir / f"Translated_{code}.stf"
+    untrans_path = target_dir / f"Untranslated_{code}.stf"
 
     _write_lf_utf8(full_path, render_full_stf(doc))
     _write_lf_utf8(trans_path, render_translated_only_stf(doc))

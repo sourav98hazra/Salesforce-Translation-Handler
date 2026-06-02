@@ -108,7 +108,7 @@ def test_xlsx2stf(tmp_path):
     out_dir = tmp_path / "stf_out"
     result = runner.invoke(app, ["xlsx2stf", str(xlsx), str(out_dir), "--language", "Japanese", "--code", "ja"])
     assert result.exit_code == 0
-    assert (out_dir / "Super_STF_ja.stf").exists()
+    assert (out_dir / "Bilingual_ja.stf").exists()
 
 
 def test_missing_file():

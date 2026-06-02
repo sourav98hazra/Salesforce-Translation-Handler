@@ -245,9 +245,9 @@ You get three files:
 
 | File | Contents |
 |---|---|
-| `Super_STF_<code>.stf` | Bilingual full file with both translated and untranslated sections |
-| `TranslatedOnly_STF_<code>.stf` | Only the translated rows |
-| `UntranslatedOnly_STF_<code>.stf` | Only the untranslated rows |
+| `Bilingual_<code>.stf` | Bilingual full file with both translated and untranslated sections |
+| `Translated_<code>.stf` | Only the translated rows |
+| `Untranslated_<code>.stf` | Only the untranslated rows |
 
 All three are UTF-8 with LF line endings (no BOM), byte-compatible with Salesforce's import format.
 

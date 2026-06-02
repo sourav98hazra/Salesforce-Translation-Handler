@@ -315,9 +315,9 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Phase 6 — Export STF",
         "How many STF files does the export produce?",
-        "Three files: Super_STF_<code>.stf (full bilingual file), "
-        "TranslatedOnly_STF_<code>.stf (translated rows only), "
-        "UntranslatedOnly_STF_<code>.stf (untranslated rows only). "
+        "Three files: Bilingual_<code>.stf (full bilingual file), "
+        "Translated_<code>.stf (translated rows only), "
+        "Untranslated_<code>.stf (untranslated rows only). "
         "All are UTF-8 with LF line endings, compatible with Salesforce Translation Workbench.",
     ),
     (
