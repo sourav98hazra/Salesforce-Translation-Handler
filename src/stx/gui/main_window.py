@@ -563,8 +563,10 @@ class MainWindow(QMainWindow):
             act.setCheckable(True)
             act.setChecked(get_fn())
             act.setToolTip(tooltip)
-            def _toggled(checked: bool, _set=set_fn) -> None:
+            def _toggled(checked: bool, _set=set_fn, _label=label) -> None:
                 _set(checked)
+                state_str = "ON" if checked else "OFF"
+                self._log(f"Translation option changed: {_label} \u2192 {state_str}")
             act.toggled.connect(_toggled)
             return act
 
@@ -1120,11 +1122,51 @@ class MainWindow(QMainWindow):
         """
         from .settings_dialog import open_settings
 
+        # Snapshot key settings before the dialog opens
+        before = self._snapshot_settings()
+
         if open_settings(self):
-            self._log("Settings updated.")
+            after = self._snapshot_settings()
+            changes = self._describe_settings_changes(before, after)
+            if changes:
+                self._log(f"Settings updated: {changes}")
+            else:
+                self._log("Settings updated (no value changes detected).")
             current = self._stack.currentIndex()
             if 0 <= current < len(self._pages):
                 self._pages[current].on_enter()
+
+    def _snapshot_settings(self) -> dict:
+        """Capture current key settings values for change detection."""
+        return {
+            "backend": gui_settings.get_str(gui_settings.KEYS.backend, "google"),
+            "workers": gui_settings.get_int(gui_settings.KEYS.workers, 4),
+            "theme": gui_settings.get_theme(),
+            "session_persistence": gui_settings.get_session_enabled(),
+            "glossary_path": gui_settings.get_str(gui_settings.KEYS.glossary_path, ""),
+            "tm_path": gui_settings.get_str(gui_settings.KEYS.memory_path, ""),
+            "fuzzy_threshold": gui_settings.get_int(gui_settings.KEYS.fuzzy_threshold, 80),
+        }
+
+    @staticmethod
+    def _describe_settings_changes(before: dict, after: dict) -> str:
+        """Return a human-readable string of what changed between two snapshots."""
+        parts: list[str] = []
+        labels = {
+            "backend": "backend",
+            "workers": "workers",
+            "theme": "theme",
+            "session_persistence": "session persistence",
+            "glossary_path": "glossary path",
+            "tm_path": "TM path",
+            "fuzzy_threshold": "fuzzy threshold",
+        }
+        for key, label in labels.items():
+            old_val = before.get(key)
+            new_val = after.get(key)
+            if old_val != new_val:
+                parts.append(f"{label}={new_val}")
+        return ", ".join(parts)
 
     def _show_user_guide(self) -> None:
         """Open the bundled user guide *inside the app*.

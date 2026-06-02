@@ -962,27 +962,41 @@ class Phase3TranslatePage(PhasePage):
         # Set progress bar to 100% on completion
         self._progress.setValue(100)
 
-        # Append summary line to the feed
-        rate = done.translated_count / elapsed if elapsed > 0 else 0
-        self._log.appendPlainText("")
-        self._log.appendPlainText("\u2501\u2501\u2501 DONE \u2501\u2501\u2501")
-        self._log.appendPlainText(
-            f"Translated via API: {done.translated_count} | "
-            f"From TM cache: {done.cached_count} | "
-            f"Reused (dedup): {done.deduped_count} | "
-            f"Skipped: {done.skipped_count}"
-            + (f" | Resumed from checkpoint: {done.resumed_count}" if done.resumed_count else "")
-            + (f" | Reused from imported file: {done.imported_reuse_count}" if done.imported_reuse_count else "")
-        )
-        self._log.appendPlainText(
-            "  TM cache = previously translated by this app and reused (no API call).  "
-            "Dedup = identical label appeared multiple times; translated once, reused for the rest.  "
-            "Reused from file = label already translated in same file, reused without API call."
-        )
-        self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
-
         # Detect if this completion was from a cancellation
         was_cancelled = self._worker is not None and self._worker.is_cancelled
+
+        # Append formatted summary block to the live feed
+        total_processed = (
+            done.translated_count + done.cached_count
+            + done.deduped_count + done.skipped_count
+        )
+        elapsed_str = _format_eta(elapsed)
+        rate = done.translated_count / elapsed if elapsed > 0 else 0
+
+        sep = "\u2550" * 43
+        self._log.appendPlainText("")
+        if was_cancelled:
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText("  TRANSLATION CANCELLED")
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText(f"  Completed before stop: {total_processed:>7,}")
+        else:
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText("  TRANSLATION COMPLETE")
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText(f"  Total rows processed:  {total_processed:>7,}")
+        self._log.appendPlainText(f"  Translated (API):      {done.translated_count:>7,}")
+        self._log.appendPlainText(f"  From Translation Memory:{done.cached_count:>6,}")
+        self._log.appendPlainText(f"  Deduplicated:          {done.deduped_count:>7,}")
+        if done.imported_reuse_count:
+            self._log.appendPlainText(f"  From imported file:    {done.imported_reuse_count:>7,}")
+        if done.resumed_count:
+            self._log.appendPlainText(f"  Resumed from checkpoint:{done.resumed_count:>6,}")
+        self._log.appendPlainText(f"  Skipped (existing):    {done.skipped_count:>7,}")
+        self._log.appendPlainText(f"  Elapsed time:          {elapsed_str:>7}")
+        if rate > 0:
+            self._log.appendPlainText(f"  Rate:                  {rate:>5.1f} rows/s")
+        self._log.appendPlainText(sep)
 
         if was_cancelled:
             msg = (
@@ -998,7 +1012,7 @@ class Phase3TranslatePage(PhasePage):
                 f"Translated {done.translated_count:,} "
                 f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
                 f"resumed {done.resumed_count:,}, "
-                f"skipped {done.skipped_count:,}) in {elapsed:.1f}s."
+                f"skipped {done.skipped_count:,}) in {elapsed_str}."
             )
 
         self._eta_label.setText(msg)
