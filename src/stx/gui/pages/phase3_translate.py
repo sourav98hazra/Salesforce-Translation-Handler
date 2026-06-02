@@ -415,11 +415,11 @@ class Phase3TranslatePage(PhasePage):
             "Progress and live source/translation pairs appear in the feed below."
         )
         self._start_btn.clicked.connect(self._on_start)
-        self._reset_checkpoint_btn = QPushButton("Reset checkpoint")
+        self._reset_checkpoint_btn = QPushButton("Clear progress")
         self._reset_checkpoint_btn.setToolTip(
             "Clear any saved resume point. Use this if you want to start translation\n"
             "from scratch instead of continuing where it last stopped.\n"
-            "(The checkpoint is only created when translation is interrupted mid-run.)"
+            "(The progress is only saved when translation is interrupted mid-run.)"
         )
         self._reset_checkpoint_btn.clicked.connect(self._on_reset_checkpoint)
         self._cancel_btn = QPushButton("Cancel")
@@ -873,6 +873,16 @@ class Phase3TranslatePage(PhasePage):
 
     def _on_progress(self, percent: int, message: str) -> None:
         self._progress.setValue(percent)
+        if self._start_time is not None and self._current_row > 0:
+            elapsed = time.time() - self._start_time
+            rate = self._current_row / elapsed if elapsed > 0 else 0
+            remaining = self._total_rows - self._current_row
+            eta_sec = remaining / rate if rate > 0 else 0
+            self._eta_label.setText(
+                f"Translating... {percent}% | {rate:.1f} rows/s | ETA: {int(eta_sec)}s"
+            )
+        elif percent > 0:
+            self._eta_label.setText(f"Translating... {percent}%")
 
     def _on_row_translated(self, source: str, translation: str, status: str, from_fuzzy: bool) -> None:
         self._current_row += 1
@@ -925,6 +935,9 @@ class Phase3TranslatePage(PhasePage):
         self._state.translation_statuses = done.statuses
         elapsed = done.elapsed_seconds
 
+        # Set progress bar to 100% on completion
+        self._progress.setValue(100)
+
         # Append summary line to the feed
         rate = done.translated_count / elapsed if elapsed > 0 else 0
         self._log.appendPlainText("")
@@ -944,16 +957,26 @@ class Phase3TranslatePage(PhasePage):
         )
         self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
 
-        # The translated document is held in memory (self._state.document).
-        # Don't auto-save: surface the "Save copy to..." button instead so
-        # the user picks where to save.
-        msg = (
-            f"Translation complete -- click 'Save copy to...' to save the translated file.  "
-            f"Translated {done.translated_count:,} "
-            f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
-            f"resumed {done.resumed_count:,}, "
-            f"skipped {done.skipped_count:,}) in {elapsed:.1f}s."
-        )
+        # Detect if this completion was from a cancellation
+        was_cancelled = self._worker is not None and self._worker.is_cancelled
+
+        if was_cancelled:
+            msg = (
+                f"Cancelled - translated {done.translated_count:,} rows before stopping.  "
+                f"Click 'Start translation' to resume from checkpoint."
+            )
+        else:
+            # The translated document is held in memory (self._state.document).
+            # Don't auto-save: surface the "Save copy to..." button instead so
+            # the user picks where to save.
+            msg = (
+                f"Translation complete - click 'Save a Copy...' to save the translated file.  "
+                f"Translated {done.translated_count:,} "
+                f"(TM hits {done.cached_count:,}, dedup {done.deduped_count:,}, "
+                f"resumed {done.resumed_count:,}, "
+                f"skipped {done.skipped_count:,}) in {elapsed:.1f}s."
+            )
+
         self._eta_label.setText(msg)
         self.status_message.emit(msg)
 

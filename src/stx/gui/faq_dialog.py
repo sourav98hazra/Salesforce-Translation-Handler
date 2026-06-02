@@ -218,7 +218,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "Can I resume a translation that was interrupted?",
         "Yes. The checkpoint feature saves progress after each row. If you cancel or the app "
         "crashes, restarting will continue from where it left off. "
-        "Click 'Reset checkpoint' to start fresh instead of resuming.",
+        "Click 'Clear progress' to start fresh instead of resuming.",
     ),
     (
         "Phase 3 — Translate",
