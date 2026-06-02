@@ -33,6 +33,7 @@ htmlcov/
 
 # Kiro build metadata
 .agents/
+semantic-review/
 
 # PyInstaller
 *.spec
