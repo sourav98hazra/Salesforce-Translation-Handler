@@ -332,7 +332,7 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
 
         # Retranslation checkbox — shown only when doc has translated rows
-        self._retranslate_check = QCheckBox("Retranslate existing translations")
+        self._retranslate_check = QCheckBox("Retranslate all (overwrite existing)")
         self._retranslate_check.setToolTip(
             "When checked, rows that already have translations will be "
             "retranslated. When unchecked (default), only untranslated "

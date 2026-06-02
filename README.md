@@ -939,7 +939,7 @@ stx translate input.xlsx output.xlsx --target ja
 stx translate input.xlsx output.xlsx --target ja --retranslate-existing
 ```
 
-In the GUI, a **"Retranslate existing translations"** checkbox is available in Phase 3 (shown when the file already has translated rows), and the same toggle lives under **Translation → Retranslate existing rows**.
+In the GUI, a **"Retranslate all (overwrite existing)"** checkbox is available in Phase 3 (shown when the file already has translated rows), and the same toggle lives under **Translation → Retranslate all (overwrite existing)**.
 
 ### 9. Secure credential storage
 
@@ -1057,7 +1057,7 @@ Every toggle persists between sessions.
 | Use Translation Memory cache | On | Reuse translations from the local SQLite TM (previous runs). |
 | Use Fuzzy matching | On | Accept approximate TM matches above the configured threshold. |
 | Use imported translations | Off | Apply translations from a separately imported Excel with highest priority. |
-| Retranslate existing rows | Off | Send ALL rows (including already-translated ones) to the backend. |
+| Retranslate all (overwrite existing) | Off | Send ALL rows (including already-translated ones) to the backend. |
 
 The menu also exposes **Settings...** (`Ctrl+,`) and **Re-enable pre-flight confirmation**.
 
@@ -1073,7 +1073,7 @@ translation directly. The live feed marks these rows:
 
 Matching is by **label text**, not key, so different keys that share the same label
 (e.g. several "Save" buttons) all reuse the one existing translation. When
-*Retranslate existing rows* is on, in-file reuse is skipped.
+*Retranslate all (overwrite existing)* is on, in-file reuse is skipped.
 
 ## Pre-flight confirmation dialog
 

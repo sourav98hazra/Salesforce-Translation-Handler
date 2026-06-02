@@ -147,7 +147,7 @@ Translation
 │
 ├── ─────────────────────────────────
 │
-├── [  ] Retranslate existing rows    (default off)
+├── [  ] Retranslate all (overwrite existing)    (default off)
 │         Send ALL rows to the backend, overwriting existing translations.
 │         When on, in-file translations are also skipped.
 │
@@ -171,7 +171,7 @@ Translation options:
   ✓ Use Translation Memory cache — reuse from previous runs
   ✓ Use Fuzzy matching           — approximate TM matches
   ✗ Use imported translations    — no file imported
-  ✗ Retranslate existing rows    — only untranslated rows processed
+  ✗ Retranslate all (overwrite existing)    — only untranslated rows processed
 
 Run summary:
   Backend:             google

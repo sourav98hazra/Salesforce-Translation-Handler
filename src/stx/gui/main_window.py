@@ -609,7 +609,7 @@ class MainWindow(QMainWindow):
         trans_menu.addSeparator()
 
         self._act_retranslate = _make_toggle(
-            "Retranslate existing rows",
+            "Retranslate all (overwrite existing)",
             "When checked, ALL rows (including already-translated ones) are sent for translation.\n"
             "When unchecked (default), only blank/untranslated rows are translated.",
             gui_settings.get_retranslate_existing,

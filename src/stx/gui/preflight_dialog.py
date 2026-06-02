@@ -134,12 +134,12 @@ class PreflightDialog(QDialog):
 
         if kw["retranslate"]:
             opts_layout.addLayout(
-                _opt_row(True, "Retranslate existing rows",
+                _opt_row(True, "Retranslate all (overwrite existing)",
                          "⚠ ALL rows will be retranslated — existing translations will be overwritten")
             )
         else:
             opts_layout.addLayout(
-                _opt_row(False, "Retranslate existing rows",
+                _opt_row(False, "Retranslate all (overwrite existing)",
                          "only untranslated rows will be processed (default)")
             )
 

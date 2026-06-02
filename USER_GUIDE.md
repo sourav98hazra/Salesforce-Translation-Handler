@@ -143,7 +143,7 @@ The **Translation** menu in the menu bar groups all translation behaviour toggle
 | Use Translation Memory cache | ✓ On | Reuses translations from the SQLite TM database (previous runs) |
 | Use Fuzzy matching | ✓ On | Finds approximate matches in the TM (e.g. "Save record" matches "Save Record") |
 | Use imported translations | ✗ Off | Applies translations from a separately imported Excel with highest priority |
-| Retranslate existing rows | ✗ Off | When on, ALL rows including already-translated ones are sent to the backend |
+| Retranslate all (overwrite existing) | ✗ Off | When on, ALL rows including already-translated ones are sent to the backend |
 
 The menu also has a **Settings...** shortcut (Ctrl+,) and a **Re-enable pre-flight confirmation** action.
 
@@ -700,7 +700,7 @@ By default, entries that already have a non-empty translation are skipped during
 
 ### GUI usage
 
-In Phase 3, check the **"Retranslate existing"** checkbox before starting translation.
+In Phase 3, check the **"Retranslate all (overwrite existing)"** checkbox before starting translation.
 
 ### CLI usage
 

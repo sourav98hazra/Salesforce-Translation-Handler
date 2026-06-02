@@ -91,9 +91,9 @@ _FAQ: list[tuple[str, str, str]] = [
         "via the Translation menu:\n"
         "• 'Use in-file translations' (on by default) reuses a translation already present "
         "elsewhere in the same file for matching labels.\n"
-        "• 'Retranslate existing rows' (off by default) sends ALL rows — including translated "
+        "• 'Retranslate all (overwrite existing)' (off by default) sends ALL rows — including translated "
         "ones — to the backend, overwriting them. In Phase 3 this also appears as the "
-        "'Retranslate existing translations' checkbox when the file already has translated rows.",
+        "'Retranslate all (overwrite existing)' checkbox when the file already has translated rows.",
     ),
     (
         "Phase 1 — Import STF",
@@ -124,7 +124,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "• Use Translation Memory cache (default on) — reuse from previous runs\n"
         "• Use Fuzzy matching (default on) — approximate TM matches\n"
         "• Use imported translations (default off) — apply an external Excel at highest priority\n"
-        "• Retranslate existing rows (default off) — send ALL rows to the backend\n"
+        "• Retranslate all (overwrite existing) (default off) — send ALL rows to the backend\n"
         "All toggles persist between sessions. Open Settings... (Ctrl+,) for advanced options.",
     ),
     (
@@ -145,11 +145,11 @@ _FAQ: list[tuple[str, str, str]] = [
         "Example: CustomLabel.SaveButton has translation '保存'. "
         "CustomLabel.SaveAction (untranslated) has the same label 'Save' — it gets '保存' "
         "automatically.\n"
-        "When Retranslate existing rows is on, in-file reuse is skipped.",
+        "When Retranslate all (overwrite existing) is on, in-file reuse is skipped.",
     ),
     (
         "Phase 3 — Translate",
-        "What does 'Retranslate existing rows' do?",
+        "What does 'Retranslate all (overwrite existing)' do?",
         "When checked in the Translation menu, ALL rows in the document — including those "
         "already translated — are sent to the backend. Existing translations are overwritten.\n"
         "Default is off (only blank rows are translated). "

@@ -325,7 +325,7 @@ class AboutDialog(QDialog):
             "Use Fuzzy matching (default on)",
             "Use imported translations (default off) -- apply an external "
             "Excel with highest priority",
-            "Retranslate existing rows (default off) -- override all rows",
+            "Retranslate all (overwrite existing) (default off) -- override all rows",
             "Pre-flight confirmation dialog -- summarises active options "
             "before every run; dismissable with 'Don't show again'",
         ]))
