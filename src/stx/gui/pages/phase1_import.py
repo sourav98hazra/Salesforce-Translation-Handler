@@ -125,9 +125,9 @@ class Phase1ImportPage(PhasePage):
 
         meta_box = QGroupBox("Parsed metadata")
         meta_grid = QGridLayout(meta_box)
-        meta_grid.setContentsMargins(8, 6, 8, 6)
-        meta_grid.setHorizontalSpacing(16)
-        meta_grid.setVerticalSpacing(6)
+        meta_grid.setContentsMargins(6, 4, 6, 4)
+        meta_grid.setHorizontalSpacing(12)
+        meta_grid.setVerticalSpacing(4)
 
         # Row 0 — Translation language (STF target)
         lbl0a = QLabel("Translation language:")

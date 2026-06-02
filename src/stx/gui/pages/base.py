@@ -139,17 +139,17 @@ class PhasePage(QWidget):
         self._busy = False
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(14, 10, 14, 10)
-        outer.setSpacing(10)
+        outer.setContentsMargins(10, 6, 10, 6)
+        outer.setSpacing(6)
 
         heading = QVBoxLayout()
-        heading.setSpacing(2)
+        heading.setSpacing(1)
         title_label = QLabel(title)
         title_label.setProperty("class", "phase-title")
-        title_label.setStyleSheet("font-size: 17px; font-weight: 700;")
+        title_label.setStyleSheet("font-size: 16px; font-weight: 700;")
         heading.addWidget(title_label)
         subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: #4a5568; font-size: 12px;")
+        subtitle_label.setStyleSheet("color: #4a5568; font-size: 11px;")
         subtitle_label.setWordWrap(True)
         heading.addWidget(subtitle_label)
 
@@ -157,7 +157,7 @@ class PhasePage(QWidget):
 
         # Subclass-supplied content lives in ``self._content_layout``.
         self._content_layout = QVBoxLayout()
-        self._content_layout.setSpacing(8)
+        self._content_layout.setSpacing(6)
         outer.addLayout(self._content_layout, stretch=1)
 
     # ------------------------------------------------------------------ helpers
@@ -368,9 +368,9 @@ def clamp_to_screen(widget: QWidget, w: int, h: int, h_margin: int = 80, v_margi
 def make_action_row(*buttons: QPushButton) -> QHBoxLayout:
     """Lay out a row of action buttons, left-aligned with spacer pushing right."""
     layout = QHBoxLayout()
-    layout.setSpacing(8)
+    layout.setSpacing(6)
     for btn in buttons:
-        btn.setMinimumHeight(32)
+        btn.setMinimumHeight(28)
         btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         layout.addWidget(btn)
     layout.addStretch(1)

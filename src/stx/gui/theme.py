@@ -176,20 +176,20 @@ def build_stylesheet(palette: dict) -> str:
     QGroupBox {{
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
-        border-radius: 10px;
-        margin-top: 10px;
-        padding: 12px 12px 8px 12px;
+        border-radius: 8px;
+        margin-top: 8px;
+        padding: 6px 8px 4px 8px;
         font-weight: 600;
         font-size: 12px;
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
         subcontrol-position: top left;
-        left: 12px;
+        left: 10px;
         top: -2px;
-        padding: 2px 8px;
+        padding: 1px 6px;
         background-color: {p["surface"]};
-        border-radius: 6px;
+        border-radius: 4px;
         color: {p["text_subtle"]};
         font-size: 11px;
     }}
@@ -205,9 +205,9 @@ def build_stylesheet(palette: dict) -> str:
         background-color: {p["surface_raised"]};
         color: {p["text"]};
         border: 1px solid {p["border"]};
-        border-radius: 8px;
-        padding: 6px 14px;
-        min-height: 20px;
+        border-radius: 6px;
+        padding: 4px 10px;
+        min-height: 18px;
     }}
     QPushButton:hover {{
         background-color: {p["surface_alt"]};
@@ -253,8 +253,8 @@ def build_stylesheet(palette: dict) -> str:
     QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
         background-color: {p["surface_raised"]};
         border: 1px solid {p["border"]};
-        border-radius: 8px;
-        padding: 5px 8px;
+        border-radius: 6px;
+        padding: 3px 6px;
         color: {p["text"]};
         selection-background-color: {p["accent"]};
         selection-color: white;
@@ -295,7 +295,7 @@ def build_stylesheet(palette: dict) -> str:
         selection-color: white;
     }}
     QTableView::item, QTableWidget::item {{
-        padding: 4px 8px;
+        padding: 2px 6px;
     }}
     QHeaderView::section {{
         background-color: {p["surface_alt"]};
@@ -303,7 +303,7 @@ def build_stylesheet(palette: dict) -> str:
         border: 0;
         border-right: 1px solid {p["border"]};
         border-bottom: 1px solid {p["border"]};
-        padding: 6px 8px;
+        padding: 4px 8px;
         font-weight: 600;
         font-size: 11px;
         text-transform: uppercase;
@@ -317,10 +317,10 @@ def build_stylesheet(palette: dict) -> str:
         outline: 0;
     }}
     QListWidget::item {{
-        padding: 12px 14px;
-        margin-bottom: 4px;
+        padding: 8px 12px;
+        margin-bottom: 2px;
         color: {p["sidebar_text"]};
-        border-radius: 8px;
+        border-radius: 6px;
     }}
     QListWidget::item:selected {{
         background: {p["sidebar_item_active"]};
@@ -409,11 +409,11 @@ def build_stylesheet(palette: dict) -> str:
     QTabBar::tab {{
         background-color: {p["surface_alt"]};
         color: {p["text_muted"]};
-        padding: 8px 18px;
+        padding: 5px 14px;
         border: 1px solid {p["border"]};
         border-bottom: 0;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
         margin-right: 2px;
         font-weight: 600;
     }}

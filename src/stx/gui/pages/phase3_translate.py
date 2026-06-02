@@ -302,7 +302,7 @@ class Phase3TranslatePage(PhasePage):
         lang_row.addWidget(self._target_combo, stretch=1)
 
         setup_layout = QVBoxLayout(setup_box)
-        setup_layout.setContentsMargins(8, 6, 8, 6)
+        setup_layout.setContentsMargins(6, 4, 6, 4)
         setup_layout.addLayout(lang_row)
 
         # ----- Filter row 1: action buttons + checkboxes
