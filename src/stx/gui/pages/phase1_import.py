@@ -74,16 +74,51 @@ class Phase1ImportPage(PhasePage):
         self.add_widget(path_box)
 
         # ---------- Parsed metadata (2-column grid)
-        self._language_field = QLineEdit()
-        self._language_field.setToolTip(
-            "Human-readable target language name (e.g. Japanese). "
-            "Auto-filled from the STF header; edit if it's missing or wrong."
+        # ---- Row 0: Translation Language (= the STF target language, read from header)
+        # This is the language the STF is translating INTO (e.g. Japanese).
+        # It is auto-filled from the STF header but the user can override via dropdown.
+        self._stf_lang_combo = QComboBox()
+        self._stf_lang_combo.addItems(supported_language_names())
+        self._stf_lang_combo.setCurrentIndex(-1)   # blank until a file is loaded
+        self._stf_lang_combo.setToolTip(
+            "The language this STF file translates INTO — read from the STF header.\n"
+            "Change here if the header is missing or incorrect.\n"
+            "This value is carried forward to Phase 3 as the translation target."
         )
-        self._language_code_field = QLineEdit()
-        self._language_code_field.setToolTip(
-            "Salesforce language code (e.g. ja, fr, de). "
-            "Auto-filled from the STF header; edit if it's missing or wrong."
+        self._stf_lang_combo.currentTextChanged.connect(self._on_stf_lang_changed)
+
+        self._stf_lang_code_field = QLineEdit()
+        self._stf_lang_code_field.setReadOnly(True)
+        self._stf_lang_code_field.setToolTip(
+            "Salesforce language code for the translation language (auto-filled from the dropdown)."
         )
+
+        # ---- Row 1: Source Language (= language the labels are written in, e.g. English)
+        # Auto-detected from label text via langdetect; user can override.
+        self._source_language_combo = QComboBox()
+        self._source_language_combo.addItems(supported_language_names())
+        self._source_language_combo.setCurrentText("English")   # safe default
+        self._source_language_combo.setToolTip(
+            "The language the STF labels are written in — usually English.\n"
+            "Auto-detected from label text after parsing; change if incorrect.\n"
+            "This is used as the 'source' language in Phase 3 translation."
+        )
+        self._source_language_combo.currentTextChanged.connect(self._on_source_language_changed)
+
+        self._source_language_code_field = QLineEdit()
+        self._source_language_code_field.setReadOnly(True)
+        self._source_language_code_field.setToolTip(
+            "Salesforce code for the label language (auto-filled from the dropdown)."
+        )
+        _default_src_code = code_for_language("English") or "en_US"
+        self._source_language_code_field.setText(_default_src_code)
+
+        self._source_detect_label = QLabel("")
+        self._source_detect_label.setStyleSheet(
+            "color: #2563eb; font-size: 11px; font-weight: 700;"
+        )
+
+        # ---- Other stat fields
         self._stf_type_field = QLineEdit(); self._stf_type_field.setReadOnly(True)
         self._total_field = QLineEdit(); self._total_field.setReadOnly(True)
         self._translated_field = QLineEdit(); self._translated_field.setReadOnly(True)
@@ -92,61 +127,77 @@ class Phase1ImportPage(PhasePage):
 
         meta_box = QGroupBox("Parsed metadata")
         meta_grid = QGridLayout(meta_box)
-        meta_grid.setContentsMargins(8, 4, 8, 4)
+        meta_grid.setContentsMargins(8, 6, 8, 6)
         meta_grid.setHorizontalSpacing(16)
-        meta_grid.setVerticalSpacing(4)
+        meta_grid.setVerticalSpacing(6)
 
-        # Row 0
-        meta_grid.addWidget(QLabel("Language:"), 0, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._language_field, 0, 1)
-        meta_grid.addWidget(QLabel("Language code:"), 0, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._language_code_field, 0, 3)
-        # Row 1 - Source language (dropdown + auto-detect)
-        self._source_language_combo = QComboBox()
-        self._source_language_combo.addItems(supported_language_names())
-        self._source_language_combo.setCurrentText("English")  # sensible default
-        self._source_language_combo.setToolTip(
-            "Source language of the STF file. Auto-detected after parsing; "
-            "change manually if the detection is wrong."
-        )
-        self._source_language_combo.currentTextChanged.connect(self._on_source_language_changed)
+        # Row 0 — Translation language (STF target)
+        lbl0a = QLabel("Translation language:")
+        lbl0a.setToolTip("The language this STF translates into (from STF header).")
+        meta_grid.addWidget(lbl0a, 0, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._stf_lang_combo, 0, 1)
+        lbl0b = QLabel("Language code:")
+        lbl0b.setToolTip("Salesforce code for the translation language.")
+        meta_grid.addWidget(lbl0b, 0, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._stf_lang_code_field, 0, 3)
 
-        self._source_language_code_field = QLineEdit()
-        self._source_language_code_field.setReadOnly(True)
-        self._source_language_code_field.setToolTip(
-            "Salesforce code for the source language (auto-filled from the dropdown)."
-        )
-        # Populate code field from default "English"
-        _default_code = code_for_language("English") or "en_US"
-        self._source_language_code_field.setText(_default_code)
-
-        self._source_detect_label = QLabel("")
-        self._source_detect_label.setStyleSheet(
-            "color: #2563eb; font-size: 12px; font-weight: 700;"
-        )
-        meta_grid.addWidget(QLabel("Source language:"), 1, 0, Qt.AlignmentFlag.AlignRight)
+        # Row 1 — Source / label language
+        lbl1a = QLabel("Label language:")
+        lbl1a.setToolTip("Language the labels are written in (usually English). Auto-detected.")
+        meta_grid.addWidget(lbl1a, 1, 0, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._source_language_combo, 1, 1)
-        meta_grid.addWidget(QLabel("Source code:"), 1, 2, Qt.AlignmentFlag.AlignRight)
+        lbl1b = QLabel("Label code:")
+        lbl1b.setToolTip("Salesforce code for the label language.")
+        meta_grid.addWidget(lbl1b, 1, 2, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._source_language_code_field, 1, 3)
-        # Row 2
-        meta_grid.addWidget(QLabel("STF type:"), 2, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._stf_type_field, 2, 1)
-        meta_grid.addWidget(QLabel("Total rows:"), 2, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._total_field, 2, 3)
-        # Row 3
-        meta_grid.addWidget(QLabel("Translated:"), 3, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._translated_field, 3, 1)
-        meta_grid.addWidget(QLabel("Untranslated:"), 3, 2, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._untranslated_field, 3, 3)
-        # Row 4
-        meta_grid.addWidget(QLabel("Component types:"), 4, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._components_field, 4, 1, 1, 3)
-        # Row 5 - Detection info label
-        meta_grid.addWidget(self._source_detect_label, 5, 1, 1, 3)
+
+        # Row 2 — detection info
+        meta_grid.addWidget(self._source_detect_label, 2, 1, 1, 3)
+
+        # Row 3 — STF type + total rows
+        meta_grid.addWidget(QLabel("STF type:"), 3, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._stf_type_field, 3, 1)
+        meta_grid.addWidget(QLabel("Total rows:"), 3, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._total_field, 3, 3)
+
+        # Row 4 — translated + untranslated
+        meta_grid.addWidget(QLabel("Translated:"), 4, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._translated_field, 4, 1)
+        meta_grid.addWidget(QLabel("Untranslated:"), 4, 2, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._untranslated_field, 4, 3)
+
+        # Row 5 — component types
+        meta_grid.addWidget(QLabel("Component types:"), 5, 0, Qt.AlignmentFlag.AlignRight)
+        meta_grid.addWidget(self._components_field, 5, 1, 1, 3)
 
         meta_grid.setColumnStretch(1, 1)
         meta_grid.setColumnStretch(3, 1)
         self.add_widget(meta_box)
+
+        # ---------- "Use existing translations" option (shown for mixed STFs)
+        from PySide6.QtWidgets import QCheckBox as _QCB
+        self._use_existing_row = QGroupBox()
+        self._use_existing_row.setFlat(True)
+        self._use_existing_row.setStyleSheet(
+            "QGroupBox { border: 1px solid #f59e0b; border-radius: 4px; "
+            "background: #fffbeb; padding: 4px 8px; }"
+        )
+        _ue_layout = QHBoxLayout(self._use_existing_row)
+        _ue_layout.setContentsMargins(6, 4, 6, 4)
+        _ue_icon = QLabel("\u26a0")
+        _ue_icon.setStyleSheet("font-size: 14px; color: #d97706;")
+        _ue_layout.addWidget(_ue_icon)
+        self._use_existing_check = _QCB("Keep existing translations (mixed STF detected)")
+        self._use_existing_check.setToolTip(
+            "This STF has both translated and untranslated rows.\n"
+            "Checked (default): existing translations are kept — only blank rows will be translated.\n"
+            "Unchecked: all rows will be retranslated, overwriting existing translations."
+        )
+        self._use_existing_check.setChecked(True)
+        self._use_existing_check.toggled.connect(self._on_use_existing_toggled)
+        _ue_layout.addWidget(self._use_existing_check, stretch=1)
+        self._use_existing_row.setVisible(False)   # shown only when mixed STF is loaded
+        self.add_widget(self._use_existing_row)
 
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
@@ -199,6 +250,13 @@ class Phase1ImportPage(PhasePage):
 
     # ------------------------------------------------------------------ slots
 
+    def _on_stf_lang_changed(self, name: str) -> None:
+        """Sync translation language code field and state when the dropdown changes."""
+        code = code_for_language(name) or ""
+        self._stf_lang_code_field.setText(code)
+        self._state.target_language_name = name
+        self._state.target_language_code = code
+
     def _on_source_language_changed(self, name: str) -> None:
         """Sync source language code field and state when the dropdown changes."""
         code = code_for_language(name) or ""
@@ -241,23 +299,46 @@ class Phase1ImportPage(PhasePage):
             self._state.target_language_code = doc.language_code
 
         stats = doc.stats()
-        self._set_field(self._language_field, doc.language)
-        self._set_field(self._language_code_field, doc.language_code)
+
+        # Populate the Translation Language dropdown from the STF header.
+        # Block signals so _on_stf_lang_changed doesn't fire redundantly.
+        from ...languages import language_for_code as _lang_for_code
+        stf_lang_name = _lang_for_code(doc.language_code) or doc.language or ""
+        if stf_lang_name:
+            self._stf_lang_combo.blockSignals(True)
+            # Try to match in the combo; fall back to plain text set
+            idx = self._stf_lang_combo.findText(stf_lang_name)
+            if idx >= 0:
+                self._stf_lang_combo.setCurrentIndex(idx)
+            else:
+                # Language from header not in our list — show it as-is
+                self._stf_lang_combo.setCurrentIndex(-1)
+                self._stf_lang_combo.setEditText(stf_lang_name) if hasattr(self._stf_lang_combo, 'setEditText') else None
+            self._stf_lang_combo.blockSignals(False)
+        self._stf_lang_code_field.setText(doc.language_code or "")
+
         self._set_field(self._stf_type_field, doc.stf_type)
         self._set_field(self._total_field, f"{stats['total']:,}")
         self._set_field(self._translated_field, f"{stats['translated']:,}")
         self._set_field(self._untranslated_field, f"{stats['untranslated']:,}")
         self._set_field(self._components_field, str(stats["components"]))
 
-        # Auto-detect source language
+        # Auto-detect label language (source language)
         self._detect_source_language(doc)
+
+        # Show "use existing translations" option if the STF is mixed
+        has_translated = stats["translated"] > 0
+        has_untranslated = stats["untranslated"] > 0
+        self._use_existing_row.setVisible(has_translated and has_untranslated)
+        if has_translated and has_untranslated:
+            self._use_existing_check.setChecked(True)   # default: keep existing
+            self._state.retranslate_existing = False
 
         self._populate_preview(doc)
         self._save_stf_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
 
-        # Set the active workflow context so every subsequent load-in-any-phase
-        # will trigger the override confirmation dialog.
+        # Set the active workflow context.
         if self._state.source_stf_path:
             self._state.set_active_workflow_context(
                 document=doc,
@@ -270,11 +351,9 @@ class Phase1ImportPage(PhasePage):
                 reset_downstream=False,
             )
 
-        # Persist this file in the recent files list and mark phase 1 done.
         try:
             from .. import settings as gui_settings
             from ..state import PhaseStatus
-
             if self._state.source_stf_path:
                 gui_settings.add_recent_file(self._state.source_stf_path)
             self._state.set_phase(0, PhaseStatus.DONE)
@@ -361,16 +440,21 @@ class Phase1ImportPage(PhasePage):
             if self._preview.columnWidth(c) > 320:
                 self._preview.setColumnWidth(c, 320)
 
+    def _on_use_existing_toggled(self, checked: bool) -> None:
+        """Keep or discard existing translations for the next translation run."""
+        # checked = keep existing (retranslate_existing = False)
+        # unchecked = retranslate everything
+        self._state.retranslate_existing = not checked
+
     def _on_save_stf(self) -> None:
         if not self._state.document:
             return
         path = self.pick_directory("Choose output folder for STF files")
         if not path:
             return
-        # Pull current language values from the fields so the user can correct
-        # missing metadata before saving.
-        lang = self._language_field.text().strip() or self._state.target_language_name
-        code = self._language_code_field.text().strip() or self._state.target_language_code
+        # Use the translation language dropdown values
+        lang = self._stf_lang_combo.currentText().strip() or self._state.target_language_name
+        code = self._stf_lang_code_field.text().strip() or self._state.target_language_code
 
         self.status_message.emit(f"Writing STF files to {path} ...")
         worker = WriteStfWorker(self._state.document, path, lang, code, self)
@@ -385,12 +469,14 @@ class Phase1ImportPage(PhasePage):
         self.status_message.emit(f"STF files written to {res.full.parent}")
 
     def _on_next(self) -> None:
-        # Sync language fields back into shared state before navigating.
-        if self._language_field.text().strip():
-            self._state.target_language_name = self._language_field.text().strip()
-        if self._language_code_field.text().strip():
-            self._state.target_language_code = self._language_code_field.text().strip()
-        # Sync source language from dropdown
+        # Sync translation language (STF target) into state
+        stf_lang = self._stf_lang_combo.currentText().strip()
+        stf_code = self._stf_lang_code_field.text().strip()
+        if stf_lang:
+            self._state.target_language_name = stf_lang
+        if stf_code:
+            self._state.target_language_code = stf_code
+        # Sync label language (source) into state
         src_name = self._source_language_combo.currentText()
         src_code = code_for_language(src_name) or self._source_language_code_field.text().strip()
         if src_name:
@@ -405,12 +491,14 @@ class Phase1ImportPage(PhasePage):
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
         self._path_label.setText("No file selected.")
-        self._language_field.clear()
-        self._language_code_field.clear()
+        self._stf_lang_combo.setCurrentIndex(-1)
+        self._stf_lang_code_field.clear()
         self._source_language_combo.setCurrentText("English")
         default_code = code_for_language("English") or "en_US"
         self._source_language_code_field.setText(default_code)
         self._source_detect_label.setText("")
+        self._use_existing_row.setVisible(False)
+        self._use_existing_check.setChecked(True)
         self._stf_type_field.clear()
         self._total_field.clear()
         self._translated_field.clear()

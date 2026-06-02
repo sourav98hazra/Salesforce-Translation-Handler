@@ -305,8 +305,7 @@ class Phase3TranslatePage(PhasePage):
         setup_layout.setContentsMargins(8, 6, 8, 6)
         setup_layout.addLayout(lang_row)
 
-        # ----- Filter row: button + estimate, sits BELOW the two columns
-        # so it isn't visually competing with the Target combo or Output field.
+        # ----- Filter row 1: action buttons + checkboxes
         self._filter_btn = QPushButton("Filter Components...")
         self._filter_btn.setStyleSheet("padding: 5px 16px; font-weight: 600;")
         self._filter_btn.setToolTip(
@@ -331,22 +330,7 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_check.setChecked(self._state.imported_translations_enabled)
         self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
 
-        self._import_trans_label = QLabel("")
-        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
-
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
-
-        filter_row = QHBoxLayout()
-        filter_row.setContentsMargins(0, 8, 0, 0)
-        filter_row.setSpacing(12)
-        filter_row.addWidget(self._filter_btn)
-        filter_row.addWidget(self._import_trans_btn)
-        filter_row.addWidget(self._import_trans_check)
-        filter_row.addWidget(self._import_trans_label)
-        filter_row.addSpacing(8)
-
-        # Retranslation checkbox
+        # Retranslation checkbox — shown only when doc has translated rows
         self._retranslate_check = QCheckBox("Retranslate existing translations")
         self._retranslate_check.setToolTip(
             "When checked, rows that already have translations will be "
@@ -354,26 +338,35 @@ class Phase3TranslatePage(PhasePage):
             "rows are sent to the backend."
         )
         self._retranslate_check.setChecked(False)
-        self._retranslate_check.setVisible(False)  # shown only when doc has translated entries
-        self._retranslate_check.setStyleSheet("font-weight: 600;")
-        filter_row.addWidget(self._retranslate_check)
+        self._retranslate_check.setVisible(False)
+        self._retranslate_check.setStyleSheet("font-weight: 600; color: #b45309;")
+        self._retranslate_check.toggled.connect(self._on_retranslate_toggled)
 
-        self._retranslate_info = QLabel("(overwrites existing)")
-        self._retranslate_info.setStyleSheet("color: #dc2626; font-size: 10px;")
-        self._retranslate_info.setVisible(False)
-        filter_row.addWidget(self._retranslate_info)
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 8, 0, 0)
+        btn_row.setSpacing(10)
+        btn_row.addWidget(self._filter_btn)
+        btn_row.addWidget(self._import_trans_btn)
+        btn_row.addWidget(self._import_trans_check)
+        btn_row.addSpacing(16)
+        btn_row.addWidget(self._retranslate_check)
+        btn_row.addStretch(1)
 
-        # Vertical divider for visual separation between the action and the metric
-        divider = QFrame()
-        divider.setFrameShape(QFrame.Shape.VLine)
-        divider.setStyleSheet("color: #475569;")
-        filter_row.addWidget(divider)
-        filter_row.addSpacing(8)
+        # ----- Filter row 2: status labels + row estimate
+        self._import_trans_label = QLabel("")
+        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
 
-        filter_row.addWidget(self._estimate_label)
-        filter_row.addStretch(1)
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
 
-        setup_layout.addLayout(filter_row)
+        info_row = QHBoxLayout()
+        info_row.setContentsMargins(0, 2, 0, 0)
+        info_row.setSpacing(12)
+        info_row.addWidget(self._import_trans_label, stretch=1)
+        info_row.addWidget(self._estimate_label)
+
+        setup_layout.addLayout(btn_row)
+        setup_layout.addLayout(info_row)
 
         # Settings hint
         self._settings_summary = QLabel("")
@@ -538,10 +531,8 @@ class Phase3TranslatePage(PhasePage):
         if self._state.document is not None:
             has_translated = any(e.translation.strip() for e in self._state.document.entries)
             self._retranslate_check.setVisible(has_translated)
-            self._retranslate_info.setVisible(has_translated)
         else:
             self._retranslate_check.setVisible(False)
-            self._retranslate_info.setVisible(False)
 
     def _refresh_settings_summary(self) -> None:
         backend = gui_settings.get_str(gui_settings.KEYS.backend, "google")
@@ -644,6 +635,10 @@ class Phase3TranslatePage(PhasePage):
 
     # ------------------------------------------------------------------ output path
 
+    def _on_retranslate_toggled(self, checked: bool) -> None:
+        """Propagate retranslate checkbox to state."""
+        self._state.retranslate_existing = checked
+
     def _on_target_changed(self, name: str) -> None:
         code = code_for_language(name)
         if code:
@@ -740,9 +735,13 @@ class Phase3TranslatePage(PhasePage):
         src_code = code_for_language(self._source_combo.currentText()) or "en"
         self._log.appendPlainText(
             f"\u2500\u2500  {src_code.upper()} \u2192 {self._state.target_language_code.upper()}  "
-            f"\u2500\u2500  scope: {self._total_rows:,} rows  "
-            f"workers: {workers}\n"
+            f"\u2500\u2500  scope: {self._total_rows:,} rows  |  workers: {workers}"
         )
+        self._log.appendPlainText(
+            "  Legend: Trans = translated via API  |  TM = from Translation Memory cache  "
+            "|  Dedup = duplicate row reused from same run"
+        )
+        self._log.appendPlainText("")
 
         self._progress.setValue(0)
         self._eta_label.setText("Starting...")
@@ -802,12 +801,12 @@ class Phase3TranslatePage(PhasePage):
         elif status.startswith("Skipped") or status.startswith("Cancelled") or "Fallback" in status:
             self._skipped_count += 1
 
-        # Inline counters in the feed line
+        # Inline counters in the feed line — readable labels
         src_code = (code_for_language(self._source_combo.currentText()) or "en").upper()
         tgt_code = (self._state.target_language_code or "ja").upper()
         prefix = (
             f"[{self._current_row}/{self._total_rows} | "
-            f"T:{self._translated_count} TM:{self._cached_count} D:{self._deduped_count}]"
+            f"Trans:{self._translated_count} TM:{self._cached_count} Dedup:{self._deduped_count}]"
         )
 
         # Show [FUZZY] prefix for fuzzy TM matches using structured flag
@@ -845,9 +844,15 @@ class Phase3TranslatePage(PhasePage):
         self._log.appendPlainText("")
         self._log.appendPlainText("\u2501\u2501\u2501 DONE \u2501\u2501\u2501")
         self._log.appendPlainText(
-            f"Translated: {done.translated_count} | TM hits: {done.cached_count} | "
-            f"Deduped: {done.deduped_count} | Skipped: {done.skipped_count}"
-            + (f" | Resumed: {done.resumed_count}" if done.resumed_count else "")
+            f"Translated via API: {done.translated_count} | "
+            f"From TM cache: {done.cached_count} | "
+            f"Reused (dedup): {done.deduped_count} | "
+            f"Skipped: {done.skipped_count}"
+            + (f" | Resumed from checkpoint: {done.resumed_count}" if done.resumed_count else "")
+        )
+        self._log.appendPlainText(
+            "  TM cache = previously translated by this app and reused (no API call).  "
+            "Dedup = identical label appeared multiple times; translated once, reused for the rest."
         )
         self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
 
@@ -1137,7 +1142,6 @@ class Phase3TranslatePage(PhasePage):
         self._start_time = None
         self._retranslate_check.setChecked(False)
         self._retranslate_check.setVisible(False)
-        self._retranslate_info.setVisible(False)
         self._import_trans_label.setText("")
         self._import_trans_check.setChecked(False)
 

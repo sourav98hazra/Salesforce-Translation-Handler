@@ -417,37 +417,44 @@ class MainWindow(QMainWindow):
         # Edit menu: Undo/Redo (delegated to Phase 4) then Settings.
         edit_menu = bar.addMenu("&Edit")
 
-        self._undo_action = QAction("&Undo", self)
+        self._undo_action = QAction("&Undo translation edit", self)
         self._undo_action.setShortcut("Ctrl+Z")
         self._undo_action.setEnabled(False)
+        self._undo_action.setToolTip(
+            "Undo the last individual translation cell edit in Phase 4.\n"
+            "Only works while Phase 4 (Browse & Review) is open."
+        )
         self._undo_action.triggered.connect(self._action_undo)
         edit_menu.addAction(self._undo_action)
 
-        self._redo_action = QAction("&Redo", self)
+        self._redo_action = QAction("&Redo translation edit", self)
         self._redo_action.setShortcut("Ctrl+Y")
         self._redo_action.setEnabled(False)
+        self._redo_action.setToolTip(
+            "Redo a previously undone translation cell edit in Phase 4."
+        )
         self._redo_action.triggered.connect(self._action_redo)
         edit_menu.addAction(self._redo_action)
 
         edit_menu.addSeparator()
 
-        # App-wide (coarse) undo/redo of major actions -- separate from the
-        # Phase 4 per-translation undo above.  Different shortcuts so both
-        # coexist without clashing.
-        self._app_undo_action = QAction("Undo Last Action (App-wide)", self)
+        # App-wide coarse undo/redo — reverses whole major actions, not single edits.
+        self._app_undo_action = QAction("Undo last major action", self)
         self._app_undo_action.setShortcut("Ctrl+Shift+Z")
         self._app_undo_action.setEnabled(False)
         self._app_undo_action.setToolTip(
-            "Reverse the last major action (load file, translate, auto-fix, reset)."
+            "Reverse the last major step such as loading a file, running translation,\n"
+            "applying auto-fix, or resetting.  Different from Ctrl+Z which only undoes\n"
+            "single cell edits inside Phase 4."
         )
         self._app_undo_action.triggered.connect(self._app_undo)
         edit_menu.addAction(self._app_undo_action)
 
-        self._app_redo_action = QAction("Redo Last Action (App-wide)", self)
+        self._app_redo_action = QAction("Redo last major action", self)
         self._app_redo_action.setShortcut("Ctrl+Shift+Y")
         self._app_redo_action.setEnabled(False)
         self._app_redo_action.setToolTip(
-            "Re-apply the last major action reversed by App-wide Undo."
+            "Re-apply the last major step that was reversed by 'Undo last major action'."
         )
         self._app_redo_action.triggered.connect(self._app_redo)
         edit_menu.addAction(self._app_redo_action)
@@ -512,8 +519,9 @@ class MainWindow(QMainWindow):
         guide_action.triggered.connect(self._show_user_guide)
         help_menu.addAction(guide_action)
         faq_action = QAction("FAQ && Troubleshooting", self)
-        faq_action.setToolTip("Open the FAQ and troubleshooting section")
-        faq_action.triggered.connect(self._show_user_guide)
+        faq_action.setShortcut("Ctrl+F1")
+        faq_action.setToolTip("Open the searchable FAQ")
+        faq_action.triggered.connect(self._show_faq)
         help_menu.addAction(faq_action)
         about = QAction("&About", self)
         about.triggered.connect(self._show_about)
@@ -728,12 +736,12 @@ class MainWindow(QMainWindow):
         undo_label = self._app_history.undo_label()
         redo_label = self._app_history.redo_label()
         self._app_undo_action.setText(
-            f"Undo Last Action: {undo_label}" if can_undo and undo_label
-            else "Undo Last Action (App-wide)"
+            f"Undo: {undo_label}" if can_undo and undo_label
+            else "Undo last major action"
         )
         self._app_redo_action.setText(
-            f"Redo Last Action: {redo_label}" if can_redo and redo_label
-            else "Redo Last Action (App-wide)"
+            f"Redo: {redo_label}" if can_redo and redo_label
+            else "Redo last major action"
         )
 
     def _is_translation_running(self) -> bool:
@@ -1037,6 +1045,12 @@ class MainWindow(QMainWindow):
         s.setValue(gui_settings.KEYS.window_geometry, self.saveGeometry())
         s.setValue(gui_settings.KEYS.window_state, self.saveState())
         super().closeEvent(event)
+
+    def _show_faq(self) -> None:
+        """Open the searchable FAQ dialog."""
+        from .faq_dialog import FaqDialog
+        dlg = FaqDialog(self)
+        dlg.exec()
 
     def _show_about(self) -> None:
         from .about_dialog import AboutDialog

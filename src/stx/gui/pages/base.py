@@ -339,14 +339,11 @@ class PhasePage(QWidget):
 # ---------------------------------------------------------------------------
 
 def clamp_to_screen(widget: QWidget, w: int, h: int, h_margin: int = 80, v_margin: int = 120) -> None:
-    """Resize *widget* to ``(w, h)``, but never larger than the screen.
+    """Resize *widget* to at most ``(w, h)``, then center it on screen.
 
-    Many of our pop-out dialogs and the main window were calling
-    ``resize(1400, 900)`` / ``resize(1100, 700)`` unconditionally, which
-    overflows the screen on smaller laptops (1366x768, 13" displays,
-    multi-monitor secondary screens, etc.).  This helper clamps the
-    request to the available screen geometry, leaving margins so the
-    title bar and OS taskbar stay visible.
+    Prevents dialogs and pop-out windows from opening larger than the
+    available screen area or starting off-screen (common on small laptops,
+    secondary monitors, or 1366x768 displays).
     """
     from PySide6.QtGui import QGuiApplication
 
@@ -357,7 +354,15 @@ def clamp_to_screen(widget: QWidget, w: int, h: int, h_margin: int = 80, v_margi
         avail = screen.availableGeometry()
         w = min(w, max(640, avail.width() - h_margin))
         h = min(h, max(480, avail.height() - v_margin))
+
     widget.resize(w, h)
+
+    # Center on the parent / screen so it never opens partially off-screen.
+    if screen is not None:
+        avail = screen.availableGeometry()
+        x = avail.x() + (avail.width() - w) // 2
+        y = avail.y() + (avail.height() - h) // 2
+        widget.move(x, y)
 
 
 def make_action_row(*buttons: QPushButton) -> QHBoxLayout:

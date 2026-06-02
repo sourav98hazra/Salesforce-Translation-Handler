@@ -58,8 +58,20 @@ class SettingsDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(520)
-        self.setModal(True)
+        self.setMinimumWidth(560)
+        self.setMinimumHeight(400)
+        # Make the dialog a proper top-level window so it is:
+        # - movable independently of the main window
+        # - resizable by dragging the edges
+        # - has minimize / maximize / close buttons in the title bar
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowCloseButtonHint
+        )
+        # Non-blocking: the user can interact with the main window while Settings is open.
+        self.setModal(False)
         self.setWindowFlags(
             Qt.WindowType.Window
             | Qt.WindowType.WindowMinimizeButtonHint
