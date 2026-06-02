@@ -141,7 +141,7 @@ The **Translation** menu in the menu bar groups all translation behaviour toggle
 |---|---|---|
 | Use in-file translations | ✓ On | Before calling the API for an untranslated row, checks if the same label text already has a translation elsewhere in the same STF/Excel file and reuses it without any API call |
 | Use Translation Memory cache | ✓ On | Reuses translations from the SQLite TM database (previous runs) |
-| Use Fuzzy matching | ✓ On | Finds approximate matches in the TM (e.g. "Save record" matches "Save Record") |
+| Use Fuzzy matching | ✗ Off | Finds approximate matches in the TM (e.g. "Save record" matches "Save Record") |
 | Use imported translations | ✗ Off | Applies translations from a separately imported Excel with highest priority |
 | Retranslate all (overwrite existing) | ✗ Off | When on, ALL rows including already-translated ones are sent to the backend |
 
@@ -700,7 +700,7 @@ By default, entries that already have a non-empty translation are skipped during
 
 ### GUI usage
 
-In Phase 3, check the **"Retranslate all (overwrite existing)"** checkbox before starting translation.
+Open the **Translation** menu and check **"Retranslate all (overwrite existing)"** before starting translation.
 
 ### CLI usage
 

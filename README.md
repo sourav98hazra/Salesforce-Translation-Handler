@@ -744,9 +744,22 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
 * **Intermittent summary** every 50 rows showing progress percentage, translation rate, and ETA.
 * **Final summary block** when translation completes:
   ```
-  ━━━ DONE ━━━
-  Translated: 800 | TM: 120 | Deduped: 50 | Skipped: 30
-  Elapsed: 5m 32s | Rate: 3.2 rows/s
+  ═══════════════════════════════════════════
+    TRANSLATION COMPLETE
+  ═══════════════════════════════════════════
+    Rows processed successfully:   800
+    ├─ Translated via API:         500
+    ├─ From Translation Memory:    120
+    │    (of which fuzzy match:     15)
+    ├─ Deduplicated (reused):       80
+    ├─ From imported file:           5
+    └─ Already translated (kept):   95
+
+    Rows failed:                      3
+
+    Elapsed time:             00:05:32
+    Rate:                     2.4 rows/s
+  ═══════════════════════════════════════════
   ```
 
 ---
@@ -1055,7 +1068,7 @@ Every toggle persists between sessions.
 |---|---|---|
 | Use in-file translations | On | Before calling the API for an untranslated row, reuse a translation that already exists for the **same label text** elsewhere in the same STF/Excel file — no API call. |
 | Use Translation Memory cache | On | Reuse translations from the local SQLite TM (previous runs). |
-| Use Fuzzy matching | On | Accept approximate TM matches above the configured threshold. |
+| Use Fuzzy matching | Off | Accept approximate TM matches above the configured threshold. |
 | Use imported translations | Off | Apply translations from a separately imported Excel with highest priority. |
 | Retranslate all (overwrite existing) | Off | Send ALL rows (including already-translated ones) to the backend. |
 

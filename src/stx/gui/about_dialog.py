@@ -322,7 +322,7 @@ class AboutDialog(QDialog):
             "Use in-file translations (default on) -- reuse existing "
             "translations from the same file before calling the API",
             "Use Translation Memory cache (default on)",
-            "Use Fuzzy matching (default on)",
+            "Use Fuzzy matching (default off)",
             "Use imported translations (default off) -- apply an external "
             "Excel with highest priority",
             "Retranslate all (overwrite existing) (default off) -- override all rows",

@@ -122,7 +122,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "The Translation menu in the menu bar groups all translation behaviour toggles:\n"
         "• Use in-file translations (default on) — reuse translations already present in the same file\n"
         "• Use Translation Memory cache (default on) — reuse from previous runs\n"
-        "• Use Fuzzy matching (default on) — approximate TM matches\n"
+        "• Use Fuzzy matching (default off) — approximate TM matches\n"
         "• Use imported translations (default off) — apply an external Excel at highest priority\n"
         "• Retranslate all (overwrite existing) (default off) — send ALL rows to the backend\n"
         "All toggles persist between sessions. Open Settings... (Ctrl+,) for advanced options.",
@@ -219,6 +219,40 @@ _FAQ: list[tuple[str, str, str]] = [
         "Yes. The checkpoint feature saves progress after each row. If you cancel or the app "
         "crashes, restarting will continue from where it left off. "
         "Click 'Clear progress' to start fresh instead of resuming.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What happens when I cancel a running translation?",
+        "A choice dialog appears with two options:\n"
+        "- 'Finish in-flight rows' — waits for active API requests to complete, then stops cleanly. "
+        "Progress is checkpointed so you can resume later.\n"
+        "- 'Stop immediately' — disconnects all signals and halts instantly with no further progress "
+        "updates. Use this if you need to stop urgently.\n"
+        "In both cases, rows already translated are preserved.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What is the 'Clear progress' button?",
+        "The 'Clear progress' button deletes any saved checkpoint/resume data for the current file. "
+        "Use it when you want to start translation completely fresh instead of resuming from where "
+        "a previous run left off.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What happens when the API fails for a specific row?",
+        "If a row fails all retries, the app applies a 'fallback to original' strategy: the translation "
+        "field is filled with the source label text (not left blank). This ensures no rows end up with "
+        "empty translations. The row is counted under 'Rows failed' in the final summary.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What does the translation summary show when complete?",
+        "After translation finishes, the live feed shows a structured summary:\n"
+        "- 'Rows processed successfully' — total rows that have a valid translation, with a tree "
+        "breakdown showing how each was obtained (API, Translation Memory, fuzzy match, dedup, "
+        "imported file, already-translated kept as-is).\n"
+        "- 'Rows failed' — rows where the API failed and fallback was applied.\n"
+        "- Elapsed time and translation rate (rows/second).",
     ),
     (
         "Phase 3 — Translate",
@@ -583,6 +617,10 @@ class FaqDialog(QDialog):
             "phase": ["step", "stage", "workflow", "pipeline"],
             "session": ["save", "restore", "resume", "persist"],
             "reset": ["clear", "start over", "fresh", "clean"],
+            "cancel": ["stop", "abort", "interrupt", "finish in-flight"],
+            "summary": ["done", "complete", "finished", "result", "report", "total"],
+            "fallback": ["fail", "error", "blank", "original", "source"],
+            "progress": ["checkpoint", "resume", "clear", "restart"],
         }
 
         # Expand the needle with synonyms

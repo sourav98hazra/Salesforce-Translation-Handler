@@ -138,7 +138,7 @@ Translation
 ├── [✓] Use Translation Memory cache  (default on)
 │         Reuse translations from previous runs (SQLite TM database).
 │
-├── [✓] Use Fuzzy matching            (default on)
+├── [ ] Use Fuzzy matching             (default off)
 │         Approximate TM matches (e.g. "Save record" ~ "Save Record").
 │         Only active when TM cache is also on.
 │
@@ -169,7 +169,7 @@ Translating 19 rows  (English → Japanese)
 Translation options:
   ✓ Use in-file translations     — reuse translations already in this file
   ✓ Use Translation Memory cache — reuse from previous runs
-  ✓ Use Fuzzy matching           — approximate TM matches
+  ✗ Use Fuzzy matching           — approximate TM matches (default off)
   ✗ Use imported translations    — no file imported
   ✗ Retranslate all (overwrite existing)    — only untranslated rows processed
 
@@ -184,6 +184,45 @@ Run summary:
 ```
 
 Re-enable via: **Translation → Re-enable pre-flight confirmation**
+
+## Cancellation Dialog
+
+When you click "Cancel" during translation, a choice dialog appears:
+
+```
+Cancel Translation
+---
+The translation is currently running.
+
+[Finish in-flight rows]   [Stop immediately]   [Keep running]
+```
+
+- **Finish in-flight rows** -- waits for active API requests to complete, saves checkpoint, then stops.
+- **Stop immediately** -- disconnects all signals, halts instantly with no further progress updates.
+- **Keep running** -- dismisses the dialog and continues translating.
+
+## Translation Summary (Live Feed)
+
+After translation completes, the live feed displays:
+
+```
+═══════════════════════════════════════════
+  TRANSLATION COMPLETE
+═══════════════════════════════════════════
+  Rows processed successfully:   800
+  ├─ Translated via API:         500
+  ├─ From Translation Memory:    120
+  │    (of which fuzzy match:     15)
+  ├─ Deduplicated (reused):       80
+  ├─ From imported file:           5
+  └─ Already translated (kept):   95
+
+  Rows failed:                      3
+
+  Elapsed time:             00:05:32
+  Rate:                     2.4 rows/s
+═══════════════════════════════════════════
+```
 
 ## Phase 4 Column Filtering
 
