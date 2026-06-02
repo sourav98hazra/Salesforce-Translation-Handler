@@ -872,6 +872,8 @@ class Phase3TranslatePage(PhasePage):
         self._worker.start()
 
     def _on_progress(self, percent: int, message: str) -> None:
+        if self._worker is None:
+            return  # Ignore queued signals after force stop
         self._progress.setValue(percent)
         if self._start_time is not None and self._current_row > 0:
             elapsed = time.time() - self._start_time
@@ -885,6 +887,8 @@ class Phase3TranslatePage(PhasePage):
             self._eta_label.setText(f"Translating... {percent}%")
 
     def _on_row_translated(self, source: str, translation: str, status: str, from_fuzzy: bool) -> None:
+        if self._worker is None:
+            return  # Ignore queued signals after force stop
         self._current_row += 1
 
         # Update running counters from status keywords.
@@ -1162,9 +1166,19 @@ class Phase3TranslatePage(PhasePage):
             self._worker.cancel()  # set the flag first
             self._worker.terminate()
             self._worker.wait(3000)  # wait up to 3s for cleanup
+            # Disconnect progress signals so queued events don't update UI
+            try:
+                self._worker.progress.disconnect(self._on_progress)
+                self._worker.row_translated.disconnect(self._on_row_translated)
+            except (RuntimeError, TypeError):
+                pass  # already disconnected
+            self._worker = None
             self._set_running(False)
             self._cancel_btn.setText("Cancel")
-            self._eta_label.setText("Cancelled (force stopped)")
+            # Freeze progress bar at current value and show cancelled state
+            self._eta_label.setText(
+                f"Cancelled (force stopped) — {self._current_row:,} rows completed"
+            )
             self._log.appendPlainText(
                 "\n[CANCELLED] Force stopped -- in-flight rows discarded."
             )
