@@ -98,23 +98,21 @@ class Phase5ValidatePage(PhasePage):
         )
         self._fix_selected_btn.setEnabled(False)
         self._fix_selected_btn.clicked.connect(self._on_fix_selected)
-        # Row 2: save / export
         self._save_btn = QPushButton("Save Workbook")
         self._save_btn.setToolTip(
             "Save the current (fixed) document as an .xlsx file."
         )
         self._save_btn.clicked.connect(self._on_save)
-        self._download_report_btn = QPushButton("Export Validation Report")
+        self._download_report_btn = QPushButton("Export Report")
         self._download_report_btn.setToolTip(
             "Export the validation report as CSV, JSON, or HTML."
         )
         self._download_report_btn.clicked.connect(self._on_download_report)
 
+        # All 6 action buttons on a single row — fits on 1366px
         self.add_layout(make_action_row(
             self._load_btn, self._validate_btn,
             self._fix_all_btn, self._fix_selected_btn,
-        ))
-        self.add_layout(make_action_row(
             self._save_btn, self._download_report_btn,
         ))
 
