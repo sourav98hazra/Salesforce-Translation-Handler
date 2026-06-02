@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
@@ -45,6 +46,21 @@ from .. import secrets as gui_secrets
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _format_eta(seconds: float) -> str:
+    """Format seconds as HH:MM:SS (or MM:SS if under one hour)."""
+    seconds = max(0, int(seconds))
+    h, remainder = divmod(seconds, 3600)
+    m, s = divmod(remainder, 60)
+    if h > 0:
+        return f"{h:d}:{m:02d}:{s:02d}"
+    return f"{m:d}:{s:02d}"
 
 
 # ---------------------------------------------------------------------------
@@ -887,7 +903,7 @@ class Phase3TranslatePage(PhasePage):
             remaining = self._total_rows - self._current_row
             eta_sec = remaining / rate if rate > 0 else 0
             self._eta_label.setText(
-                f"Translating... {percent}% | {rate:.1f} rows/s | ETA: {int(eta_sec)}s"
+                f"Translating... {percent}% | {rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
             )
         elif percent > 0:
             self._eta_label.setText(f"Translating... {percent}%")
@@ -935,7 +951,7 @@ class Phase3TranslatePage(PhasePage):
             self._log.appendPlainText(
                 f"  --- {self._current_row}/{self._total_rows} "
                 f"({pct}%) | "
-                f"{rate:.1f} rows/s | ETA: {eta:.0f}s ---"
+                f"{rate:.1f} rows/s | ETA: {_format_eta(eta)} ---"
             )
 
     def _on_translation_done(self, done) -> None:
@@ -1112,13 +1128,61 @@ class Phase3TranslatePage(PhasePage):
         self.error(message, "Save failed")
 
     def _on_cancel(self) -> None:
-        if self._worker is not None and not self._worker.is_cancelled:
+        if self._worker is None:
+            return
+        if self._worker.is_cancelled:
+            self.status_message.emit("Already cancelling -- please wait.")
+            return
+
+        # Show cancellation type dialog
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle("Cancel Translation")
+        dlg.setText("Translation is running. How would you like to cancel?")
+        dlg.setIcon(QMessageBox.Icon.Question)
+
+        graceful_btn = dlg.addButton(
+            "Finish in-flight rows", QMessageBox.ButtonRole.AcceptRole
+        )
+        graceful_btn.setToolTip(
+            "Wait for currently running rows to complete, then stop.\n"
+            "Progress is saved and resumable."
+        )
+        force_btn = dlg.addButton(
+            "Stop immediately", QMessageBox.ButtonRole.DestructiveRole
+        )
+        force_btn.setToolTip(
+            "Kill all workers immediately without waiting.\n"
+            "Progress up to the last completed row is saved."
+        )
+        dlg.addButton(QMessageBox.StandardButton.Cancel)
+
+        dlg.exec()
+        clicked = dlg.clickedButton()
+
+        if clicked == graceful_btn:
+            # Cooperative cancellation: let in-flight rows finish
             self._worker.cancel()
             self._cancel_btn.setEnabled(False)
-            self._cancel_btn.setText("Cancelling...")
-            self.status_message.emit("Cancellation requested -- finishing in-flight rows...")
-        elif self._worker is not None and self._worker.is_cancelled:
-            self.status_message.emit("Already cancelling -- please wait.")
+            self._cancel_btn.setText("Cancelling (graceful)...")
+            self.status_message.emit(
+                "Graceful cancellation requested -- finishing in-flight rows..."
+            )
+        elif clicked == force_btn:
+            # Force-terminate the worker thread immediately
+            self._worker.cancel()  # set the flag first
+            self._worker.terminate()
+            self._worker.wait(3000)  # wait up to 3s for cleanup
+            self._set_running(False)
+            self._cancel_btn.setText("Cancel")
+            self._eta_label.setText("Cancelled (force stopped)")
+            self._log.appendPlainText(
+                "\n[CANCELLED] Force stopped -- in-flight rows discarded."
+            )
+            self._state.set_phase(2, PhaseStatus.ERROR)
+            self.status_message.emit(
+                "Translation force-stopped. Progress up to last completed row is saved."
+            )
+        # else: user clicked Cancel (dismiss) -- translation continues
 
     def _on_load_existing(self) -> None:
         """Load any Excel into this phase -- makes Phase 3 fully independent.
