@@ -347,17 +347,7 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_check.setEnabled(False)   # disabled until a file is imported
         self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
 
-        # Retranslation checkbox — shown only when doc has translated rows
-        self._retranslate_check = QCheckBox("Retranslate all (overwrite existing)")
-        self._retranslate_check.setToolTip(
-            "When checked, rows that already have translations will be "
-            "retranslated. When unchecked (default), only untranslated "
-            "rows are sent to the backend."
-        )
-        self._retranslate_check.setChecked(False)
-        self._retranslate_check.setVisible(False)
-        self._retranslate_check.setStyleSheet("font-weight: 600; color: #b45309;")
-        self._retranslate_check.toggled.connect(self._on_retranslate_toggled)
+
 
         # Single row: Filter Components | Import translations | Use imports | Retranslate | stretch | import status | Rows to translate
         self._import_trans_label = QLabel("")
@@ -372,8 +362,6 @@ class Phase3TranslatePage(PhasePage):
         btn_row.addWidget(self._filter_btn)
         btn_row.addWidget(self._import_trans_btn)
         btn_row.addWidget(self._import_trans_check)
-        btn_row.addSpacing(16)
-        btn_row.addWidget(self._retranslate_check)
         btn_row.addStretch(1)
         btn_row.addWidget(self._import_trans_label)
         btn_row.addWidget(self._estimate_label)
@@ -559,10 +547,7 @@ class Phase3TranslatePage(PhasePage):
 
         # Show retranslation checkbox only if document has any translated entries
         if self._state.document is not None:
-            has_translated = any(e.translation.strip() for e in self._state.document.entries)
-            self._retranslate_check.setVisible(has_translated)
-        else:
-            self._retranslate_check.setVisible(False)
+            pass  # retranslate is controlled via Translation menu only
 
     def _refresh_settings_summary(self) -> None:
         backend = gui_settings.get_str(gui_settings.KEYS.backend, "google")
@@ -684,10 +669,6 @@ class Phase3TranslatePage(PhasePage):
 
     # ------------------------------------------------------------------ output path
 
-    def _on_retranslate_toggled(self, checked: bool) -> None:
-        """Propagate retranslate checkbox to state."""
-        self._state.retranslate_existing = checked
-
     def _on_target_changed(self, name: str) -> None:
         code = code_for_language(name)
         if code:
@@ -741,11 +722,6 @@ class Phase3TranslatePage(PhasePage):
         use_tm = gui_settings.get_use_tm_cache()
         use_fuzzy = gui_settings.get_use_fuzzy_matching() and use_tm
         retranslate = gui_settings.get_retranslate_existing()
-
-        # Phase 3 retranslate checkbox overrides the menu setting if visible and checked
-        if self._retranslate_check.isVisible():
-            retranslate = self._retranslate_check.isChecked()
-            gui_settings.set_retranslate_existing(retranslate)
         self._state.retranslate_existing = retranslate
 
         # Imported translations: respect both the menu toggle and state
@@ -1340,8 +1316,6 @@ class Phase3TranslatePage(PhasePage):
         self._total_rows = 0
         self._current_row = 0
         self._start_time = None
-        self._retranslate_check.setChecked(False)
-        self._retranslate_check.setVisible(False)
         self._import_trans_label.setText("")
         self._import_trans_check.setChecked(False)
 
