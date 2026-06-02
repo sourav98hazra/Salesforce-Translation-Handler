@@ -77,8 +77,10 @@ class Phase1ImportPage(PhasePage):
         # This is the language the STF is translating INTO (e.g. Japanese).
         # It is auto-filled from the STF header but the user can override via dropdown.
         self._stf_lang_combo = QComboBox()
+        self._stf_lang_combo.addItem("(load an STF file to populate)")
         self._stf_lang_combo.addItems(supported_language_names())
-        self._stf_lang_combo.setCurrentIndex(-1)   # blank until a file is loaded
+        self._stf_lang_combo.setCurrentIndex(0)   # placeholder until a file is loaded
+        self._stf_lang_combo.setStyleSheet("QComboBox { color: #94a3b8; }")  # grey placeholder
         self._stf_lang_combo.setToolTip(
             "The language this STF file translates INTO — read from the STF header.\n"
             "Change here if the header is missing or incorrect.\n"
@@ -88,6 +90,7 @@ class Phase1ImportPage(PhasePage):
 
         self._stf_lang_code_field = QLineEdit()
         self._stf_lang_code_field.setReadOnly(True)
+        self._stf_lang_code_field.setPlaceholderText("auto-filled")
         self._stf_lang_code_field.setToolTip(
             "Salesforce language code for the translation language (auto-filled from the dropdown)."
         )
@@ -227,6 +230,11 @@ class Phase1ImportPage(PhasePage):
 
     def _on_stf_lang_changed(self, name: str) -> None:
         """Sync translation language code field and state when the dropdown changes."""
+        if not name or name.startswith("("):   # ignore placeholder item
+            self._stf_lang_code_field.clear()
+            return
+        # Restore normal text colour when user selects a real language
+        self._stf_lang_combo.setStyleSheet("")
         code = code_for_language(name) or ""
         self._stf_lang_code_field.setText(code)
         self._state.target_language_name = name
@@ -290,6 +298,8 @@ class Phase1ImportPage(PhasePage):
                 self._stf_lang_combo.setCurrentIndex(-1)
                 self._stf_lang_combo.setEditText(stf_lang_name) if hasattr(self._stf_lang_combo, 'setEditText') else None
             self._stf_lang_combo.blockSignals(False)
+            # Restore normal text colour (clear the grey placeholder style)
+            self._stf_lang_combo.setStyleSheet("")
         self._stf_lang_code_field.setText(doc.language_code or "")
 
         self._set_field(self._stf_type_field, doc.stf_type)
@@ -472,7 +482,8 @@ class Phase1ImportPage(PhasePage):
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
         self._path_label.setText("No file selected.")
-        self._stf_lang_combo.setCurrentIndex(-1)
+        self._stf_lang_combo.setCurrentIndex(0)   # back to placeholder
+        self._stf_lang_combo.setStyleSheet("QComboBox { color: #94a3b8; }")
         self._stf_lang_code_field.clear()
         self._source_language_combo.setCurrentIndex(0)   # back to blank
         self._source_language_code_field.clear()

@@ -340,21 +340,6 @@ class Phase4ReviewPage(PhasePage):
 
         tb_layout.addStretch(1)
 
-        # Undo / Redo toolbar buttons
-        self._undo_btn = QPushButton("Undo")
-        self._undo_btn.setToolTip("Undo last translation edit (Ctrl+Z)")
-        self._undo_btn.setEnabled(False)
-        self._undo_btn.clicked.connect(self._on_undo)
-        tb_layout.addWidget(self._undo_btn)
-
-        self._redo_btn = QPushButton("Redo")
-        self._redo_btn.setToolTip("Redo last undone edit (Ctrl+Y)")
-        self._redo_btn.setEnabled(False)
-        self._redo_btn.clicked.connect(self._on_redo)
-        tb_layout.addWidget(self._redo_btn)
-
-        self._undo_stack.stack_changed.connect(self._refresh_undo_buttons)
-
         self._load_btn = QPushButton("Load reviewed Excel...")
         self._load_btn.setToolTip(
             "Replace the current document with an externally edited workbook.  "
@@ -373,11 +358,36 @@ class Phase4ReviewPage(PhasePage):
 
         self.add_widget(toolbar)
 
-        # ---------- Filter row (slim)
+        # ---------- Filter row: Undo/Redo | filters | Clear
+        # Undo/Redo live here (not the toolbar) so the toolbar stays
+        # narrow enough to fit on 1366px displays.
         filter_row = QFrame()
         fr_layout = QHBoxLayout(filter_row)
         fr_layout.setContentsMargins(2, 0, 2, 0)
         fr_layout.setSpacing(8)
+
+        # Undo / Redo — placed at the left of the filter row
+        self._undo_stack = UndoStack(self)
+
+        self._undo_btn = QPushButton("Undo")
+        self._undo_btn.setToolTip("Undo last translation edit (Ctrl+Z)")
+        self._undo_btn.setEnabled(False)
+        self._undo_btn.clicked.connect(self._on_undo)
+        fr_layout.addWidget(self._undo_btn)
+
+        self._redo_btn = QPushButton("Redo")
+        self._redo_btn.setToolTip("Redo last undone edit (Ctrl+Y)")
+        self._redo_btn.setEnabled(False)
+        self._redo_btn.clicked.connect(self._on_redo)
+        fr_layout.addWidget(self._redo_btn)
+
+        self._undo_stack.stack_changed.connect(self._refresh_undo_buttons)
+
+        # Slim separator between undo/redo and filters
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setStyleSheet("color: #e2e8f0;")
+        fr_layout.addWidget(sep)
 
         fr_layout.addWidget(QLabel("Component:"))
         self._component_combo = QComboBox()
