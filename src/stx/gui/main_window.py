@@ -313,18 +313,33 @@ class MainWindow(QMainWindow):
 
         # Count rows and unique components
         row_count = len(doc.entries)
+        translated = len(doc.translated())
+        untranslated = row_count - translated
         components = {e.component_type for e in doc.entries}
-        self._footer_stats.setText(
-            f"{row_count:,} rows \u00b7 {len(components)} components"
-        )
+        stats_parts = [f"{row_count:,} rows", f"{len(components)} components"]
+        if untranslated > 0:
+            stats_parts.append(f"{untranslated:,} untranslated")
+        self._footer_stats.setText(" \u00b7 ".join(stats_parts))
 
-        # Target language
+        # Second line: target language + import count if applicable
         lang_name = self._state.target_language_name or ""
         lang_code = self._state.target_language_code or ""
-        if lang_name and lang_code:
-            self._footer_lang.setText(f"{lang_name} ({lang_code})")
-        elif lang_name:
-            self._footer_lang.setText(lang_name)
+        lang_text = f"{lang_name} ({lang_code})" if lang_name and lang_code else lang_name
+
+        # Show import translations count if loaded and enabled
+        import_text = ""
+        if (
+            self._state.imported_translations
+            and self._state.imported_translations_enabled
+        ):
+            import_text = f"\u2713 {len(self._state.imported_translations):,} imports active"
+
+        if lang_text and import_text:
+            self._footer_lang.setText(f"{lang_text}\n{import_text}")
+        elif lang_text:
+            self._footer_lang.setText(lang_text)
+        elif import_text:
+            self._footer_lang.setText(import_text)
         else:
             self._footer_lang.setText("")
 

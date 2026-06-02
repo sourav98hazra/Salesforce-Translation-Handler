@@ -324,10 +324,11 @@ class Phase3TranslatePage(PhasePage):
 
         self._import_trans_check = QCheckBox("Use imports")
         self._import_trans_check.setToolTip(
-            "When checked, imported translations are applied during translation. "
-            "Uncheck to skip imported translations even if a file is loaded."
+            "Enable or disable the imported translations.\n"
+            "Only available after a translation file has been imported."
         )
-        self._import_trans_check.setChecked(self._state.imported_translations_enabled)
+        self._import_trans_check.setChecked(False)
+        self._import_trans_check.setEnabled(False)   # disabled until a file is imported
         self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
 
         # Retranslation checkbox — shown only when doc has translated rows
@@ -371,18 +372,24 @@ class Phase3TranslatePage(PhasePage):
 
         self.add_widget(setup_box)
 
-        # ----- Progress bar + percentage
+        # ----- Progress bar + status label on same row (no wasted line)
+        progress_row = QHBoxLayout()
         self._progress = QProgressBar()
         self._progress.setRange(0, 100)
         self._progress.setValue(0)
         self._progress.setMaximumHeight(20)
         self._progress.setTextVisible(True)
-        self._progress.setFormat("%p%  (%v rows)")
-        self.add_widget(self._progress)
+        self._progress.setFormat("%p%")
+        progress_row.addWidget(self._progress, stretch=1)
 
-        self._eta_label = QLabel("Idle.")
-        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700;")
-        self.add_widget(self._eta_label)
+        self._eta_label = QLabel("")   # blank until translation starts
+        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700; margin-left: 8px;")
+        self._eta_label.setMinimumWidth(120)
+        progress_row.addWidget(self._eta_label)
+        progress_layout = QVBoxLayout()
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        progress_layout.addLayout(progress_row)
+        self.add_layout(progress_layout)
 
         # ----- Live feed log (takes all remaining space)
         feed_box = QGroupBox("Live feed")
@@ -518,9 +525,18 @@ class Phase3TranslatePage(PhasePage):
                 f"Loaded {count:,} translations from imported file"
             )
 
-        # Sync import translations checkbox with state
-        self._import_trans_check.setChecked(self._state.imported_translations_enabled)
-
+        # Sync import translations checkbox state — only enable if translations are loaded
+        has_imports = bool(self._state.imported_translations)
+        self._import_trans_check.setEnabled(has_imports)
+        self._import_trans_check.setChecked(
+            has_imports and self._state.imported_translations_enabled
+        )
+        if has_imports:
+            count = len(self._state.imported_translations)
+            self._import_trans_label.setText(f"\u2713 {count:,} translations imported")
+            self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+        else:
+            self._import_trans_label.setText("")
         self._update_estimate()
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
@@ -619,10 +635,12 @@ class Phase3TranslatePage(PhasePage):
         self._state.imported_translations = result.translations
         self._state.imported_translations_path = Path(path)
         self._state.imported_translations_enabled = True
+        self._import_trans_check.setEnabled(True)
         self._import_trans_check.setChecked(True)
         self._import_trans_label.setText(
-            f"Loaded {result.count:,} translations from imported file"
+            f"\u2713 {result.count:,} translations imported"
         )
+        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
         self.status_message.emit(
             f"Imported {result.count:,} translations from {Path(path).name}"
         )
@@ -1185,7 +1203,7 @@ class Phase3TranslatePage(PhasePage):
         """Called by Reset Session to clear all displayed widgets back to defaults."""
         self._log.clear()
         self._progress.setValue(0)
-        self._eta_label.setText("Idle.")
+        self._eta_label.setText("")
         self._save_copy_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
         self._next_btn.setEnabled(False)
@@ -1194,6 +1212,9 @@ class Phase3TranslatePage(PhasePage):
         self._target_combo.setCurrentText("Japanese")
         self._selected_components = None
         self._estimate_label.setText("Rows to translate: --")
+        self._import_trans_label.setText("")
+        self._import_trans_check.setChecked(False)
+        self._import_trans_check.setEnabled(False)
         self._translated_count = 0
         self._cached_count = 0
         self._deduped_count = 0
