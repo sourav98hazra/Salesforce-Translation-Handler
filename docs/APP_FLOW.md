@@ -124,16 +124,77 @@ Settings Dialog
     +-- Credentials (remember API key in OS keyring)
 ```
 
+## Translation Menu
+
+The **Translation** menu (menu bar) groups all translation behaviour toggles. Changes persist between sessions.
+
+```
+Translation
+├── [✓] Use in-file translations      (default on)
+│         Reuse translations already present in the same file.
+│         If "Save" is translated elsewhere as "保存", untranslated rows
+│         with the same label get "保存" without any API call.
+│
+├── [✓] Use Translation Memory cache  (default on)
+│         Reuse translations from previous runs (SQLite TM database).
+│
+├── [✓] Use Fuzzy matching            (default on)
+│         Approximate TM matches (e.g. "Save record" ~ "Save Record").
+│         Only active when TM cache is also on.
+│
+├── [  ] Use imported translations    (default off)
+│         Apply translations from an imported Excel file at highest priority.
+│
+├── ─────────────────────────────────
+│
+├── [  ] Retranslate existing rows    (default off)
+│         Send ALL rows to the backend, overwriting existing translations.
+│         When on, in-file translations are also skipped.
+│
+├── ─────────────────────────────────
+│
+├──  Settings...  (Ctrl+,)
+└──  Re-enable pre-flight confirmation
+```
+
+## Pre-flight Confirmation Dialog
+
+Shown before every translation run (can be disabled with "Don't show again"):
+
+```
+Ready to translate?
+─────────────────────────────────────────────
+Translating 19 rows  (English → Japanese)
+
+Translation options:
+  ✓ Use in-file translations     — reuse translations already in this file
+  ✓ Use Translation Memory cache — reuse from previous runs
+  ✓ Use Fuzzy matching           — approximate TM matches
+  ✗ Use imported translations    — no file imported
+  ✗ Retranslate existing rows    — only untranslated rows processed
+
+Run summary:
+  Backend:             google
+  Workers:             4
+  Rows to translate:   19 of 2,738 total
+
+[Start translation]   [Cancel — review settings]
+─────────────────────────────────────────────
+[ ] Don't show this dialog again
+```
+
+Re-enable via: **Translation → Re-enable pre-flight confirmation**
+
 ## Phase 4 Column Filtering
 
 Right-click any column header in the Review table:
 - Sort Ascending / Sort Descending
 - Filter by value (checkable list of distinct values)
-- Clear filter
+- Clear filter (also available via the **"Clear"** button in the filter row)
 - Select all / Select none
 
 Multiple column filters stack (AND logic).
 
 ---
 
-*Generated for v2.0.0 of Salesforce Translation Manager.*
+*Updated for v2.0.0 of Salesforce Translation Manager.*

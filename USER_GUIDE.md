@@ -84,10 +84,13 @@ This prevents accidental data loss and ensures that the export in Phase 6 always
 **How to use:**
 
 1. Click **"Browse STF..."** and pick the `.stf` you exported from Salesforce.
-2. Verify the parsed metadata displayed in a **2-column grid** (language and code side by side, STF type and total rows side by side, translated and untranslated counts side by side). Hover over any field to see the full value in a tooltip if it is truncated.
-3. (Optional) Edit the language fields if Salesforce's preamble was missing or wrong.
-4. (Optional) Click **"Save copy as STF..."** to write a clean copy to disk.
-5. Click **"Continue to Phase 2 →"**.
+2. Review the **Parsed metadata** grid:
+   - **Translation language** — the language this STF translates *into* (e.g. Japanese), read from the STF header. Change via the dropdown if the header is wrong.
+   - **Language code** — Salesforce code for the translation language (e.g. `ja`), auto-filled.
+   - **Label language** — the language the source labels are written in (usually English). Auto-detected from the label text after parsing; change via the dropdown if incorrect.
+   - **Label code** — Salesforce code for the label language, auto-filled from the dropdown.
+3. (Optional) Click **"Save copy as STF..."** to write a clean copy to disk.
+4. Click **"Continue to Phase 2 →"**.
 
 **Independent path:** drop an `.stf` directly here and parse it; no need to do anything else.
 
@@ -99,13 +102,12 @@ The Preview panel in Phase 1 has a **"Pop out"** button that detaches the previe
 
 **How to use:**
 
-1. The output path defaults to `<source>_organized.xlsx`.  Click **Browse...** to change it.
-2. Click **"Convert and save .xlsx"** (the primary button) to write the file.
-3. (Optional) Click **"Save copy to..."** to write an additional copy elsewhere — handy for backups or sharing without disturbing the file the rest of the pipeline uses.
-4. Inspect the **Content Details** preview to confirm the row counts.
-5. Click **"Continue to Phase 3 →"**.
+1. Click **"Convert"** (the primary button) to generate the organised workbook.  The output is auto-named from the source file and saved in the same folder.
+2. (Optional) Click **"Save a Copy..."** to write an additional copy elsewhere.
+3. Inspect the **Content Details** preview to confirm the row counts.
+4. Click **"Continue to Phase 3 →"**.
 
-**Independent path:** click **"Load existing organised .xlsx..."** to start from a previously generated workbook.
+**Independent path:** click **"Load existing .xlsx..."** to start from a previously generated workbook.
 
 ### Phase 3 — Translate
 
@@ -114,33 +116,47 @@ The Preview panel in Phase 1 has a **"Pop out"** button that detaches the previe
 **How to use:**
 
 1. Pick the **Source** and **Target** language (displayed side by side in a compact form at the top).
-2. Click **"Filter Components..."** to open a dialog where you can select which component types to translate (default: all selected). See the [Filter Components dialog](#filter-components-dialog-phase-3) section below for full details on the search, status filter, and bulk-action controls.
-3. Click **"Start translation"**.
-4. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
+2. Click **"Filter Components..."** to choose which component types to translate (default: all selected).
+3. (Optional) Set translation options via the **Translation menu** in the menu bar — see [Translation menu](#translation-menu) below.
+4. Click **"Start translation"**. A **pre-flight confirmation dialog** appears summarising the current options. Review them and click **"Start translation"** to proceed, or **"Cancel — review settings"** to adjust first.
+5. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
    ```
-   [42/1000 | T:30 TM:5 D:7] EN: Hello -> JA: こんにちは
+   [42/1000 | Trans:30 TM:5 Dedup:7] EN: Hello -> JA: こんにちは
    ```
-   - `T` = translated via API, `TM` = from translation memory, `D` = deduplicated
-5. Every 50 rows an **intermittent summary** appears with progress percentage, rate (rows/s), and ETA.
-6. When translation completes, a **final summary block** is printed:
+   - `Trans` = translated via API, `TM` = from Translation Memory cache (no API call), `Dedup` = duplicate label reused from same run
+6. Rows that match an already-translated label **elsewhere in the same file** appear as:
    ```
-   ━━━ DONE ━━━
-   Translated: 800 | TM: 120 | Deduped: 50 | Skipped: 30
-   Elapsed: 5m 32s | Rate: 3.2 rows/s
+   [Reused from file] EN: Save -> JA: 保存
    ```
-7. The translated document is held **in memory** — click **"Save copy to..."** to write it to a file of your choice. The default suggested filename is `<source>_translated.xlsx` in the same folder as the source. Audit sheets (per-row status log + summary) are appended to the saved workbook automatically.
-8. Click **"Continue to Phase 4 →"** when done.
+   No API call is made for these — the existing translation is reused directly.
+7. When translation completes, a **final summary block** is printed in the live feed.
+8. The translated document is held **in memory** — click **"Save a Copy..."** to write it to disk with a professional dated filename.
+9. Click **"Continue to Phase 4 →"** when done.
+
+#### Translation menu
+
+The **Translation** menu in the menu bar groups all translation behaviour toggles. Changes take effect on the next run and are persisted between sessions.
+
+| Option | Default | What it does |
+|---|---|---|
+| Use in-file translations | ✓ On | Before calling the API for an untranslated row, checks if the same label text already has a translation elsewhere in the same STF/Excel file and reuses it without any API call |
+| Use Translation Memory cache | ✓ On | Reuses translations from the SQLite TM database (previous runs) |
+| Use Fuzzy matching | ✓ On | Finds approximate matches in the TM (e.g. "Save record" matches "Save Record") |
+| Use imported translations | ✗ Off | Applies translations from a separately imported Excel with highest priority |
+| Retranslate existing rows | ✗ Off | When on, ALL rows including already-translated ones are sent to the backend |
+
+The menu also has a **Settings...** shortcut (Ctrl+,) and a **Re-enable pre-flight confirmation** action.
+
+#### Pre-flight confirmation dialog
+
+Before every translation run a summary dialog shows the active options so you can review them before committing. Tick **"Don't show this dialog again"** to skip it in future runs. Re-enable it via Translation → Re-enable pre-flight confirmation.
 
 #### Filter Components dialog (Phase 3)
 
 Click "Filter Components..." to open the component selection dialog. Use it to:
 
 - **Search**: Type to filter the component list by name (case-insensitive substring match).
-- **Status filter**: Choose what kinds of components to show:
-  - "Show all components" — every type, regardless of status (default)
-  - "Only components with untranslated rows" — focus on what needs translation
-  - "Only components with translated rows (for retranslation)" — useful if you want to redo translations
-  - "Only components with both translated and untranslated" — mixed-state components
+- **Status filter**: Choose what kinds of components to show.
 - **Select all / Select none / Invert**: Bulk actions on the visible (filtered) component list.
 - **Live summary**: At the bottom of the dialog, see "X of Y selected · Z rows will be translated" updating as you tick boxes.
 
@@ -148,9 +164,9 @@ Click **Apply** to confirm your selection. The estimate next to the Filter butto
 
 The live feed panel has a **"Pop out"** button that detaches it into an independent window so you can monitor translation progress while navigating other phases.
 
-**Independent path:** click **"Load translated .xlsx..."** to skip translation and continue with a workbook you already translated.
+**Independent path:** click **"Load Excel..."** to skip translation and continue with a workbook you already translated.
 
-**Advanced options live in `Edit → Settings`** (Ctrl+,):
+**Advanced options live in `Translation → Settings...`** (Ctrl+,):
 
 * **Backend** (Google free / DeepL / Azure / OpenAI) and API key.
 * **Workers** (concurrent translation threads, default 4).
@@ -187,7 +203,7 @@ The filter row at the top of Phase 4 lets you focus on a subset of translations:
 
 The three filters combine: e.g. setting Component=CustomLabel + Status=Untranslated + Search="error" shows only untranslated CustomLabel rows whose key or label contains "error".
 
-The table updates immediately as you type or change dropdowns.
+The table updates immediately as you type or change dropdowns.  Click the **"Clear"** button at the right of the filter row to reset all filters at once, including any column-value filters applied via the header right-click menu.
 
 ### Phase 5 — Validate & Fix
 
@@ -352,10 +368,12 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 | `Ctrl+0..5` | Switch to phase N |
 | `Ctrl+O` | Open file (auto-routes by extension) |
 | `Ctrl+S` | Save current phase artifact |
-| `Ctrl+H` | Find and Replace (Phase 4) |
-| `Ctrl+Z` | Undo (Phase 4) |
-| `Ctrl+Y` | Redo (Phase 4) |
+| `Ctrl+H` | Find & Replace (Phase 4) |
+| `Ctrl+Z / Ctrl+Y` | Undo / Redo last translation edit (Phase 4 only) |
+| `Ctrl+Shift+Z / Ctrl+Shift+Y` | Undo / Redo last major action (app-wide) |
+| `Ctrl+B` | Go to previous phase |
 | `Ctrl+,` | Open Settings |
+| `Ctrl+F1` | FAQ & Troubleshooting |
 | `F1` | This user guide |
 | `Ctrl+Q` | Quit |
 

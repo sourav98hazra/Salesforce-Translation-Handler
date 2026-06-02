@@ -105,6 +105,53 @@ _FAQ: list[tuple[str, str, str]] = [
     # -- Phase 3 --
     (
         "Phase 3 — Translate",
+        "What is the Translation menu?",
+        "The Translation menu in the menu bar groups all translation behaviour toggles:\n"
+        "• Use in-file translations (default on) — reuse translations already present in the same file\n"
+        "• Use Translation Memory cache (default on) — reuse from previous runs\n"
+        "• Use Fuzzy matching (default on) — approximate TM matches\n"
+        "• Use imported translations (default off) — apply an external Excel at highest priority\n"
+        "• Retranslate existing rows (default off) — send ALL rows to the backend\n"
+        "All toggles persist between sessions. Open Settings... (Ctrl+,) for advanced options.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What is the pre-flight confirmation dialog?",
+        "Before every translation run, a summary dialog shows the current translation options "
+        "so you can review them before committing. It shows: which options are on/off, the "
+        "backend, workers, and how many rows will be translated.\n"
+        "Tick 'Don't show this dialog again' to skip it in future runs.\n"
+        "Re-enable it via Translation → Re-enable pre-flight confirmation.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What does 'Use in-file translations' mean?",
+        "If the same label text (e.g. 'Save') is already translated elsewhere in the same "
+        "STF or Excel file, that translation is reused for untranslated rows with the same "
+        "label — without any API call. This is on by default.\n"
+        "Example: CustomLabel.SaveButton has translation '保存'. "
+        "CustomLabel.SaveAction (untranslated) has the same label 'Save' — it gets '保存' "
+        "automatically.\n"
+        "When Retranslate existing rows is on, in-file reuse is skipped.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What does 'Retranslate existing rows' do?",
+        "When checked in the Translation menu, ALL rows in the document — including those "
+        "already translated — are sent to the backend. Existing translations are overwritten.\n"
+        "Default is off (only blank rows are translated). "
+        "Use this when existing translations are outdated or inconsistent and you want a "
+        "completely fresh pass.",
+    ),
+    (
+        "Phase 3 — Translate",
+        "The live feed shows 'Reused from file' — what does that mean?",
+        "The row's label text matched an already-translated label elsewhere in the same file. "
+        "The existing translation was reused directly — no API call was made. "
+        "This is controlled by the 'Use in-file translations' toggle in the Translation menu.",
+    ),
+    (
+        "Phase 3 — Translate",
         "Why is translation not starting?",
         "Check that a document is loaded (complete Phase 1-2 or click Load .xlsx). "
         "Also verify the backend is ready in Edit → Settings — if using a paid backend "

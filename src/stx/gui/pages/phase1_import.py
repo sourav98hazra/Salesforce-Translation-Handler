@@ -8,7 +8,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
-    QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -175,31 +174,6 @@ class Phase1ImportPage(PhasePage):
         meta_grid.setColumnStretch(3, 1)
         self.add_widget(meta_box)
 
-        # ---------- "Use existing translations" option (shown for mixed STFs)
-        from PySide6.QtWidgets import QCheckBox as _QCB
-        self._use_existing_row = QGroupBox()
-        self._use_existing_row.setFlat(True)
-        self._use_existing_row.setStyleSheet(
-            "QGroupBox { border: 1px solid #f59e0b; border-radius: 4px; "
-            "background: #fffbeb; padding: 4px 8px; }"
-        )
-        _ue_layout = QHBoxLayout(self._use_existing_row)
-        _ue_layout.setContentsMargins(6, 4, 6, 4)
-        _ue_icon = QLabel("\u26a0")
-        _ue_icon.setStyleSheet("font-size: 14px; color: #d97706;")
-        _ue_layout.addWidget(_ue_icon)
-        self._use_existing_check = _QCB("Keep existing translations (mixed STF detected)")
-        self._use_existing_check.setToolTip(
-            "This STF has both translated and untranslated rows.\n"
-            "Checked (default): existing translations are kept — only blank rows will be translated.\n"
-            "Unchecked: all rows will be retranslated, overwriting existing translations."
-        )
-        self._use_existing_check.setChecked(True)
-        self._use_existing_check.toggled.connect(self._on_use_existing_toggled)
-        _ue_layout.addWidget(self._use_existing_check, stretch=1)
-        self._use_existing_row.setVisible(False)   # shown only when mixed STF is loaded
-        self.add_widget(self._use_existing_row)
-
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
         self._preview_box = preview_box
@@ -327,14 +301,6 @@ class Phase1ImportPage(PhasePage):
         # Auto-detect label language (source language)
         self._detect_source_language(doc)
 
-        # Show "use existing translations" option if the STF is mixed
-        has_translated = stats["translated"] > 0
-        has_untranslated = stats["untranslated"] > 0
-        self._use_existing_row.setVisible(has_translated and has_untranslated)
-        if has_translated and has_untranslated:
-            self._use_existing_check.setChecked(True)   # default: keep existing
-            self._state.retranslate_existing = False
-
         self._populate_preview(doc)
         self._save_stf_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
@@ -461,12 +427,6 @@ class Phase1ImportPage(PhasePage):
             if self._preview.columnWidth(c) > 320:
                 self._preview.setColumnWidth(c, 320)
 
-    def _on_use_existing_toggled(self, checked: bool) -> None:
-        """Keep or discard existing translations for the next translation run."""
-        # checked = keep existing (retranslate_existing = False)
-        # unchecked = retranslate everything
-        self._state.retranslate_existing = not checked
-
     def _on_save_stf(self) -> None:
         if not self._state.document:
             return
@@ -517,8 +477,6 @@ class Phase1ImportPage(PhasePage):
         self._source_language_combo.setCurrentIndex(0)   # back to blank
         self._source_language_code_field.clear()
         self._source_detect_label.setText("")
-        self._use_existing_row.setVisible(False)
-        self._use_existing_check.setChecked(True)
         self._stf_type_field.clear()
         self._total_field.clear()
         self._translated_field.clear()

@@ -301,13 +301,33 @@ class AboutDialog(QDialog):
         layout.addWidget(_bullets([
             "Google Translate (free tier) -- default, no API key required",
             "DeepL, Azure, OpenAI -- when API keys are configured "
-            "(Settings \u2192 Translation)",
+            "(Translation \u2192 Settings)",
             "Translation Memory (SQLite) -- caches translations across "
             "runs for speed",
+            "In-file translation reuse -- if label 'Save' is already "
+            "translated elsewhere in the same file, that translation is "
+            "reused without any API call (Translation menu toggle)",
             "Glossary support -- protect brand and product terms from "
             "modification",
             "In-run deduplication -- the same string is translated only once",
+            "Fuzzy TM matching -- finds approximate matches in the TM "
+            "(configurable threshold)",
             "Adaptive rate limiting -- auto-tunes to backend tolerance",
+            "Checkpoint resume -- interruptions save progress; the next "
+            "run continues where it left off",
+        ]))
+
+        layout.addWidget(_heading("Translation menu"))
+        layout.addWidget(_bullets([
+            "Use in-file translations (default on) -- reuse existing "
+            "translations from the same file before calling the API",
+            "Use Translation Memory cache (default on)",
+            "Use Fuzzy matching (default on)",
+            "Use imported translations (default off) -- apply an external "
+            "Excel with highest priority",
+            "Retranslate existing rows (default off) -- override all rows",
+            "Pre-flight confirmation dialog -- summarises active options "
+            "before every run; dismissable with 'Don't show again'",
         ]))
 
         layout.addWidget(_heading("Safety & Protection"))
