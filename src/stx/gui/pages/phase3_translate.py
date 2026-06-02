@@ -892,13 +892,13 @@ class Phase3TranslatePage(PhasePage):
         self._current_row += 1
 
         # Update running counters from status keywords.
-        if status.startswith("Translated"):
+        if status.startswith("Translated") or status.startswith("Reused") or status.startswith("Resumed"):
             self._translated_count += 1
             if "TM hit" in status:
                 self._cached_count += 1
             elif "dedup" in status:
                 self._deduped_count += 1
-        elif status.startswith("Skipped") or status.startswith("Cancelled") or "Fallback" in status:
+        elif status.startswith("Skipped") or status.startswith("Cancelled"):
             self._skipped_count += 1
 
         # Inline counters in the feed line — readable labels
@@ -947,14 +947,11 @@ class Phase3TranslatePage(PhasePage):
 
         # Compute summary numbers
         # "Rows processed successfully" = all rows that ended up with a valid
-        # translation (regardless of method).  This includes API translations,
-        # TM hits, dedup reuse, imported file reuse, and already-translated rows
-        # that were kept as-is.
-        rows_successful = (
-            done.translated_count + done.cached_count
-            + done.deduped_count + done.skipped_count
-            + done.infile_reuse_count
-        )
+        # translation (regardless of method).  translated_count already includes
+        # TM hits, dedup reuse, imported file reuse, in-file reuse, and fuzzy
+        # matches as subsets.  skipped_count covers rows kept as-is (blank
+        # labels, already translated when not retranslating, out of scope).
+        rows_successful = done.translated_count + done.skipped_count
         rows_failed = done.failed_count
         elapsed_str = _format_eta(elapsed)
         rate = rows_successful / elapsed if elapsed > 0 else 0
@@ -972,8 +969,15 @@ class Phase3TranslatePage(PhasePage):
             self._log.appendPlainText(sep)
             self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
 
-        # Breakdown of how rows were translated
-        self._log.appendPlainText(f"  \u251c\u2500 Via Translation API:        {done.translated_count:>5,}")
+        # Breakdown of how rows were translated.  translated_count is the
+        # TOTAL of all methods, so compute the pure-API portion by subtracting
+        # all sub-categories that are already tracked separately.
+        api_count = (
+            done.translated_count - done.cached_count - done.deduped_count
+            - done.fuzzy_accepted_count - done.imported_reuse_count
+            - done.infile_reuse_count - done.resumed_count
+        )
+        self._log.appendPlainText(f"  \u251c\u2500 Via Translation API:        {api_count:>5,}")
         self._log.appendPlainText(f"  \u251c\u2500 Via Translation Memory:     {done.cached_count:>5,}")
         if done.fuzzy_accepted_count:
             self._log.appendPlainText(f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})")
@@ -1008,7 +1012,7 @@ class Phase3TranslatePage(PhasePage):
             msg = (
                 f"Translation complete - {rows_successful:,} rows processed successfully{failed_note}.  "
                 f"Click 'Save a Copy...' to save.  "
-                f"[API: {done.translated_count:,} | TM: {done.cached_count:,} | "
+                f"[API: {api_count:,} | TM: {done.cached_count:,} | "
                 f"Dedup: {done.deduped_count:,}{infile_note} | Kept: {done.skipped_count:,}] "
                 f"in {elapsed_str}."
             )

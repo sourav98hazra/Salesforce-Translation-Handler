@@ -377,3 +377,96 @@ class TestTranslationResultFields:
     def test_result_retranslated_count_set(self) -> None:
         result = TranslationResult(document=_make_doc([]), retranslated_count=5)
         assert result.retranslated_count == 5
+
+
+# ---------------------------------------------------------------------------
+# Tests: counting invariants
+# ---------------------------------------------------------------------------
+
+
+class TestCountingInvariants:
+    """Verify translated_count includes all sub-categories (TM, dedup, etc.)."""
+
+    def test_translated_count_includes_dedup(self) -> None:
+        """translated_count already includes deduped rows (no double-counting)."""
+        doc = _make_doc([
+            Entry(key="k1", label="Hello", translation="Old1"),
+            Entry(key="k2", label="Hello", translation="Old2"),
+            Entry(key="k3", label="World", translation="Old3"),
+        ])
+        result = translate_document(
+            doc,
+            _UpperTranslator(),
+            source_lang="en",
+            target_lang="ja",
+            workers=1,
+            rate_limit_per_second=None,
+            prevent_system_sleep=False,
+            retranslate_existing=True,
+        )
+        # All 3 rows are translated (1 API + 1 dedup + 1 API)
+        assert result.translated_count == 3
+        assert result.deduped_count == 1
+        # skipped_count should be 0 (no blank labels, retranslating all)
+        assert result.skipped_count == 0
+        # The sum of sub-categories should equal translated_count
+        api_only = (
+            result.translated_count - result.cached_count - result.deduped_count
+            - result.fuzzy_accepted_count - result.imported_reuse_count
+            - result.infile_reuse_count - result.resumed_count
+        )
+        assert api_only == 2  # k1 via API, k3 via API; k2 via dedup
+        # Total processed = translated + skipped + failed (no gaps)
+        total_processed = result.translated_count + result.skipped_count + result.failed_count
+        assert total_processed == len(doc.entries)
+
+    def test_retranslate_all_skipped_is_zero(self) -> None:
+        """With retranslate_existing=True and no blank labels, skipped_count=0."""
+        doc = _make_doc([
+            Entry(key="k1", label="Alpha", translation="Old Alpha"),
+            Entry(key="k2", label="Beta", translation="Old Beta"),
+            Entry(key="k3", label="Gamma", translation=""),
+            Entry(key="k4", label="Delta", translation="Old Delta"),
+        ])
+        result = translate_document(
+            doc,
+            _UpperTranslator(),
+            source_lang="en",
+            target_lang="ja",
+            workers=1,
+            rate_limit_per_second=None,
+            prevent_system_sleep=False,
+            retranslate_existing=True,
+        )
+        assert result.skipped_count == 0
+        assert result.translated_count == 4
+        assert result.failed_count == 0
+        # All rows accounted for
+        assert result.translated_count + result.skipped_count + result.failed_count == 4
+
+    def test_blank_label_only_skip_with_retranslate(self) -> None:
+        """With retranslate_existing=True, only blank-label rows are skipped."""
+        doc = _make_doc([
+            Entry(key="k1", label="", translation="Something"),
+            Entry(key="k2", label="Hello", translation="Old"),
+            Entry(key="k3", label="   ", translation="Whitespace label"),
+            Entry(key="k4", label="World", translation="Old World"),
+        ])
+        result = translate_document(
+            doc,
+            _UpperTranslator(),
+            source_lang="en",
+            target_lang="ja",
+            workers=1,
+            rate_limit_per_second=None,
+            prevent_system_sleep=False,
+            retranslate_existing=True,
+        )
+        # k1 and k3 have blank labels, should be skipped
+        assert result.skipped_count == 2
+        # k2 and k4 should be translated
+        assert result.translated_count == 2
+        assert result.failed_count == 0
+        # Total accounted for
+        assert result.translated_count + result.skipped_count + result.failed_count == 4
+

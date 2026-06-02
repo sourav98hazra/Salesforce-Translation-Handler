@@ -155,8 +155,7 @@ class TranslationResult:
 
     @property
     def cache_hit_rate(self) -> float:
-        seen = self.translated_count + self.cached_count
-        return self.cached_count / seen if seen else 0.0
+        return self.cached_count / self.translated_count if self.translated_count else 0.0
 
 
 @dataclass
