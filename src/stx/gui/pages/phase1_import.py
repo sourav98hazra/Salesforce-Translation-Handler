@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFormLayout,
     QGridLayout,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...languages import LANGUAGE_NAME_TO_CODE, code_for_language, supported_language_names
 from ...stf import write_stf_files
 from ..state import AppState, PhaseStatus
 from ..workers import ParseStfWorker, WriteStfWorker
@@ -99,21 +101,31 @@ class Phase1ImportPage(PhasePage):
         meta_grid.addWidget(self._language_field, 0, 1)
         meta_grid.addWidget(QLabel("Language code:"), 0, 2, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._language_code_field, 0, 3)
-        # Row 1 - Source language (auto-detected)
-        self._source_language_field = QLineEdit()
-        self._source_language_field.setToolTip(
-            "Auto-detected source language. Edit if incorrect."
+        # Row 1 - Source language (dropdown + auto-detect)
+        self._source_language_combo = QComboBox()
+        self._source_language_combo.addItems(supported_language_names())
+        self._source_language_combo.setCurrentText("English")  # sensible default
+        self._source_language_combo.setToolTip(
+            "Source language of the STF file. Auto-detected after parsing; "
+            "change manually if the detection is wrong."
         )
+        self._source_language_combo.currentTextChanged.connect(self._on_source_language_changed)
+
         self._source_language_code_field = QLineEdit()
+        self._source_language_code_field.setReadOnly(True)
         self._source_language_code_field.setToolTip(
-            "Salesforce code for the detected source language."
+            "Salesforce code for the source language (auto-filled from the dropdown)."
         )
+        # Populate code field from default "English"
+        _default_code = code_for_language("English") or "en_US"
+        self._source_language_code_field.setText(_default_code)
+
         self._source_detect_label = QLabel("")
         self._source_detect_label.setStyleSheet(
             "color: #2563eb; font-size: 12px; font-weight: 700;"
         )
         meta_grid.addWidget(QLabel("Source language:"), 1, 0, Qt.AlignmentFlag.AlignRight)
-        meta_grid.addWidget(self._source_language_field, 1, 1)
+        meta_grid.addWidget(self._source_language_combo, 1, 1)
         meta_grid.addWidget(QLabel("Source code:"), 1, 2, Qt.AlignmentFlag.AlignRight)
         meta_grid.addWidget(self._source_language_code_field, 1, 3)
         # Row 2
@@ -186,6 +198,13 @@ class Phase1ImportPage(PhasePage):
         field.setToolTip(value)
 
     # ------------------------------------------------------------------ slots
+
+    def _on_source_language_changed(self, name: str) -> None:
+        """Sync source language code field and state when the dropdown changes."""
+        code = code_for_language(name) or ""
+        self._source_language_code_field.setText(code)
+        self._state.source_language_code = code
+        self._state.source_language_name = name
 
     def _on_browse(self) -> None:
         path = self.pick_open_file(
@@ -270,7 +289,7 @@ class Phase1ImportPage(PhasePage):
             self.action_recorded.emit(f"Load STF ({self._state.source_stf_path.name})")
 
     def _detect_source_language(self, doc) -> None:
-        """Run language detection on labels and populate source language fields."""
+        """Run language detection on labels and populate the source language dropdown."""
         try:
             from ...lang_detect import (
                 CONFIDENCE_THRESHOLD,
@@ -279,37 +298,54 @@ class Phase1ImportPage(PhasePage):
             )
             from ...languages import language_for_code
         except ImportError:
+            # langdetect not installed — leave dropdown at its current value
+            self._source_detect_label.setText(
+                "(langdetect not installed — select source language manually)"
+            )
             return
 
         labels = [e.label for e in doc.entries if e.label]
+        if not labels:
+            self._source_detect_label.setText("(no labels to detect from)")
+            return
+
         detected = detect_source_language(labels)
         if not detected:
-            self._source_detect_label.setText("")
+            self._source_detect_label.setText(
+                "Could not detect source language — please select manually."
+            )
             return
 
         iso_code, confidence = detected[0]
         if confidence < CONFIDENCE_THRESHOLD:
             self._source_detect_label.setText(
-                f"Low confidence detection: {iso_code} ({confidence * 100:.0f}%) "
-                "-- using default"
+                f"Low confidence ({iso_code}, {confidence * 100:.0f}%) — "
+                "please confirm the source language in the dropdown."
             )
             return
 
+        # Map ISO code to Salesforce code and set the dropdown
         sf_code = map_detected_to_salesforce(iso_code)
-        if sf_code:
-            lang_name = language_for_code(sf_code) or iso_code
-            self._set_field(self._source_language_field, lang_name)
-            self._set_field(self._source_language_code_field, sf_code)
-            self._state.source_language_code = sf_code
+        lang_name = language_for_code(sf_code) if sf_code else None
+
+        if lang_name and lang_name in LANGUAGE_NAME_TO_CODE:
+            # Block signals so _on_source_language_changed fires only once
+            self._source_language_combo.blockSignals(True)
+            self._source_language_combo.setCurrentText(lang_name)
+            self._source_language_combo.blockSignals(False)
+            # Update code field and state manually
+            self._source_language_code_field.setText(sf_code or "")
+            self._state.source_language_code = sf_code or ""
             self._state.source_language_name = lang_name
             self._source_detect_label.setText(
-                f"Auto-detected: {lang_name} ({confidence * 100:.0f}%)"
+                f"\u2713 Auto-detected: {lang_name} ({confidence * 100:.0f}% confidence)"
             )
         else:
-            self._set_field(self._source_language_field, iso_code)
-            self._set_field(self._source_language_code_field, iso_code)
+            # Detection succeeded but language not in our list — show info
+            fallback_name = lang_name or iso_code
             self._source_detect_label.setText(
-                f"Auto-detected: {iso_code} ({confidence * 100:.0f}%)"
+                f"Detected: {fallback_name} ({confidence * 100:.0f}%) — "
+                "not in dropdown list, please select manually."
             )
 
     def _populate_preview(self, doc) -> None:
@@ -349,11 +385,18 @@ class Phase1ImportPage(PhasePage):
         self.status_message.emit(f"STF files written to {res.full.parent}")
 
     def _on_next(self) -> None:
-        # Sync any user-edited language fields back into shared state.
+        # Sync language fields back into shared state before navigating.
         if self._language_field.text().strip():
             self._state.target_language_name = self._language_field.text().strip()
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
+        # Sync source language from dropdown
+        src_name = self._source_language_combo.currentText()
+        src_code = code_for_language(src_name) or self._source_language_code_field.text().strip()
+        if src_name:
+            self._state.source_language_name = src_name
+        if src_code:
+            self._state.source_language_code = src_code
         self._state.set_phase(0, PhaseStatus.DONE)
         self.request_navigate.emit(1)
 
@@ -364,8 +407,9 @@ class Phase1ImportPage(PhasePage):
         self._path_label.setText("No file selected.")
         self._language_field.clear()
         self._language_code_field.clear()
-        self._source_language_field.clear()
-        self._source_language_code_field.clear()
+        self._source_language_combo.setCurrentText("English")
+        default_code = code_for_language("English") or "en_US"
+        self._source_language_code_field.setText(default_code)
         self._source_detect_label.setText("")
         self._stf_type_field.clear()
         self._total_field.clear()
