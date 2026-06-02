@@ -246,16 +246,13 @@ class Phase5ValidatePage(PhasePage):
         # whole splitter (issues table + editor) into a modeless QDialog.
         add_popout_to_groupbox(issues_box, self._on_popout_issues)
 
-        # ---------- Bottom: save/export row (below the table, above Continue)
-        self.add_layout(make_action_row(
-            self._save_btn, self._download_report_btn,
-        ))
-
-        # ---------- Bottom: next phase
+        # ---------- Bottom: save/export + next phase on same row
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
         self._next_btn.setToolTip("Move to the next phase (Export STF).")
         self._next_btn.clicked.connect(self._on_continue_to_phase6)
-        self.add_layout(make_action_row(self._next_btn))
+        self.add_layout(make_action_row(
+            self._save_btn, self._download_report_btn, self._next_btn,
+        ))
 
     # ------------------------------------------------------------------ continue to Phase 6
 

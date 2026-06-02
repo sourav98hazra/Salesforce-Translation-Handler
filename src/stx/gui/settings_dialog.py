@@ -101,7 +101,7 @@ class SettingsDialog(QDialog):
             0, "Translator backend, API key, performance, multi-language batch"
         )
         self._tabs.setTabToolTip(
-            1, "Translation memory, glossary, imported translations, session"
+            1, "Translation memory, glossary, session"
         )
         self._tabs.setTabToolTip(
             2, "Application theme and credential storage"
@@ -219,8 +219,15 @@ class SettingsDialog(QDialog):
         row.addWidget(tm_browse)
         tm_layout.addLayout(row)
 
-        # Fuzzy matching controls within TM group
+        # Fuzzy matching controls within TM group -- visually separated
+        fuzzy_header = QLabel("Fuzzy Matching")
+        fuzzy_header.setStyleSheet(
+            "font-weight: 600; font-size: 12px; margin-top: 12px; color: #334155;"
+        )
+        tm_layout.addWidget(fuzzy_header)
+
         fuzzy_form = QFormLayout()
+        fuzzy_form.setContentsMargins(0, 4, 0, 0)
         fuzzy_help = QLabel(
             "When an exact TM match is not found, fuzzy matching searches for "
             "similar source strings.  Matches above the auto-accept threshold "
@@ -281,36 +288,6 @@ class SettingsDialog(QDialog):
         row.addWidget(gloss_browse)
         gloss_layout.addLayout(row)
         outer.addWidget(gloss_box)
-
-        # --- Import Translations group ---
-        import_box = QGroupBox("Import Translations")
-        import_layout = QVBoxLayout(import_box)
-        import_help = QLabel(
-            "Reuse translations from a previously translated Excel file.  "
-            "Imported translations have the highest priority -- they are used "
-            "before the TM or network translator."
-        )
-        import_help.setWordWrap(True)
-        import_help.setStyleSheet("color: #64748b; font-size: 11px;")
-        import_layout.addWidget(import_help)
-        row = QHBoxLayout()
-        self._import_trans_field = QLineEdit()
-        self._import_trans_field.setPlaceholderText("Path to translated .xlsx file")
-        import_browse = QPushButton("Browse...")
-        import_browse.clicked.connect(self._on_browse_import_translations)
-        row.addWidget(self._import_trans_field, stretch=1)
-        row.addWidget(import_browse)
-        import_layout.addLayout(row)
-        self._import_trans_check = QCheckBox("Use imported translations")
-        self._import_trans_check.setToolTip(
-            "When checked, translations from the imported file are applied "
-            "with highest priority during translation runs.\n"
-            "Only available after a file path is set above."
-        )
-        self._import_trans_check.setEnabled(False)   # enabled only when a file path is present
-        self._import_trans_field.textChanged.connect(self._on_import_path_changed)
-        import_layout.addWidget(self._import_trans_check)
-        outer.addWidget(import_box)
 
         # --- Session group ---
         session_box = QGroupBox("Session")
@@ -444,17 +421,6 @@ class SettingsDialog(QDialog):
                 self._theme_combo.setCurrentIndex(i)
                 break
 
-        # Import existing translations
-        import_path = gui_settings.get_str(gui_settings.KEYS.import_translations_path, "")
-        self._import_trans_field.setText(import_path)
-        has_path = bool(import_path.strip())
-        self._import_trans_check.setEnabled(has_path)
-        import_enabled = gui_settings.get_str(
-            gui_settings.KEYS.import_translations_enabled, "0"
-        )
-        # Only check if we actually have a file path and it's enabled
-        self._import_trans_check.setChecked(has_path and import_enabled in {"1", "true"})
-
         # Session persistence
         self._session_check.setChecked(gui_settings.get_session_enabled())
 
@@ -495,14 +461,6 @@ class SettingsDialog(QDialog):
         gui_settings.set_str(
             gui_settings.KEYS.fuzzy_auto_accept, str(self._fuzzy_auto_accept_spin.value())
         )
-        gui_settings.set_str(
-            gui_settings.KEYS.import_translations_path,
-            self._import_trans_field.text().strip(),
-        )
-        gui_settings.set_str(
-            gui_settings.KEYS.import_translations_enabled,
-            "1" if self._import_trans_check.isChecked() else "0",
-        )
         gui_settings.set_theme(self._theme_combo.currentData())
         gui_settings.set_session_enabled(self._session_check.isChecked())
 
@@ -528,9 +486,6 @@ class SettingsDialog(QDialog):
         self._fuzzy_threshold_spin.setValue(75.0)
         self._fuzzy_max_results_spin.setValue(5)
         self._fuzzy_auto_accept_spin.setValue(90.0)
-        self._import_trans_field.clear()
-        self._import_trans_check.setChecked(False)
-        self._import_trans_check.setEnabled(False)   # disabled until a file is selected
         self._theme_combo.setCurrentIndex(0)
         self._session_check.setChecked(False)
 
@@ -589,33 +544,6 @@ class SettingsDialog(QDialog):
         )
         if path:
             self._memory_field.setText(path)
-
-    def _on_import_path_changed(self, text: str) -> None:
-        """Enable/disable the 'Use imported translations' checkbox based on whether a path is set.
-
-        Rule: checkbox is only interactive when a file path is present.
-        Before any file is imported it stays disabled so the user cannot
-        accidentally enable it with no data behind it.
-        """
-        has_path = bool(text.strip())
-        self._import_trans_check.setEnabled(has_path)
-        if not has_path:
-            # No path → force unchecked so we never save enabled=True with no file
-            self._import_trans_check.blockSignals(True)
-            self._import_trans_check.setChecked(False)
-            self._import_trans_check.blockSignals(False)
-
-    def _on_browse_import_translations(self) -> None:
-        start = self._import_trans_field.text() or str(Path.home())
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Choose translated Excel file", start,
-            "Excel files (*.xlsx);;All files (*)"
-        )
-        if path:
-            self._import_trans_field.setText(path)
-            # Auto-enable and check when a file is selected via Browse
-            self._import_trans_check.setEnabled(True)
-            self._import_trans_check.setChecked(True)
 
 
 def open_settings(parent: Optional[QWidget] = None) -> bool:

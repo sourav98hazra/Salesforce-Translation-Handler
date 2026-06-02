@@ -196,8 +196,8 @@ def set_use_tm_cache(value: bool) -> None:
 
 
 def get_use_fuzzy_matching() -> bool:
-    """Return True (default) if fuzzy TM matching is enabled."""
-    return _get_bool(KEYS.use_fuzzy_matching, default=True)
+    """Return False (default) if fuzzy TM matching is enabled."""
+    return _get_bool(KEYS.use_fuzzy_matching, default=False)
 
 
 def set_use_fuzzy_matching(value: bool) -> None:
