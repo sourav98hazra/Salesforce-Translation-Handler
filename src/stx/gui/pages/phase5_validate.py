@@ -683,6 +683,10 @@ class Phase5ValidatePage(PhasePage):
         self._state.set_phase(4, PhaseStatus.DONE)
         self.set_busy(False)
         self.status_message.emit(f"Fixed workbook saved: {path}")
+        self.info(
+            f"Workbook saved successfully.\n\n{path.name}\n\nLocation: {path.parent}",
+            "Save Complete",
+        )
         try:
             from .. import settings as gui_settings
             gui_settings.add_recent_file(path)
