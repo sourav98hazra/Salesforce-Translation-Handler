@@ -461,6 +461,11 @@ class Phase3TranslatePage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
+        # Sync source language combo from state.
+        src_name = getattr(self._state, "source_language_name", "English") or "English"
+        if src_name in LANGUAGE_NAME_TO_CODE:
+            self._source_combo.setCurrentText(src_name)
+
         # Restore remembered target language.
         remembered = gui_settings.remembered_target_language()
         if remembered in LANGUAGE_NAME_TO_CODE:
@@ -658,6 +663,20 @@ class Phase3TranslatePage(PhasePage):
                 "No document loaded yet.\n\n"
                 "Click 'Load .xlsx ...' to load an Excel directly into this phase,\n"
                 "or complete Phase 1 (Import STF) first."
+            )
+            return
+
+        # Pre-flight: check backend availability before spinning up the worker.
+        from ...translate.factory import check_backend_available
+
+        backend_key = gui_settings.get_str(gui_settings.KEYS.backend, "google")
+        api_key = gui_secrets.retrieve_api_key(backend_key) or None
+        available, reason = check_backend_available(backend_key, api_key)
+        if not available:
+            self.error(
+                f"Backend '{backend_key}' is not ready:\n\n{reason}\n\n"
+                "Fix the issue in Edit \u2192 Settings, then try again.",
+                "Backend not available",
             )
             return
 
@@ -863,7 +882,43 @@ class Phase3TranslatePage(PhasePage):
     def _on_translation_failed(self, message: str) -> None:
         self._set_running(False)
         self._state.set_phase(2, PhaseStatus.ERROR)
-        self.error(gui_secrets.sanitize_error_message(message), "Translation failed")
+        safe_msg = gui_secrets.sanitize_error_message(message)
+
+        # Append the error to the live feed so it's visible even if the dialog is dismissed.
+        self._log.appendPlainText(f"\n[ERROR] Translation failed: {safe_msg}")
+        self._eta_label.setText(f"Error: {safe_msg[:120]}")
+
+        # Provide actionable help based on common error types.
+        help_text = ""
+        lower = message.lower()
+        if "connectionerror" in lower or "network" in lower or "timeout" in lower or "connect" in lower:
+            help_text = (
+                "\n\nThis looks like a network issue.\n"
+                "• Check that you have internet access.\n"
+                "• If you're behind a corporate proxy, translation may be blocked.\n"
+                "• Try again -- Google's free tier sometimes rate-limits briefly."
+            )
+        elif "429" in message or "too many requests" in lower or "rate" in lower:
+            help_text = (
+                "\n\nGoogle's free tier rate-limited the request.\n"
+                "• Wait a minute and try again.\n"
+                "• Reduce Workers in Edit → Settings (try 1 worker).\n"
+                "• Switch to a paid backend (DeepL/Azure) in Edit → Settings."
+            )
+        elif "importerror" in lower or "no module" in lower:
+            help_text = (
+                "\n\nA required library is missing.\n"
+                "• Run: pip install -e \".[gui]\" in the project folder.\n"
+                "• Re-launch the app."
+            )
+        elif "invalid" in lower and ("lang" in lower or "code" in lower):
+            help_text = (
+                "\n\nThe source or target language code is not recognised by Google.\n"
+                "• Check that the Source language combo in Phase 3 shows 'English'.\n"
+                "• Check that the Target language is set correctly."
+            )
+
+        self.error(safe_msg + help_text, "Translation failed")
 
     def _on_save_copy_to(self) -> None:
         """Open a save dialog and persist the in-memory translated document.
