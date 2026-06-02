@@ -199,6 +199,8 @@ class Phase1ImportPage(PhasePage):
         meta_grid.setColumnStretch(1, 1)
         meta_grid.setColumnStretch(3, 0)   # code column — just wide enough for the code
         self.add_widget(meta_box)
+        self._meta_box = meta_box
+        meta_box.setVisible(False)
 
         # ---------- Preview table
         preview_box = QGroupBox(f"Preview (first {_PREVIEW_ROWS} rows)")
@@ -297,6 +299,7 @@ class Phase1ImportPage(PhasePage):
 
     def _on_parsed(self, doc) -> None:
         self._state.document = doc
+        self._meta_box.setVisible(True)
         if doc.language:
             self._state.target_language_name = doc.language
         if doc.language_code:
@@ -500,6 +503,7 @@ class Phase1ImportPage(PhasePage):
 
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
+        self._meta_box.setVisible(False)
         self._path_label.setText("No file selected.")
         self._stf_lang_combo.setCurrentIndex(-1)
         self._stf_lang_code_label.clear()
