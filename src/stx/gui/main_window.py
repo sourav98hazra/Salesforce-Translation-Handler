@@ -483,6 +483,9 @@ class MainWindow(QMainWindow):
         # Refresh undo/redo menu state when navigating between pages
         self._stack.currentChanged.connect(lambda _idx: self._refresh_undo_actions())
 
+        # ------------------------------------------------------------------ Translation menu
+        self._build_translation_menu(bar)
+
         view_menu = bar.addMenu("&View")
         themes = [
             ("light", "&Light theme"),
@@ -530,6 +533,94 @@ class MainWindow(QMainWindow):
         updates_action = QAction("Check for &Updates", self)
         updates_action.triggered.connect(self._check_for_updates)
         help_menu.addAction(updates_action)
+
+    def _build_translation_menu(self, bar) -> None:
+        """Build the Translation menu with all translation option toggles."""
+        trans_menu = bar.addMenu("&Translation")
+
+        def _make_toggle(label: str, tooltip: str, get_fn, set_fn) -> QAction:
+            act = QAction(label, self)
+            act.setCheckable(True)
+            act.setChecked(get_fn())
+            act.setToolTip(tooltip)
+            def _toggled(checked: bool, _set=set_fn) -> None:
+                _set(checked)
+            act.toggled.connect(_toggled)
+            return act
+
+        self._act_use_infile = _make_toggle(
+            "Use in-file translations",
+            "Reuse translations already present in the same STF/Excel file.\n"
+            "If label 'Save' is already translated as '保存' somewhere in the file,\n"
+            "all other untranslated rows with label 'Save' will reuse '保存' — no API call.",
+            gui_settings.get_use_infile_translations,
+            gui_settings.set_use_infile_translations,
+        )
+        trans_menu.addAction(self._act_use_infile)
+
+        self._act_use_tm = _make_toggle(
+            "Use Translation Memory cache",
+            "Reuse translations from the Translation Memory database (from previous runs).\n"
+            "Speeds up repeated translations significantly.",
+            gui_settings.get_use_tm_cache,
+            gui_settings.set_use_tm_cache,
+        )
+        trans_menu.addAction(self._act_use_tm)
+
+        self._act_use_fuzzy = _make_toggle(
+            "Use Fuzzy matching",
+            "Find approximate matches in the Translation Memory (e.g. 'Save record' matches 'Save Record').\n"
+            "Configure threshold in Edit → Settings → Resources.",
+            gui_settings.get_use_fuzzy_matching,
+            gui_settings.set_use_fuzzy_matching,
+        )
+        trans_menu.addAction(self._act_use_fuzzy)
+
+        self._act_use_imported = _make_toggle(
+            "Use imported translations",
+            "Apply translations imported from an external Excel file with highest priority.\n"
+            "Import a file in Phase 3 → 'Import existing translations...'",
+            gui_settings.get_use_imported_translations,
+            gui_settings.set_use_imported_translations,
+        )
+        trans_menu.addSeparator()
+        trans_menu.addAction(self._act_use_imported)
+
+        trans_menu.addSeparator()
+
+        self._act_retranslate = _make_toggle(
+            "Retranslate existing rows",
+            "When checked, ALL rows (including already-translated ones) are sent for translation.\n"
+            "When unchecked (default), only blank/untranslated rows are translated.",
+            gui_settings.get_retranslate_existing,
+            gui_settings.set_retranslate_existing,
+        )
+        trans_menu.addAction(self._act_retranslate)
+
+        trans_menu.addSeparator()
+
+        settings_shortcut = QAction("&Settings...", self)
+        settings_shortcut.setShortcut("Ctrl+,")
+        settings_shortcut.setToolTip("Open advanced translation settings (backend, TM path, fuzzy thresholds, etc.)")
+        settings_shortcut.triggered.connect(self._action_open_settings)
+        trans_menu.addAction(settings_shortcut)
+
+        trans_menu.addSeparator()
+
+        re_enable_preflight = QAction("Re-enable pre-flight confirmation", self)
+        re_enable_preflight.setToolTip(
+            "Show the 'Ready to translate?' summary dialog before each run again.\n"
+            "(Shown by default, can be disabled with 'Don't show again' in the dialog.)"
+        )
+        re_enable_preflight.triggered.connect(
+            lambda: (
+                gui_settings.set_preflight_skip(False),
+                self._log(  # type: ignore[attr-defined]
+                    "Pre-flight dialog re-enabled — will show before the next translation run."
+                ),
+            )
+        )
+        trans_menu.addAction(re_enable_preflight)
 
     def _wire_shortcuts(self) -> None:
         # Ctrl+0..6 to switch phases.

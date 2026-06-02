@@ -190,6 +190,7 @@ def translate_document(
     fuzzy_max_results: int = 5,
     fuzzy_auto_accept_threshold: float = 90.0,
     imported_translations: Optional[Dict[str, str]] = None,
+    infile_translations: Optional[Dict[str, str]] = None,
     retranslate_existing: bool = False,
 ) -> TranslationResult:
     """Translate every untranslated entry in ``doc`` in place.
@@ -253,6 +254,7 @@ def translate_document(
         fuzzy_max_results=fuzzy_max_results,
         fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
         imported_translations=imported_translations,
+        infile_translations=infile_translations,
         retranslate_existing=retranslate_existing,
     )
     if prevent_system_sleep:
@@ -365,6 +367,7 @@ class _Runner:
         fuzzy_max_results: int = 5,
         fuzzy_auto_accept_threshold: float = 90.0,
         imported_translations: Optional[Dict[str, str]] = None,
+        infile_translations: Optional[Dict[str, str]] = None,
         retranslate_existing: bool = False,
     ) -> None:
         self.doc = doc
@@ -382,6 +385,7 @@ class _Runner:
         self.fuzzy_max_results = fuzzy_max_results
         self.fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
         self.imported_translations = imported_translations or {}
+        self.infile_translations = infile_translations or {}
         self.retranslate_existing = retranslate_existing
         self.limiter: Optional[AdaptiveLimiter] = (
             AdaptiveLimiter(max_capacity=rate_limit_per_second)
@@ -558,6 +562,42 @@ class _Runner:
         # override already-translated rows even when retranslate_existing=False.
         if self.imported_translations and entry.label in self.imported_translations:
             return "translate"
+
+        # In-file translation reuse: if the same label already has a translation
+        # elsewhere in THIS file, and retranslate_existing is not requested, skip
+        # the API and reuse that translation immediately.
+        if (
+            self.infile_translations
+            and not self.retranslate_existing
+            and not entry.translation.strip()   # only for untranslated rows
+            and entry.label.strip() in self.infile_translations
+        ):
+            infile_value = self.infile_translations[entry.label.strip()]
+            new_entry = Entry(
+                key=entry.key,
+                label=entry.label,
+                translation=infile_value,
+                approved=entry.approved,
+            )
+            self._new_entries[index] = new_entry
+            status = "Reused from file"
+            self._statuses[index] = StatusEntry(
+                sheet_name=sheet,
+                row_index=index + 2,
+                key=entry.key,
+                label=entry.label,
+                translation=infile_value,
+                status=status,
+            )
+            summary.cached_rows += 1   # count as cache hit (no API call)
+            self._cached += 1
+            self._translated += 1
+            # Also populate the dedup cache so subsequent duplicates in the
+            # same run also benefit.
+            with self._dedup_lock:
+                self._dedup.setdefault(entry.label, infile_value)
+            self._emit_progress(index, entry.key, sheet, status, entry.label, infile_value)
+            return "done"
 
         if entry.translation.strip():
             if self.retranslate_existing:

@@ -490,48 +490,76 @@ class FaqDialog(QDialog):
         return widget
 
     def _apply_filter(self, text: str) -> None:
-        """Show/hide FAQ items based on search text."""
+        """Show/hide FAQ items based on search text — with synonym matching."""
         needle = text.strip().lower()
         visible_count = 0
 
-        # Track which category headers should be visible
-        # We need to show category headers only when at least one item in the category is visible
+        # Synonym / keyword expansion — maps common user terms to canonical search words
+        _SYNONYMS: dict[str, list[str]] = {
+            "slow": ["speed", "performance", "rate limit", "workers", "429", "quota"],
+            "fast": ["speed", "performance", "workers"],
+            "speed": ["workers", "rate limit", "dedup", "tm", "cache"],
+            "error": ["fail", "crash", "not working", "issue", "problem"],
+            "crash": ["error", "fail", "close", "stx_crash"],
+            "api": ["key", "backend", "deepl", "azure", "openai", "google"],
+            "key": ["api", "backend", "deepl", "azure", "openai", "secret"],
+            "backend": ["google", "deepl", "azure", "openai", "translator"],
+            "cache": ["tm", "translation memory", "dedup", "reuse"],
+            "dedup": ["duplicate", "same label", "repeat", "reuse"],
+            "reuse": ["dedup", "cache", "tm", "infile", "existing"],
+            "existing": ["reuse", "keep", "mixed", "already translated"],
+            "mixed": ["existing", "partial", "some translated", "untranslated"],
+            "approved": ["review", "mark", "accept", "validate"],
+            "undo": ["undo", "revert", "ctrl+z", "ctrl z"],
+            "find": ["find", "replace", "search", "ctrl+h"],
+            "replace": ["find", "replace", "bulk", "global"],
+            "export": ["stf", "output", "save", "write", "download"],
+            "import": ["load", "upload", "open", "bring in"],
+            "validate": ["check", "error", "warning", "fix", "issue"],
+            "install": ["setup", "launch", "run", "start"],
+            "update": ["upgrade", "latest", "git pull", "new version"],
+            "glossary": ["brand", "term", "do not translate", "dnt", "forced"],
+            "shortcut": ["keyboard", "ctrl", "hotkey", "key combination"],
+            "phase": ["step", "stage", "workflow", "pipeline"],
+            "session": ["save", "restore", "resume", "persist"],
+            "reset": ["clear", "start over", "fresh", "clean"],
+        }
+
+        # Expand the needle with synonyms
+        expanded_terms = {needle}
+        for keyword, synonyms in _SYNONYMS.items():
+            if keyword in needle:
+                expanded_terms.update(synonyms)
+            for syn in synonyms:
+                if syn in needle:
+                    expanded_terms.add(keyword)
+                    expanded_terms.update(synonyms)
+
         cat_visible: dict[str, bool] = {}
 
         for category, question, answer, widget in self._items:
             if not needle:
                 widget.setVisible(True)
-                # Also expand if search was just cleared
                 cat_visible[category] = True
                 visible_count += 1
             else:
-                matches = (
-                    needle in question.lower()
-                    or needle in answer.lower()
-                    or needle in category.lower()
-                )
+                # Check if any expanded term matches question, answer, or category
+                haystack = f"{question} {answer} {category}".lower()
+                matches = any(term in haystack for term in expanded_terms if term)
                 widget.setVisible(matches)
                 if matches:
-                    # Auto-expand matched items
                     widget._q_btn.setChecked(True)  # type: ignore[attr-defined]
                     cat_visible[category] = True
                     visible_count += 1
 
         # Update category header visibility
-        # Walk through container children and toggle category labels
-        idx = 0
-        current_cat_widget = None
         for i in range(self._container_layout.count()):
             item = self._container_layout.itemAt(i)
             if item and item.widget():
                 w = item.widget()
-                # Category headers have specific styling
                 if isinstance(w, QLabel) and not hasattr(w, '_q_btn'):
-                    current_cat_widget = w
                     cat_name = w.text()
                     w.setVisible(cat_visible.get(cat_name, False))
-                elif hasattr(w, '_q_btn'):
-                    pass  # already handled above
 
         # Collapse all when search cleared
         if not needle:

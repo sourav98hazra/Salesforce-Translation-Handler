@@ -48,6 +48,13 @@ class SettingsKeys:
     import_translations_path: str = "io/import_translations_path"
     import_translations_enabled: str = "io/import_translations_enabled"
     session_enabled: str = "session/enabled"
+    # Translation option toggles (Translation menu)
+    use_infile_translations: str = "translation/use_infile_translations"
+    use_tm_cache: str = "translation/use_tm_cache"
+    use_fuzzy_matching: str = "translation/use_fuzzy_matching"
+    use_imported_translations: str = "translation/use_imported_translations"
+    retranslate_existing: str = "translation/retranslate_existing"
+    preflight_skip: str = "translation/preflight_skip"
 
 
 KEYS = SettingsKeys()
@@ -155,3 +162,70 @@ def get_session_enabled() -> bool:
 def set_session_enabled(value: bool) -> None:
     """Set whether session persistence is enabled."""
     settings().setValue(KEYS.session_enabled, "true" if value else "false")
+
+
+# ---------------------------------------------------------------------------
+# Translation option toggles
+# ---------------------------------------------------------------------------
+
+def _get_bool(key: str, default: bool = True) -> bool:
+    val = settings().value(key, "true" if default else "false")
+    return str(val).lower() in {"1", "true"}
+
+
+def _set_bool(key: str, value: bool) -> None:
+    settings().setValue(key, "true" if value else "false")
+
+
+def get_use_infile_translations() -> bool:
+    """Return True (default) if existing translations within the same file should be reused."""
+    return _get_bool(KEYS.use_infile_translations, default=True)
+
+
+def set_use_infile_translations(value: bool) -> None:
+    _set_bool(KEYS.use_infile_translations, value)
+
+
+def get_use_tm_cache() -> bool:
+    """Return True (default) if the Translation Memory cache should be used."""
+    return _get_bool(KEYS.use_tm_cache, default=True)
+
+
+def set_use_tm_cache(value: bool) -> None:
+    _set_bool(KEYS.use_tm_cache, value)
+
+
+def get_use_fuzzy_matching() -> bool:
+    """Return True (default) if fuzzy TM matching is enabled."""
+    return _get_bool(KEYS.use_fuzzy_matching, default=True)
+
+
+def set_use_fuzzy_matching(value: bool) -> None:
+    _set_bool(KEYS.use_fuzzy_matching, value)
+
+
+def get_use_imported_translations() -> bool:
+    """Return True if imported translations are enabled."""
+    return _get_bool(KEYS.use_imported_translations, default=False)
+
+
+def set_use_imported_translations(value: bool) -> None:
+    _set_bool(KEYS.use_imported_translations, value)
+
+
+def get_retranslate_existing() -> bool:
+    """Return True if all existing translations should be retranslated."""
+    return _get_bool(KEYS.retranslate_existing, default=False)
+
+
+def set_retranslate_existing(value: bool) -> None:
+    _set_bool(KEYS.retranslate_existing, value)
+
+
+def get_preflight_skip() -> bool:
+    """Return True if the pre-flight dialog should be skipped."""
+    return _get_bool(KEYS.preflight_skip, default=False)
+
+
+def set_preflight_skip(value: bool) -> None:
+    _set_bool(KEYS.preflight_skip, value)

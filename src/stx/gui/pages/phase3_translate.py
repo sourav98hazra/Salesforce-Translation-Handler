@@ -659,12 +659,12 @@ class Phase3TranslatePage(PhasePage):
         if self._state.document is None:
             self.warn(
                 "No document loaded yet.\n\n"
-                "Click 'Load .xlsx ...' to load an Excel directly into this phase,\n"
+                "Click 'Load Excel...' to load an Excel directly into this phase,\n"
                 "or complete Phase 1 (Import STF) first."
             )
             return
 
-        # Pre-flight: check backend availability before spinning up the worker.
+        # Pre-flight: check backend availability.
         from ...translate.factory import check_backend_available
 
         backend_key = gui_settings.get_str(gui_settings.KEYS.backend, "google")
@@ -689,10 +689,72 @@ class Phase3TranslatePage(PhasePage):
         self._state.scope = scope
         self._state.target_language_code = code_for_language(self._target_combo.currentText()) or "ja"
         self._state.target_language_name = self._target_combo.currentText()
-        self._state.retranslate_existing = self._retranslate_check.isChecked()
+
+        # --- Read translation option toggles from Translation menu (persistent settings)
+        use_infile = gui_settings.get_use_infile_translations()
+        use_tm = gui_settings.get_use_tm_cache()
+        use_fuzzy = gui_settings.get_use_fuzzy_matching() and use_tm
+        retranslate = gui_settings.get_retranslate_existing()
+
+        # Phase 3 retranslate checkbox overrides the menu setting if visible and checked
+        if self._retranslate_check.isVisible():
+            retranslate = self._retranslate_check.isChecked()
+            gui_settings.set_retranslate_existing(retranslate)
+        self._state.retranslate_existing = retranslate
+
+        # Imported translations: respect both the menu toggle and state
+        use_imported_menu = gui_settings.get_use_imported_translations()
+        imported_translations = None
+        imported_count = 0
+        if use_imported_menu and self._state.imported_translations_enabled and self._state.imported_translations:
+            imported_translations = self._state.imported_translations
+            imported_count = len(imported_translations)
+
+        # --- In-file translations: build seed dict from already-translated rows
+        infile_seed: dict[str, str] | None = None
+        infile_reuse_count = [0]
+        if use_infile and not retranslate:
+            seed: dict[str, str] = {}
+            for entry in self._state.document.entries:
+                label = entry.label.strip()
+                translation = entry.translation.strip()
+                if label and translation and label not in seed:
+                    seed[label] = translation
+            if seed:
+                infile_seed = seed
+                self.status_message.emit(
+                    f"In-file translations: {len(seed):,} unique labels with existing translations "
+                    f"will be reused without API calls."
+                )
+
         gui_settings.remember_target_language(self._state.target_language_name, self._state.target_language_code)
 
-        # ---- Read advanced options from the Settings dialog values.
+        # ---- Show pre-flight confirmation dialog (unless user disabled it)
+        if not gui_settings.get_preflight_skip():
+            from ..preflight_dialog import PreflightDialog
+            checkpoint = self._build_checkpoint()
+            dlg = PreflightDialog(
+                source_lang=self._source_combo.currentText() or "English",
+                target_lang=self._state.target_language_name,
+                rows_to_translate=scope.estimate_count(self._state.document) if scope else len(self._state.document.entries),
+                total_rows=len(self._state.document.entries),
+                backend=backend_key,
+                workers=gui_settings.get_int(gui_settings.KEYS.workers, 4),
+                use_infile=use_infile,
+                use_tm=use_tm,
+                use_fuzzy=use_fuzzy,
+                use_imported=use_imported_menu,
+                imported_count=imported_count,
+                retranslate=retranslate,
+                has_checkpoint=checkpoint.exists() if checkpoint else False,
+                parent=self,
+            )
+            if dlg.exec() != dlg.DialogCode.Accepted:
+                return
+            if dlg.dont_show_again():
+                gui_settings.set_preflight_skip(True)
+
+        # ---- Read advanced options from Settings.
         workers = gui_settings.get_int(gui_settings.KEYS.workers, 4)
         rate_str = gui_settings.get_str("translation/rate_limit", "8.0")
         try:
@@ -714,15 +776,17 @@ class Phase3TranslatePage(PhasePage):
                 self.error(f"Failed to load glossary: {exc}", "Glossary error")
                 return
 
-        # Translation memory (defaults to the per-user path if unset)
-        memory_path = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip() or str(default_tm_path())
-        try:
-            memory = TranslationMemory(path=Path(memory_path))
-            self._state.memory = memory
-            self._state.memory_path = Path(memory_path)
-        except Exception as exc:  # noqa: BLE001
-            self.error(f"Failed to open TM at {memory_path}: {exc}", "TM error")
-            return
+        # Translation memory (disabled if use_tm toggle is off)
+        memory = None
+        if use_tm:
+            memory_path = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip() or str(default_tm_path())
+            try:
+                memory = TranslationMemory(path=Path(memory_path))
+                self._state.memory = memory
+                self._state.memory_path = Path(memory_path)
+            except Exception as exc:  # noqa: BLE001
+                self.error(f"Failed to open TM at {memory_path}: {exc}", "TM error")
+                return
 
         # ---- Reset live counters
         self._translated_count = 0
@@ -771,14 +835,11 @@ class Phase3TranslatePage(PhasePage):
             api_key=gui_secrets.retrieve_api_key(
                 gui_settings.get_str(gui_settings.KEYS.backend, "google")
             ) or None,
-            fuzzy_threshold=self._get_fuzzy_threshold(),
+            fuzzy_threshold=self._get_fuzzy_threshold() if use_fuzzy else None,
             fuzzy_max_results=gui_settings.get_int(gui_settings.KEYS.fuzzy_max_results, 5),
             fuzzy_auto_accept_threshold=self._get_fuzzy_auto_accept(),
-            imported_translations=(
-                self._state.imported_translations
-                if self._state.imported_translations_enabled
-                else None
-            ),
+            imported_translations=imported_translations,
+            infile_translations=infile_seed,
             retranslate_existing=self._state.retranslate_existing,
             parent=self,
         )
@@ -852,10 +913,12 @@ class Phase3TranslatePage(PhasePage):
             f"Reused (dedup): {done.deduped_count} | "
             f"Skipped: {done.skipped_count}"
             + (f" | Resumed from checkpoint: {done.resumed_count}" if done.resumed_count else "")
+            + (f" | Reused from imported file: {done.imported_reuse_count}" if done.imported_reuse_count else "")
         )
         self._log.appendPlainText(
             "  TM cache = previously translated by this app and reused (no API call).  "
-            "Dedup = identical label appeared multiple times; translated once, reused for the rest."
+            "Dedup = identical label appeared multiple times; translated once, reused for the rest.  "
+            "Reused from file = label already translated in same file, reused without API call."
         )
         self._log.appendPlainText(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.1f} rows/s")
 
