@@ -827,8 +827,8 @@ class Phase3TranslatePage(PhasePage):
             f"\u2500\u2500  scope: {self._total_rows:,} rows  |  workers: {workers}"
         )
         self._log.appendPlainText(
-            "  Legend: Trans = translated via API  |  TM = from Translation Memory cache  "
-            "|  Dedup = duplicate row reused from same run"
+            "  Legend: Trans = via API  |  TM = via Translation Memory  "
+            "|  Dedup = via deduplication (same label in run)"
         )
         self._log.appendPlainText("")
 
@@ -973,21 +973,21 @@ class Phase3TranslatePage(PhasePage):
             self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
 
         # Breakdown of how rows were translated
-        self._log.appendPlainText(f"  \u251c\u2500 Translated via API:       {done.translated_count:>5,}")
-        self._log.appendPlainText(f"  \u251c\u2500 From Translation Memory:  {done.cached_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Via Translation API:        {done.translated_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Via Translation Memory:     {done.cached_count:>5,}")
         if done.fuzzy_accepted_count:
-            self._log.appendPlainText(f"  \u2502    (of which fuzzy match: {done.fuzzy_accepted_count:>5,})")
-        self._log.appendPlainText(f"  \u251c\u2500 Deduplicated (reused):    {done.deduped_count:>5,}")
-        if done.imported_reuse_count:
-            self._log.appendPlainText(f"  \u251c\u2500 From imported file:       {done.imported_reuse_count:>5,}")
+            self._log.appendPlainText(f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})")
         if done.infile_reuse_count:
-            self._log.appendPlainText(f"  \u251c\u2500 Reused from file:         {done.infile_reuse_count:>5,}")
+            self._log.appendPlainText(f"  \u251c\u2500 Via in-file label match:   {done.infile_reuse_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Via deduplication:          {done.deduped_count:>5,}")
+        if done.imported_reuse_count:
+            self._log.appendPlainText(f"  \u251c\u2500 Via imported reference:     {done.imported_reuse_count:>5,}")
         if done.resumed_count:
-            self._log.appendPlainText(f"  \u251c\u2500 Resumed from checkpoint:  {done.resumed_count:>5,}")
-        self._log.appendPlainText(f"  \u2514\u2500 Already translated (kept):{done.skipped_count:>5,}")
+            self._log.appendPlainText(f"  \u251c\u2500 Resumed from checkpoint:   {done.resumed_count:>5,}")
+        self._log.appendPlainText(f"  \u2514\u2500 Pre-existing (unchanged):  {done.skipped_count:>5,}")
 
         self._log.appendPlainText("")
-        self._log.appendPlainText(f"  Rows failed:                 {rows_failed:>5,}")
+        self._log.appendPlainText(f"  Rows with errors (fallback): {rows_failed:>5,}")
         self._log.appendPlainText("")
         self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:
