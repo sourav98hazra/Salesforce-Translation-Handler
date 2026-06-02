@@ -72,7 +72,7 @@ class TestButtonLabels:
         from stx.gui.pages.phase5_validate import Phase5ValidatePage
         page = Phase5ValidatePage(state)
         qtbot.addWidget(page)
-        assert page._download_report_btn.text() == "Export Validation Report"
+        assert page._download_report_btn.text() == "Export Report"
 
     def test_phase2_save_copy_label(self, state, qtbot):
         from stx.gui.pages.phase2_excel import Phase2ExcelPage

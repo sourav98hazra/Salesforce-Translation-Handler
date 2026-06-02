@@ -307,7 +307,7 @@ class Phase3TranslatePage(PhasePage):
 
         # ----- Filter row 1: action buttons + checkboxes
         self._filter_btn = QPushButton("Filter Components...")
-        self._filter_btn.setStyleSheet("padding: 5px 16px; font-weight: 600;")
+        self._filter_btn.setStyleSheet("padding: 4px 12px; font-weight: 600;")
         self._filter_btn.setToolTip(
             "Choose which component types to translate. By default all "
             "components are selected."
@@ -315,7 +315,7 @@ class Phase3TranslatePage(PhasePage):
         self._filter_btn.clicked.connect(self._on_filter_components)
 
         self._import_trans_btn = QPushButton("Import existing translations...")
-        self._import_trans_btn.setStyleSheet("padding: 5px 16px;")
+        self._import_trans_btn.setStyleSheet("padding: 4px 12px;")
         self._import_trans_btn.setToolTip(
             "Load translations from a previously translated Excel file. "
             "Imported translations are applied with highest priority."
@@ -342,6 +342,13 @@ class Phase3TranslatePage(PhasePage):
         self._retranslate_check.setStyleSheet("font-weight: 600; color: #b45309;")
         self._retranslate_check.toggled.connect(self._on_retranslate_toggled)
 
+        # Single row: Filter Components | Import translations | Use imports | Retranslate | stretch | import status | Rows to translate
+        self._import_trans_label = QLabel("")
+        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
+
+        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
+
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(0, 8, 0, 0)
         btn_row.setSpacing(10)
@@ -351,22 +358,10 @@ class Phase3TranslatePage(PhasePage):
         btn_row.addSpacing(16)
         btn_row.addWidget(self._retranslate_check)
         btn_row.addStretch(1)
-
-        # ----- Filter row 2: status labels + row estimate
-        self._import_trans_label = QLabel("")
-        self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
-
-        self._estimate_label = QLabel("Rows to translate: --")
-        self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
-
-        info_row = QHBoxLayout()
-        info_row.setContentsMargins(0, 2, 0, 0)
-        info_row.setSpacing(12)
-        info_row.addWidget(self._import_trans_label, stretch=1)
-        info_row.addWidget(self._estimate_label)
+        btn_row.addWidget(self._import_trans_label)
+        btn_row.addWidget(self._estimate_label)
 
         setup_layout.addLayout(btn_row)
-        setup_layout.addLayout(info_row)
 
         # Settings hint
         self._settings_summary = QLabel("")
