@@ -61,6 +61,7 @@ class Phase5ValidatePage(PhasePage):
         )
         self._issues: List[ValidationIssue] = []
         self._report: Optional[ValidationReport] = None
+        self._applied_fixes: List[dict] = []
         self._build()
 
     def _build(self) -> None:
@@ -479,11 +480,37 @@ class Phase5ValidatePage(PhasePage):
             "Proceed?"
         ):
             return
+        # Capture before-state for fix tracking
+        before_translations: dict[str, tuple[str, str]] = {}
+        for entry in self._state.document.entries:
+            before_translations[entry.key] = (entry.label, entry.translation)
+
         report = auto_fix_document(self._state.document)
         self.status_message.emit(
             f"Auto-fix complete: {report.fixed_count} fix(es) applied."
         )
+
+        # Record applied fixes with before/after details
         if report.fixed_count > 0:
+            for key, description in report.details:
+                old_label, old_translation = before_translations.get(key, ("", ""))
+                # Find current (fixed) translation
+                new_translation = old_translation
+                for entry in self._state.document.entries:
+                    if entry.key == key:
+                        new_translation = entry.translation
+                        break
+                # Determine issue category from description
+                issue_category = self._categorize_fix(description)
+                self._applied_fixes.append({
+                    "key": key,
+                    "label": old_label,
+                    "previous_translation": old_translation,
+                    "fixed_translation": new_translation,
+                    "issue_category": issue_category,
+                    "fix_description": description,
+                })
+
             self.info(
                 f"Applied {report.fixed_count} fix(es).\n\n"
                 + "\n".join(f"  \u2022 {key}: {desc}" for key, desc in report.details[:20])
@@ -509,10 +536,20 @@ class Phase5ValidatePage(PhasePage):
             entry = self._find_entry(issue.key)
             if entry is None:
                 continue
+            old_translation = entry.translation
             fixed_entry, descriptions = auto_fix_entry(entry)
             if descriptions:
                 self._replace_entry(issue.key, fixed_entry)
                 fixed_count += 1
+                # Record fix details
+                self._applied_fixes.append({
+                    "key": entry.key,
+                    "label": entry.label,
+                    "previous_translation": old_translation,
+                    "fixed_translation": fixed_entry.translation,
+                    "issue_category": issue.category,
+                    "fix_description": "; ".join(descriptions),
+                })
         self.status_message.emit(f"Fixed {fixed_count} of {len(selected_rows)} selected row(s).")
         self._on_validate()
 
@@ -525,11 +562,21 @@ class Phase5ValidatePage(PhasePage):
         entry = self._find_entry(issue.key)
         if entry is None:
             return
+        old_translation = entry.translation
         fixed_entry, descriptions = auto_fix_entry(entry)
         if descriptions:
             self._replace_entry(issue.key, fixed_entry)
             self._tgt_field.setPlainText(fixed_entry.translation)
             self.status_message.emit(f"Fixed: {'; '.join(descriptions)}")
+            # Record fix details
+            self._applied_fixes.append({
+                "key": entry.key,
+                "label": entry.label,
+                "previous_translation": old_translation,
+                "fixed_translation": fixed_entry.translation,
+                "issue_category": issue.category,
+                "fix_description": "; ".join(descriptions),
+            })
             self._on_validate()
         else:
             self.status_message.emit("Auto-fix could not resolve this issue.  Please fix manually.")
@@ -664,13 +711,14 @@ class Phase5ValidatePage(PhasePage):
 
         from ...report import export_csv, export_html, export_json
 
+        fixes = self._applied_fixes if self._applied_fixes else None
         ext = path.suffix.lower()
         if ext == ".csv":
-            export_csv(self._report, path)
+            export_csv(self._report, path, fixes_applied=fixes)
         elif ext == ".json":
-            export_json(self._report, path)
+            export_json(self._report, path, fixes_applied=fixes)
         elif ext == ".html":
-            export_html(self._report, path)
+            export_html(self._report, path, fixes_applied=fixes)
         else:
             self.status_message.emit(
                 f"Unsupported format '{ext}'. Use .csv, .json, or .html."
@@ -680,11 +728,29 @@ class Phase5ValidatePage(PhasePage):
 
     # ------------------------------------------------------------------ pop-out (entire splitter: issues table + editor)
 
+    def _categorize_fix(self, description: str) -> str:
+        """Derive issue category from a fix description string."""
+        desc_lower = description.lower()
+        if "placeholder" in desc_lower:
+            return "missing_placeholder"
+        if "messageformat" in desc_lower or "token" in desc_lower:
+            return "missing_message_format"
+        if "trim" in desc_lower or "length" in desc_lower:
+            return "length_exceeded"
+        if "whitespace" in desc_lower:
+            return "whitespace_only"
+        if "html" in desc_lower or "tag" in desc_lower:
+            return "missing_html_tag"
+        if "duplicate" in desc_lower:
+            return "duplicate_key"
+        return "other"
+
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
         self._table.setRowCount(0)
         self._issues = []
         self._report = None
+        self._applied_fixes = []
         self._banner.setText("No document loaded.  Complete earlier phases first.")
         self._banner.setStyleSheet(
             "padding: 10px; border-radius: 6px; font-weight: 700; "

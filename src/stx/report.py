@@ -1,7 +1,9 @@
 """Export validation reports to CSV, JSON, and HTML formats.
 
 Each function takes a :class:`~stx.validate.ValidationReport` and writes
-a formatted report to the given path.
+a formatted report to the given path.  An optional ``fixes_applied`` list
+can be provided to include a "Fixes Applied" section showing what auto-fix
+changed (before/after details).
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ import csv
 import json
 from html import escape as html_escape
 from pathlib import Path
+from typing import List, Optional
 
 from .validate import ValidationReport
 
@@ -22,8 +25,17 @@ def _component_from_key(key: str) -> str:
     return key or "Unknown"
 
 
-def export_csv(report: ValidationReport, path: Path) -> None:
-    """Write a CSV report with a summary row and one row per issue."""
+def export_csv(
+    report: ValidationReport,
+    path: Path,
+    fixes_applied: Optional[List[dict]] = None,
+) -> None:
+    """Write a CSV report with a summary row and one row per issue.
+
+    If *fixes_applied* is provided, a second section (separated by a blank
+    row) is appended with columns:
+    Key, Label, Previous Translation, Fixed Translation, Issue Category, Fix Applied.
+    """
     path = Path(path)
     error_count = len(report.errors)
     warning_count = len(report.warnings)
@@ -48,9 +60,37 @@ def export_csv(report: ValidationReport, path: Path) -> None:
                 issue.message,
             ])
 
+        # Fixes Applied section
+        if fixes_applied:
+            writer.writerow([])  # blank separator row
+            writer.writerow([
+                f"# Fixes Applied: {len(fixes_applied)} fix(es)",
+            ])
+            writer.writerow([
+                "Key", "Label", "Previous Translation",
+                "Fixed Translation", "Issue Category", "Fix Applied",
+            ])
+            for fix in fixes_applied:
+                writer.writerow([
+                    fix.get("key", ""),
+                    fix.get("label", ""),
+                    fix.get("previous_translation", ""),
+                    fix.get("fixed_translation", ""),
+                    fix.get("issue_category", ""),
+                    fix.get("fix_description", ""),
+                ])
 
-def export_json(report: ValidationReport, path: Path) -> None:
-    """Write a JSON report with summary, issues grouped by category, and flat list."""
+
+def export_json(
+    report: ValidationReport,
+    path: Path,
+    fixes_applied: Optional[List[dict]] = None,
+) -> None:
+    """Write a JSON report with summary, issues grouped by category, and flat list.
+
+    If *fixes_applied* is provided, an additional ``"fixes_applied"`` array
+    is included in the output.
+    """
     path = Path(path)
     error_count = len(report.errors)
     warning_count = len(report.warnings)
@@ -70,21 +110,43 @@ def export_json(report: ValidationReport, path: Path) -> None:
         issues_flat.append(issue_dict)
         issues_by_category.setdefault(issue.category, []).append(issue_dict)
 
-    data = {
+    data: dict = {
         "summary": {
             "errors": error_count,
             "warnings": warning_count,
             "total": len(report.issues),
+            "fixes_applied_count": len(fixes_applied) if fixes_applied else 0,
         },
         "issues_by_category": issues_by_category,
         "issues": issues_flat,
     }
 
+    if fixes_applied:
+        data["fixes_applied"] = [
+            {
+                "key": fix.get("key", ""),
+                "label": fix.get("label", ""),
+                "previous_translation": fix.get("previous_translation", ""),
+                "fixed_translation": fix.get("fixed_translation", ""),
+                "issue_category": fix.get("issue_category", ""),
+                "fix_description": fix.get("fix_description", ""),
+            }
+            for fix in fixes_applied
+        ]
+
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def export_html(report: ValidationReport, path: Path) -> None:
-    """Write a standalone HTML report with embedded CSS."""
+def export_html(
+    report: ValidationReport,
+    path: Path,
+    fixes_applied: Optional[List[dict]] = None,
+) -> None:
+    """Write a standalone HTML report with embedded CSS.
+
+    If *fixes_applied* is provided, an additional "Fixes Applied" table
+    section is rendered below the issues table.
+    """
     path = Path(path)
     error_count = len(report.errors)
     warning_count = len(report.warnings)
@@ -116,6 +178,34 @@ def export_html(report: ValidationReport, path: Path) -> None:
 
     rows_html = "\n".join(table_rows)
 
+    # Build fixes table if available
+    fixes_section = ""
+    if fixes_applied:
+        fix_rows = []
+        for fix in fixes_applied:
+            fix_rows.append(
+                f"<tr>"
+                f"<td>{html_escape(fix.get('key', ''))}</td>"
+                f"<td>{html_escape(fix.get('label', ''))}</td>"
+                f"<td>{html_escape(fix.get('previous_translation', ''))}</td>"
+                f"<td>{html_escape(fix.get('fixed_translation', ''))}</td>"
+                f"<td>{html_escape(fix.get('issue_category', ''))}</td>"
+                f"<td>{html_escape(fix.get('fix_description', ''))}</td>"
+                f"</tr>"
+            )
+        fix_rows_html = "\n".join(fix_rows)
+        fixes_section = f"""
+<h2>Fixes Applied ({len(fixes_applied)})</h2>
+<table>
+<thead>
+<tr><th>Key</th><th>Label</th><th>Previous Translation</th><th>Fixed Translation</th><th>Issue Category</th><th>Fix Applied</th></tr>
+</thead>
+<tbody>
+{fix_rows_html}
+</tbody>
+</table>
+"""
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -124,6 +214,7 @@ def export_html(report: ValidationReport, path: Path) -> None:
 <style>
 body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2em; color: #1a1a1a; }}
 h1 {{ color: #1e3a5f; }}
+h2 {{ color: #1e3a5f; margin-top: 2em; }}
 .summary {{ background: #f0f4f8; padding: 1em; border-radius: 6px; margin-bottom: 1.5em; }}
 .summary span {{ margin-right: 2em; font-weight: 600; }}
 .errors {{ color: #dc2626; }}
@@ -153,6 +244,7 @@ td.info {{ color: #2563eb; font-weight: 600; }}
 {rows_html}
 </tbody>
 </table>
+{fixes_section}
 </body>
 </html>
 """
