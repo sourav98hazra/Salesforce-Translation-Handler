@@ -321,8 +321,8 @@ class Phase4ReviewPage(PhasePage):
         toolbar = QFrame()
         toolbar.setProperty("role", "card")
         tb_layout = QHBoxLayout(toolbar)
-        tb_layout.setContentsMargins(12, 10, 12, 10)
-        tb_layout.setSpacing(14)
+        tb_layout.setContentsMargins(12, 8, 12, 8)
+        tb_layout.setSpacing(8)
 
         self._status_pill = QLabel("\u2022  No document loaded")
         self._status_pill.setStyleSheet(
@@ -505,34 +505,34 @@ class Phase4ReviewPage(PhasePage):
         # Inset the whole column (label + text area) so it sits with
         # breathing room from the outer group-box border on the left
         # and from the splitter handle on the right.
-        src_col.setContentsMargins(10, 6, 10, 6)
-        src_col.setSpacing(3)
+        src_col.setContentsMargins(6, 4, 6, 4)
+        src_col.setSpacing(2)
         src_label = QLabel("Source")
         src_label.setStyleSheet(
-            "padding-left: 4px; padding-bottom: 2px; "
-            "color: #475569; font-weight: 500;"
+            "padding-left: 2px; padding-bottom: 1px; "
+            "color: #475569; font-weight: 500; font-size: 11px;"
         )
         src_col.addWidget(src_label)
         self._source_field = QPlainTextEdit()
         self._source_field.setReadOnly(True)
         self._source_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._source_field.setMinimumHeight(60)
+        self._source_field.setMinimumHeight(40)
         src_col.addWidget(self._source_field)
         side_by_side.addWidget(src_widget)
 
         tgt_widget = QWidget()
         tgt_col = QVBoxLayout(tgt_widget)
-        tgt_col.setContentsMargins(10, 6, 10, 6)
-        tgt_col.setSpacing(3)
+        tgt_col.setContentsMargins(6, 4, 6, 4)
+        tgt_col.setSpacing(2)
         tgt_label = QLabel("Translation (editable)")
         tgt_label.setStyleSheet(
-            "padding-left: 4px; padding-bottom: 2px; "
-            "color: #475569; font-weight: 500;"
+            "padding-left: 2px; padding-bottom: 1px; "
+            "color: #475569; font-weight: 500; font-size: 11px;"
         )
         tgt_col.addWidget(tgt_label)
         self._translation_field = QPlainTextEdit()
         self._translation_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._translation_field.setMinimumHeight(60)
+        self._translation_field.setMinimumHeight(40)
         tgt_col.addWidget(self._translation_field)
         side_by_side.addWidget(tgt_widget)
 
@@ -544,9 +544,9 @@ class Phase4ReviewPage(PhasePage):
 
         splitter.addWidget(editor)
         self._editor_widget = editor
-        splitter.setStretchFactor(0, 4)
+        splitter.setStretchFactor(0, 5)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([400, 200])           # explicit initial sizes (table top, editor bottom)
+        splitter.setSizes([500, 150])           # table bigger, editor compact by default
 
         review_layout.addWidget(splitter)
         self.add_widget(review_box, stretch=1)
@@ -569,15 +569,19 @@ class Phase4ReviewPage(PhasePage):
 
     def _make_inline_stat(self, label: str, value: str, accent: str) -> dict:
         frame = QFrame()
+        frame.setStyleSheet(
+            "QFrame { background: transparent; border: none; "
+            "padding: 2px 6px; }"
+        )
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
         title = QLabel(label.upper())
         title.setStyleSheet(
             "color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: 0.6px;"
         )
         val = QLabel(value)
-        val.setStyleSheet(f"color: {accent}; font-size: 16px; font-weight: 700;")
+        val.setStyleSheet(f"color: {accent}; font-size: 15px; font-weight: 700;")
         layout.addWidget(title)
         layout.addWidget(val)
         return {"frame": frame, "value": val}

@@ -109,11 +109,10 @@ class Phase5ValidatePage(PhasePage):
         )
         self._download_report_btn.clicked.connect(self._on_download_report)
 
-        # All 6 action buttons on a single row — fits on 1366px
+        # Primary workflow actions row — load, validate, fix (before the table)
         self.add_layout(make_action_row(
             self._load_btn, self._validate_btn,
             self._fix_all_btn, self._fix_selected_btn,
-            self._save_btn, self._download_report_btn,
         ))
 
         # ---------- Splitter: issues table (top) + inline editor (bottom)
@@ -173,34 +172,34 @@ class Phase5ValidatePage(PhasePage):
         # Inset the whole column (label + text area) so it sits with
         # breathing room from the outer group-box border on the left
         # and from the splitter handle on the right.
-        src_col.setContentsMargins(10, 6, 10, 6)
-        src_col.setSpacing(3)
+        src_col.setContentsMargins(6, 4, 6, 4)
+        src_col.setSpacing(2)
         src_label = QLabel("Source label (read-only)")
         src_label.setStyleSheet(
-            "padding-left: 4px; padding-bottom: 2px; "
-            "color: #475569; font-weight: 500;"
+            "padding-left: 2px; padding-bottom: 1px; "
+            "color: #475569; font-weight: 500; font-size: 11px;"
         )
         src_col.addWidget(src_label)
         self._src_field = QPlainTextEdit()
         self._src_field.setReadOnly(True)
         self._src_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._src_field.setMinimumHeight(60)
+        self._src_field.setMinimumHeight(40)
         src_col.addWidget(self._src_field)
         fields_row.addWidget(src_widget)
 
         tgt_widget = QWidget()
         tgt_col = QVBoxLayout(tgt_widget)
-        tgt_col.setContentsMargins(10, 6, 10, 6)
-        tgt_col.setSpacing(3)
+        tgt_col.setContentsMargins(6, 4, 6, 4)
+        tgt_col.setSpacing(2)
         tgt_label = QLabel("Translation (editable)")
         tgt_label.setStyleSheet(
-            "padding-left: 4px; padding-bottom: 2px; "
-            "color: #475569; font-weight: 500;"
+            "padding-left: 2px; padding-bottom: 1px; "
+            "color: #475569; font-weight: 500; font-size: 11px;"
         )
         tgt_col.addWidget(tgt_label)
         self._tgt_field = QPlainTextEdit()
         self._tgt_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._tgt_field.setMinimumHeight(60)
+        self._tgt_field.setMinimumHeight(40)
         tgt_col.addWidget(self._tgt_field)
         fields_row.addWidget(tgt_widget)
 
@@ -238,7 +237,7 @@ class Phase5ValidatePage(PhasePage):
         splitter.addWidget(editor_box)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([400, 200])           # explicit initial sizes (issues top, editor bottom)
+        splitter.setSizes([450, 150])           # table bigger, editor compact by default
 
         issues_layout.addWidget(splitter)
         self.add_widget(issues_box, stretch=1)
@@ -246,6 +245,11 @@ class Phase5ValidatePage(PhasePage):
         # ONE pop-out icon glued to the group box border, popping the
         # whole splitter (issues table + editor) into a modeless QDialog.
         add_popout_to_groupbox(issues_box, self._on_popout_issues)
+
+        # ---------- Bottom: save/export row (below the table, above Continue)
+        self.add_layout(make_action_row(
+            self._save_btn, self._download_report_btn,
+        ))
 
         # ---------- Bottom: next phase
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
