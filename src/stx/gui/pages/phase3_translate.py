@@ -657,6 +657,14 @@ class Phase3TranslatePage(PhasePage):
         self._state.imported_translations_enabled = checked
         # Keep Settings dialog in sync
         gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1" if checked else "0")
+        # Keep Translation menu action in sync (use_imported_translations key)
+        gui_settings.set_use_imported_translations(checked)
+        # Update the menu action widget without triggering infinite loop
+        main_win = self.window()
+        if hasattr(main_win, '_act_use_imported'):
+            main_win._act_use_imported.blockSignals(True)
+            main_win._act_use_imported.setChecked(checked)
+            main_win._act_use_imported.blockSignals(False)
 
     # ------------------------------------------------------------------ output path
 

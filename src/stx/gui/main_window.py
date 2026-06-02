@@ -154,6 +154,9 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._wire_shortcuts()
 
+        # ---- sync Translation menu "Use imported translations" -> Phase 3 checkbox
+        self._act_use_imported.toggled.connect(self._sync_import_to_phase3)
+
         # ---- wire phase signals
         for page in self._pages:
             page.status_message.connect(self._log)
@@ -709,6 +712,16 @@ class MainWindow(QMainWindow):
         review = self._pages[3]
         if hasattr(review, "focus_key"):
             review.focus_key(key)
+
+    def _sync_import_to_phase3(self, checked: bool) -> None:
+        """Sync the Translation menu 'Use imported translations' state to Phase 3 checkbox."""
+        page = self._pages[2]  # Phase3TranslatePage
+        page._import_trans_check.blockSignals(True)
+        page._import_trans_check.setChecked(checked)
+        page._import_trans_check.blockSignals(False)
+        # Also keep the io/import_translations_enabled key in sync
+        gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1" if checked else "0")
+        self._state.imported_translations_enabled = checked
 
     def _action_previous_phase(self) -> None:
         """Navigate to the previous phase (app-wide back)."""
