@@ -105,6 +105,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
+        # Run one-time settings migration (resets stale defaults from older versions)
+        gui_settings.migrate_settings()
         self.setWindowTitle("Salesforce Translation Manager")
         # Reasonable minimum so users on small / windowed displays can
         # actually shrink the window.  Was being held hostage by a fixed

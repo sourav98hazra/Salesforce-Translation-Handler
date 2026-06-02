@@ -66,6 +66,38 @@ def settings() -> QSettings:
 
 
 # ---------------------------------------------------------------------------
+# One-time settings migration (v2.0 changed defaults)
+# ---------------------------------------------------------------------------
+
+_SETTINGS_VERSION_KEY = "internal/settings_version"
+_CURRENT_SETTINGS_VERSION = 2  # Bump when defaults change
+
+
+def migrate_settings() -> None:
+    """Reset stale toggle defaults from older app versions.
+
+    Call once at startup (idempotent — only runs when the stored version
+    is older than _CURRENT_SETTINGS_VERSION).
+    """
+    s = settings()
+    stored_version = s.value(_SETTINGS_VERSION_KEY, 0)
+    try:
+        stored_version = int(stored_version)
+    except (TypeError, ValueError):
+        stored_version = 0
+
+    if stored_version >= _CURRENT_SETTINGS_VERSION:
+        return  # Already migrated
+
+    # v2: fuzzy matching defaults to OFF, imported translations defaults to OFF
+    s.remove(KEYS.use_fuzzy_matching)
+    s.remove(KEYS.use_imported_translations)
+
+    s.setValue(_SETTINGS_VERSION_KEY, _CURRENT_SETTINGS_VERSION)
+    s.sync()
+
+
+# ---------------------------------------------------------------------------
 # Convenience getters / setters
 # ---------------------------------------------------------------------------
 
@@ -196,7 +228,7 @@ def set_use_tm_cache(value: bool) -> None:
 
 
 def get_use_fuzzy_matching() -> bool:
-    """Return False (default) if fuzzy TM matching is enabled."""
+    """Return False (default) — fuzzy TM matching is opt-in."""
     return _get_bool(KEYS.use_fuzzy_matching, default=False)
 
 
@@ -205,8 +237,15 @@ def set_use_fuzzy_matching(value: bool) -> None:
 
 
 def get_use_imported_translations() -> bool:
-    """Return True if imported translations are enabled."""
-    return _get_bool(KEYS.use_imported_translations, default=False)
+    """Return True only if enabled AND an import file path is actually set."""
+    enabled = _get_bool(KEYS.use_imported_translations, default=False)
+    if not enabled:
+        return False
+    # Guard: if no import file has been loaded, force OFF regardless of stored flag
+    path = get_str(KEYS.import_translations_path, "")
+    if not path:
+        return False
+    return True
 
 
 def set_use_imported_translations(value: bool) -> None:
