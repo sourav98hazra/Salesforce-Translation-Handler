@@ -641,13 +641,22 @@ class Phase3TranslatePage(PhasePage):
             f"\u2713 {result.count:,} translations imported"
         )
         self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+        # Persist path + enabled state so Settings dialog stays in sync
+        gui_settings.set_str(gui_settings.KEYS.import_translations_path, path)
+        gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1")
         self.status_message.emit(
             f"Imported {result.count:,} translations from {Path(path).name}"
         )
 
     def _on_import_trans_toggled(self, checked: bool) -> None:
-        """Toggle whether imported translations are used during translation."""
+        """Toggle whether imported translations are used during translation.
+
+        Writes back to gui_settings so the Settings dialog stays in sync,
+        and updates the Translation menu toggle as well.
+        """
         self._state.imported_translations_enabled = checked
+        # Keep Settings dialog in sync
+        gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1" if checked else "0")
 
     # ------------------------------------------------------------------ output path
 

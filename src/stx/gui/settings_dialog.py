@@ -304,8 +304,11 @@ class SettingsDialog(QDialog):
         self._import_trans_check = QCheckBox("Use imported translations")
         self._import_trans_check.setToolTip(
             "When checked, translations from the imported file are applied "
-            "with highest priority during translation runs."
+            "with highest priority during translation runs.\n"
+            "Only available after a file path is set above."
         )
+        self._import_trans_check.setEnabled(False)   # enabled only when a file path is present
+        self._import_trans_field.textChanged.connect(self._on_import_path_changed)
         import_layout.addWidget(self._import_trans_check)
         outer.addWidget(import_box)
 
@@ -442,13 +445,15 @@ class SettingsDialog(QDialog):
                 break
 
         # Import existing translations
-        self._import_trans_field.setText(
-            gui_settings.get_str(gui_settings.KEYS.import_translations_path, "")
-        )
+        import_path = gui_settings.get_str(gui_settings.KEYS.import_translations_path, "")
+        self._import_trans_field.setText(import_path)
+        has_path = bool(import_path.strip())
+        self._import_trans_check.setEnabled(has_path)
         import_enabled = gui_settings.get_str(
             gui_settings.KEYS.import_translations_enabled, "0"
         )
-        self._import_trans_check.setChecked(import_enabled in {"1", "true"})
+        # Only check if we actually have a file path and it's enabled
+        self._import_trans_check.setChecked(has_path and import_enabled in {"1", "true"})
 
         # Session persistence
         self._session_check.setChecked(gui_settings.get_session_enabled())
@@ -525,6 +530,7 @@ class SettingsDialog(QDialog):
         self._fuzzy_auto_accept_spin.setValue(90.0)
         self._import_trans_field.clear()
         self._import_trans_check.setChecked(False)
+        self._import_trans_check.setEnabled(False)   # disabled until a file is selected
         self._theme_combo.setCurrentIndex(0)
         self._session_check.setChecked(False)
 
@@ -584,6 +590,21 @@ class SettingsDialog(QDialog):
         if path:
             self._memory_field.setText(path)
 
+    def _on_import_path_changed(self, text: str) -> None:
+        """Enable/disable the 'Use imported translations' checkbox based on whether a path is set.
+
+        Rule: checkbox is only interactive when a file path is present.
+        Before any file is imported it stays disabled so the user cannot
+        accidentally enable it with no data behind it.
+        """
+        has_path = bool(text.strip())
+        self._import_trans_check.setEnabled(has_path)
+        if not has_path:
+            # No path → force unchecked so we never save enabled=True with no file
+            self._import_trans_check.blockSignals(True)
+            self._import_trans_check.setChecked(False)
+            self._import_trans_check.blockSignals(False)
+
     def _on_browse_import_translations(self) -> None:
         start = self._import_trans_field.text() or str(Path.home())
         path, _ = QFileDialog.getOpenFileName(
@@ -592,6 +613,8 @@ class SettingsDialog(QDialog):
         )
         if path:
             self._import_trans_field.setText(path)
+            # Auto-enable and check when a file is selected via Browse
+            self._import_trans_check.setEnabled(True)
             self._import_trans_check.setChecked(True)
 
 
