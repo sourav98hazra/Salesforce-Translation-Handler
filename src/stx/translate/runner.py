@@ -897,14 +897,18 @@ class _Runner:
         entry = self.doc.entries[index]
         sheet = entry.logical_sheet_name
         summary = self._summaries.setdefault(sheet, SheetSummary(sheet_name=sheet))
+        # "Fallback to original" means the API couldn't translate — use the
+        # source label as the translation so the row isn't left blank.
+        fallback_translation = entry.label if entry.label.strip() else entry.translation
+        new_entry = Entry(key=entry.key, label=entry.label, translation=fallback_translation)
         with self._completion_lock:
-            self._new_entries[index] = entry  # untouched
+            self._new_entries[index] = new_entry
             self._statuses[index] = StatusEntry(
                 sheet_name=sheet,
                 row_index=index + 2,
                 key=entry.key,
                 label=entry.label,
-                translation=entry.translation,
+                translation=fallback_translation,
                 status=status,
             )
             summary.skipped_rows += 1
