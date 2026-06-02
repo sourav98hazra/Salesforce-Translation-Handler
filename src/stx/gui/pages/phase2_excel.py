@@ -217,6 +217,32 @@ class Phase2ExcelPage(PhasePage):
             self._details.setItem(r, 4, QTableWidgetItem(f"{count:,}"))
         self._details.resizeColumnsToContents()
 
+    def _populate_details_from_doc(self, doc) -> None:
+        """Populate Content Details table from a loaded document (no export result needed)."""
+        if doc is None:
+            return
+        groups: dict[str, int] = {}
+        translated_groups: dict[str, int] = {}
+        for entry in doc.entries:
+            sheet = entry.logical_sheet_name
+            groups[sheet] = groups.get(sheet, 0) + 1
+            if entry.translation.strip():
+                translated_groups[sheet] = translated_groups.get(sheet, 0) + 1
+
+        self._details.setRowCount(len(groups))
+        for r, (logical, count) in enumerate(groups.items()):
+            comp, _, status = logical.partition("_")
+            translated = translated_groups.get(logical, 0)
+            trans_status = "Translated" if translated == count else (
+                "Untranslated" if translated == 0 else "Mixed"
+            )
+            self._details.setItem(r, 0, QTableWidgetItem(logical))
+            self._details.setItem(r, 1, QTableWidgetItem(logical))
+            self._details.setItem(r, 2, QTableWidgetItem(comp))
+            self._details.setItem(r, 3, QTableWidgetItem(trans_status))
+            self._details.setItem(r, 4, QTableWidgetItem(f"{count:,}"))
+        self._details.resizeColumnsToContents()
+
     def _on_load_existing(self) -> None:
         path = self.pick_open_file("Select organised workbook", "Excel files (*.xlsx)")
         if not path:
@@ -255,6 +281,10 @@ class Phase2ExcelPage(PhasePage):
         self._detect_source_language(doc)
 
         self.on_enter()
+
+        # Populate Content Details table from the loaded document
+        self._populate_details_from_doc(doc)
+
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
         self.action_recorded.emit(f"Load Excel ({path.name})")

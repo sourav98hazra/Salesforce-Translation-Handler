@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
             page.busy_changed.connect(lambda _busy: self._refresh_phase_badges())
             page.file_dropped.connect(self._handle_dropped_file)
             page.action_recorded.connect(self._record_app_action)
+            page.action_recorded.connect(lambda _label: self._update_sidebar_footer())
 
         # Any page exposing request_jump_to_row jumps to the Review phase
         # (currently index 3) focused on the matching row.
