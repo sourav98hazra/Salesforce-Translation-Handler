@@ -468,14 +468,13 @@ class Phase3TranslatePage(PhasePage):
         if self._state.target_language_name in LANGUAGE_NAME_TO_CODE:
             self._target_combo.setCurrentText(self._state.target_language_name)
 
-        # Auto-generate a default suggested output path so Save copy to...
+        # Auto-generate a professional default suggested output path so Save a Copy...
         # has a sensible filename ready when the user clicks it.
         if self._state.translated_xlsx_path is None:
             base = self._state.organized_xlsx_path or self._state.source_stf_path
             if base is not None:
-                self._state.translated_xlsx_path = Path(
-                    str(Path(base).with_suffix("")) + "_translated.xlsx"
-                )
+                parent = Path(base).parent
+                self._state.translated_xlsx_path = parent / self.default_save_name("translated")
 
         # Restore previously selected components from state
         if self._state.scope is not None and self._state.scope.components is not None:
@@ -847,12 +846,15 @@ class Phase3TranslatePage(PhasePage):
         self.status_message.emit(msg)
 
         # Mark the phase done so users can navigate forward; the Save
-        # copy to... button is now available for explicit file save.
+        # a Copy... button is now available for explicit file save.
         self._set_running(False)
         self._save_copy_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
         self._state.set_phase(2, PhaseStatus.DONE)
         self._state.has_unsaved_changes = True
+        # Update workflow artifact type to reflect that we now have a
+        # translated in-memory document (even if not saved to disk yet).
+        self._state.current_working_artifact_type = "translated_excel"
         self.action_recorded.emit(
             f"Translate completed ({done.translated_count} rows, "
             f"{self._state.target_language_code.upper()})"
@@ -970,12 +972,21 @@ class Phase3TranslatePage(PhasePage):
             self._state.organized_xlsx_path = path
             self._state.output_dir = path.parent
             gui_settings.add_recent_file(path)
+            # Set active workflow context so subsequent loads trigger override dialog.
+            self._state.set_active_workflow_context(
+                document=doc,
+                original_source_path=path,
+                current_working_path=path,
+                current_working_artifact_type="organized_excel",
+                start_phase=2,
+                current_phase=2,
+                override_existing=False,
+                reset_downstream=False,
+            )
             # Reset component selection so Filter Components picks up the new doc.
             self._selected_components = {e.component_type for e in doc.entries}
-            # Suggest a default translated output path for Save copy to...
-            self._state.translated_xlsx_path = Path(
-                str(Path(path).with_suffix("")) + "_translated.xlsx"
-            )
+            # Suggest a professional default translated output path for Save a Copy...
+            self._state.translated_xlsx_path = path.parent / self.default_save_name("translated")
             self._next_btn.setEnabled(True)
             self.on_enter()
             self.status_message.emit(
