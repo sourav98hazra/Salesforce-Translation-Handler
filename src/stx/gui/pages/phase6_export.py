@@ -58,7 +58,7 @@ class Phase6ExportPage(PhasePage):
 
     def _build(self) -> None:
         # ---------- Load Excel (direct convert path)
-        load_box = QGroupBox("Direct convert — load a translated Excel")
+        load_box = QGroupBox("Load translated Excel")
         load_layout = QHBoxLayout(load_box)
         self._load_btn = QPushButton("Load Excel...")
         self._load_btn.setToolTip(
@@ -68,7 +68,7 @@ class Phase6ExportPage(PhasePage):
         )
         self._load_btn.clicked.connect(self._on_load_excel)
         load_layout.addWidget(self._load_btn)
-        self._load_status = QLabel("Or use the document already loaded from previous phases.")
+        self._load_status = QLabel("No document loaded yet.")
         self._load_status.setStyleSheet("font-weight: 700; color: #4a5568;")
         load_layout.addWidget(self._load_status, stretch=1)
         self.add_widget(load_box)
@@ -160,7 +160,7 @@ class Phase6ExportPage(PhasePage):
             )
         else:
             self._load_status.setText(
-                "No document loaded.  Use 'Load translated Excel' or complete earlier phases."
+                "No document loaded.  Click 'Load Excel...' to select a translated workbook."
             )
 
     # ------------------------------------------------------------------ load Excel (direct convert)
