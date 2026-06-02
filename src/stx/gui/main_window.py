@@ -1348,8 +1348,13 @@ class MainWindow(QMainWindow):
             # Clear validation report
             self._state.last_validation_report = None
 
+        # Visually reset all pages from current phase onwards.
+        # This ensures downstream phases (e.g. Phase 4 when resetting Phase 2)
+        # also clear their displayed state so stale values never linger.
+        for i in range(current, len(self._pages)):
+            self._pages[i].reset_page()
+
         self._refresh_phase_badges()
         self._update_sidebar_footer()
         self._pages[current].on_enter()
-        self._pages[current].reset_page()
-        self._log(f"Reset Phase {current + 1} and downstream phases.")
+        self._log(f"Reset Phase {current + 1} and all downstream phases.")
