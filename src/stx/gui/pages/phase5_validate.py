@@ -72,7 +72,8 @@ class Phase5ValidatePage(PhasePage):
         )
         self.add_widget(self._banner)
 
-        # ---------- Action buttons row (kept compact: 4 buttons max)
+        # ---------- Action buttons — split into two rows to avoid overflow on small screens
+        # Row 1: primary workflow actions
         self._load_btn = QPushButton("Load Excel...")
         self._load_btn.setToolTip(
             "Load any organised / translated / reviewed Excel directly into "
@@ -88,7 +89,7 @@ class Phase5ValidatePage(PhasePage):
         self._fix_all_btn = primary(QPushButton("Auto-fix all"))
         self._fix_all_btn.setToolTip(
             "Automatically fix common issues like length overflow and lost "
-            "placeholders. Use 'Auto-fix this row' below for finer control."
+            "placeholders. Use 'Fix Selected' for finer control."
         )
         self._fix_all_btn.clicked.connect(self._on_fix_all)
         self._fix_selected_btn = QPushButton("Fix Selected")
@@ -97,27 +98,25 @@ class Phase5ValidatePage(PhasePage):
         )
         self._fix_selected_btn.setEnabled(False)
         self._fix_selected_btn.clicked.connect(self._on_fix_selected)
+        # Row 2: save / export
         self._save_btn = QPushButton("Save Workbook")
         self._save_btn.setToolTip(
             "Save the current (fixed) document as an .xlsx file."
         )
         self._save_btn.clicked.connect(self._on_save)
-
         self._download_report_btn = QPushButton("Export Validation Report")
         self._download_report_btn.setToolTip(
             "Export the validation report as CSV, JSON, or HTML."
         )
         self._download_report_btn.clicked.connect(self._on_download_report)
 
-        actions = make_action_row(
-            self._load_btn,
-            self._validate_btn,
-            self._fix_all_btn,
-            self._fix_selected_btn,
-            self._save_btn,
-            self._download_report_btn,
-        )
-        self.add_layout(actions)
+        self.add_layout(make_action_row(
+            self._load_btn, self._validate_btn,
+            self._fix_all_btn, self._fix_selected_btn,
+        ))
+        self.add_layout(make_action_row(
+            self._save_btn, self._download_report_btn,
+        ))
 
         # ---------- Splitter: issues table (top) + inline editor (bottom)
         # Wrapped in a single QGroupBox so the pop-out icon lives on the
@@ -215,7 +214,7 @@ class Phase5ValidatePage(PhasePage):
         editor_layout.addWidget(fields_row, stretch=1)
 
         edit_actions = QHBoxLayout()
-        self._apply_btn = primary(QPushButton("Apply edit"))
+        self._apply_btn = primary(QPushButton("Apply"))
         self._apply_btn.setToolTip(
             "Apply your manual edit from the translation field above to this row."
         )

@@ -376,11 +376,13 @@ class Phase3TranslatePage(PhasePage):
 
         self.add_widget(setup_box)
 
-        # ----- Progress bar
+        # ----- Progress bar + percentage
         self._progress = QProgressBar()
         self._progress.setRange(0, 100)
         self._progress.setValue(0)
-        self._progress.setMaximumHeight(18)
+        self._progress.setMaximumHeight(20)
+        self._progress.setTextVisible(True)
+        self._progress.setFormat("%p%  (%v rows)")
         self.add_widget(self._progress)
 
         self._eta_label = QLabel("Idle.")
@@ -411,10 +413,11 @@ class Phase3TranslatePage(PhasePage):
             "Progress and live source/translation pairs appear in the feed below."
         )
         self._start_btn.clicked.connect(self._on_start)
-        self._reset_checkpoint_btn = QPushButton("Reset progress")
+        self._reset_checkpoint_btn = QPushButton("Reset checkpoint")
         self._reset_checkpoint_btn.setToolTip(
-            "Clear any saved checkpoint so the next run starts fresh "
-            "instead of resuming from the last interrupted position."
+            "Clear any saved resume point. Use this if you want to start translation\n"
+            "from scratch instead of continuing where it last stopped.\n"
+            "(The checkpoint is only created when translation is interrupted mid-run.)"
         )
         self._reset_checkpoint_btn.clicked.connect(self._on_reset_checkpoint)
         self._cancel_btn = QPushButton("Cancel")
@@ -431,7 +434,7 @@ class Phase3TranslatePage(PhasePage):
             "Default filename will be suggested based on the source file."
         )
         self._save_copy_btn.clicked.connect(self._on_save_copy_to)
-        self._load_btn = QPushButton("Load .xlsx ...")
+        self._load_btn = QPushButton("Load Excel...")
         self._load_btn.setToolTip(
             "Load any Excel (organised or translated) directly into this phase.\n"
             "Use this when you want to work independently without going through earlier phases."

@@ -95,9 +95,11 @@ class Phase1ImportPage(PhasePage):
 
         # ---- Row 1: Source Language (= language the labels are written in, e.g. English)
         # Auto-detected from label text via langdetect; user can override.
+        # Starts BLANK — populated after the STF is parsed (detection or fallback).
         self._source_language_combo = QComboBox()
+        self._source_language_combo.addItem("")          # blank placeholder
         self._source_language_combo.addItems(supported_language_names())
-        self._source_language_combo.setCurrentText("English")   # safe default
+        self._source_language_combo.setCurrentIndex(0)   # blank until file is loaded
         self._source_language_combo.setToolTip(
             "The language the STF labels are written in — usually English.\n"
             "Auto-detected from label text after parsing; change if incorrect.\n"
@@ -107,11 +109,10 @@ class Phase1ImportPage(PhasePage):
 
         self._source_language_code_field = QLineEdit()
         self._source_language_code_field.setReadOnly(True)
+        self._source_language_code_field.setPlaceholderText("auto-filled")
         self._source_language_code_field.setToolTip(
             "Salesforce code for the label language (auto-filled from the dropdown)."
         )
-        _default_src_code = code_for_language("English") or "en_US"
-        self._source_language_code_field.setText(_default_src_code)
 
         self._source_detect_label = QLabel("")
         self._source_detect_label.setStyleSheet(
@@ -377,9 +378,15 @@ class Phase1ImportPage(PhasePage):
             )
             from ...languages import language_for_code
         except ImportError:
-            # langdetect not installed — leave dropdown at its current value
+            # langdetect not installed — default to English and inform user
+            self._source_language_combo.blockSignals(True)
+            self._source_language_combo.setCurrentText("English")
+            self._source_language_combo.blockSignals(False)
+            self._source_language_code_field.setText(code_for_language("English") or "en_US")
+            self._state.source_language_code = code_for_language("English") or "en_US"
+            self._state.source_language_name = "English"
             self._source_detect_label.setText(
-                "(langdetect not installed — select source language manually)"
+                "Auto-detect unavailable — defaulted to English. Change if incorrect."
             )
             return
 
@@ -390,16 +397,30 @@ class Phase1ImportPage(PhasePage):
 
         detected = detect_source_language(labels)
         if not detected:
+            # Can't detect — default to English
+            self._source_language_combo.blockSignals(True)
+            self._source_language_combo.setCurrentText("English")
+            self._source_language_combo.blockSignals(False)
+            self._source_language_code_field.setText(code_for_language("English") or "en_US")
+            self._state.source_language_code = code_for_language("English") or "en_US"
+            self._state.source_language_name = "English"
             self._source_detect_label.setText(
-                "Could not detect source language — please select manually."
+                "Could not detect — defaulted to English. Change if incorrect."
             )
             return
 
         iso_code, confidence = detected[0]
         if confidence < CONFIDENCE_THRESHOLD:
+            # Low confidence — default to English as the safe fallback
+            self._source_language_combo.blockSignals(True)
+            self._source_language_combo.setCurrentText("English")
+            self._source_language_combo.blockSignals(False)
+            self._source_language_code_field.setText(code_for_language("English") or "en_US")
+            self._state.source_language_code = code_for_language("English") or "en_US"
+            self._state.source_language_name = "English"
             self._source_detect_label.setText(
-                f"Low confidence ({iso_code}, {confidence * 100:.0f}%) — "
-                "please confirm the source language in the dropdown."
+                f"Low confidence ({iso_code}, {confidence * 100:.0f}%) — defaulted to English. "
+                "Change if incorrect."
             )
             return
 
@@ -493,9 +514,8 @@ class Phase1ImportPage(PhasePage):
         self._path_label.setText("No file selected.")
         self._stf_lang_combo.setCurrentIndex(-1)
         self._stf_lang_code_field.clear()
-        self._source_language_combo.setCurrentText("English")
-        default_code = code_for_language("English") or "en_US"
-        self._source_language_code_field.setText(default_code)
+        self._source_language_combo.setCurrentIndex(0)   # back to blank
+        self._source_language_code_field.clear()
         self._source_detect_label.setText("")
         self._use_existing_row.setVisible(False)
         self._use_existing_check.setChecked(True)

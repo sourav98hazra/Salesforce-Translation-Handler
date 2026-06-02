@@ -363,9 +363,9 @@ class Phase4ReviewPage(PhasePage):
         self._load_btn.clicked.connect(self._on_load_excel)
         tb_layout.addWidget(self._load_btn)
 
-        self._find_replace_btn = QPushButton("Global Replace...")
+        self._find_replace_btn = QPushButton("Find & Replace...")
         self._find_replace_btn.setToolTip(
-            "Open Find & Replace dialog to perform bulk text replacements "
+            "Open Find & Replace dialog to search and perform bulk text replacements "
             "across translations (Ctrl+H)."
         )
         self._find_replace_btn.clicked.connect(self._on_find_replace)
@@ -407,6 +407,11 @@ class Phase4ReviewPage(PhasePage):
         )
         self._search.textChanged.connect(self._proxy.set_search)
         fr_layout.addWidget(self._search, stretch=1)
+
+        self._clear_filters_btn = QPushButton("Clear")
+        self._clear_filters_btn.setToolTip("Clear all active filters and show all rows.")
+        self._clear_filters_btn.clicked.connect(self._clear_all_filters)
+        fr_layout.addWidget(self._clear_filters_btn)
         self.add_widget(filter_row)
 
         # ---------- Splitter: table on top, slim inline editor below
@@ -568,6 +573,16 @@ class Phase4ReviewPage(PhasePage):
         return {"frame": frame, "value": val}
 
     # ------------------------------------------------------------------ undo / redo UI
+
+    def _clear_all_filters(self) -> None:
+        """Reset component, status, and search filters to show all rows."""
+        self._component_combo.setCurrentText("All")
+        self._status_combo.setCurrentText("All")
+        self._search.clear()
+        # Also clear any header column filters
+        for col in list(self._proxy._column_filters.keys()):
+            self._proxy.clear_column_filter(col)
+        self.status_message.emit("All filters cleared.")
 
     def _refresh_undo_buttons(self) -> None:
         """Enable/disable undo and redo buttons based on stack state."""

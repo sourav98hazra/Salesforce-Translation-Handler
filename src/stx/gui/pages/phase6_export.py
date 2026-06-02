@@ -58,9 +58,9 @@ class Phase6ExportPage(PhasePage):
 
     def _build(self) -> None:
         # ---------- Load Excel (direct convert path)
-        load_box = QGroupBox("Load translated Excel (direct convert)")
+        load_box = QGroupBox("Direct convert — load a translated Excel")
         load_layout = QHBoxLayout(load_box)
-        self._load_btn = QPushButton("Load translated Excel (.xlsx)...")
+        self._load_btn = QPushButton("Load Excel...")
         self._load_btn.setToolTip(
             "Load any organised/translated Excel and convert it to STF "
             "without going through earlier phases.  Validation is not "
@@ -98,7 +98,7 @@ class Phase6ExportPage(PhasePage):
         self.add_layout(lang_row)
 
         # ---------- Quick validation summary (optional, not blocking)
-        validate_box = QGroupBox("Quick validation check (optional)")
+        validate_box = QGroupBox("Pre-export validation (optional)")
         v_layout = QHBoxLayout(validate_box)
         self._validate_btn = QPushButton("Run validation")
         self._validate_btn.setToolTip(

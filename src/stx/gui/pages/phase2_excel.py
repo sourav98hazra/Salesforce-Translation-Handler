@@ -69,11 +69,11 @@ class Phase2ExcelPage(PhasePage):
         add_popout_to_groupbox(details_box, self._on_popout_details)
 
         # Actions
-        self._convert_btn = primary(QPushButton("Convert and save .xlsx"))
+        self._convert_btn = primary(QPushButton("Convert"))
         self._convert_btn.clicked.connect(self._on_convert)
         self._convert_btn.setToolTip(
-            "Save the organised workbook (auto-named from source file).\n"
-            "This is the path used by later phases."
+            "Convert the parsed STF into an organised Excel workbook.\n"
+            "The file is auto-named and saved — use 'Save a Copy...' if you want a different location."
         )
 
         self._save_copy_btn = QPushButton("Save a Copy...")
@@ -84,7 +84,7 @@ class Phase2ExcelPage(PhasePage):
             "different location (handy for backups or sharing)."
         )
 
-        self._load_btn = QPushButton("Load existing organised .xlsx ...")
+        self._load_btn = QPushButton("Load existing .xlsx...")
         self._load_btn.setToolTip(
             "Open a previously generated organised workbook so you can resume from "
             "Phase 3 (Translate) without re-parsing the STF."
@@ -104,7 +104,10 @@ class Phase2ExcelPage(PhasePage):
 
     def on_enter(self) -> None:
         if self._state.document is None:
-            self._summary_label.setText("No document loaded \u2014 complete Phase 1 or load an existing workbook.")
+            self._summary_label.setText(
+                "No document loaded \u2014 complete Phase 1 first, "
+                "or use 'Load existing organised .xlsx...' to jump straight to Phase 3."
+            )
             self._convert_btn.setEnabled(False)
             return
         stats = self._state.document.stats()
