@@ -169,9 +169,15 @@ class SettingsDialog(QDialog):
         self._rate_spin.setSingleStep(0.5)
         self._rate_spin.setValue(8.0)
         self._rate_spin.setSuffix(" req/s")
-        self._rate_spin.setSpecialValueText("unlimited")
-        self._rate_spin.setToolTip("0 = unlimited (recommended for paid backends only)")
-        perf_form.addRow("Rate limit:", self._rate_spin)
+        self._rate_spin.setSpecialValueText("No limit (use with paid API only)")
+        self._rate_spin.setToolTip(
+            "Maximum API requests per second (across all workers).\n"
+            "• 8 req/s is safe for free-tier Google Translate.\n"
+            "• Higher values (20-50) work with paid APIs.\n"
+            "• 0 = no limit — only use with paid backends that don't throttle.\n\n"
+            "This is the real speed bottleneck — not the worker count."
+        )
+        perf_form.addRow("Max requests/sec:", self._rate_spin)
 
         self._wakelock_check = QCheckBox("Prevent system sleep during translation")
         self._wakelock_check.setChecked(True)
