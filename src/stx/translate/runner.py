@@ -147,6 +147,7 @@ class TranslationResult:
     fuzzy_accepted_count: int = 0  # from fuzzy TM matching
     resumed_count: int = 0  # from checkpoint resume
     imported_reuse_count: int = 0  # from imported translations file
+    infile_reuse_count: int = 0   # from in-file translation reuse (same label in same file)
     retranslated_count: int = 0  # rows that had existing translations and were retranslated
     failed_count: int = 0  # rows where _mark_failed was called (fallbacks)
     target_lang: str = ""
@@ -411,6 +412,7 @@ class _Runner:
         self._fuzzy_accepted = 0
         self._resumed = 0
         self._imported_reuse = 0
+        self._infile_reuse = 0
         self._retranslated = 0
         self._completed_for_eta = 0
         self._started = time.monotonic()
@@ -505,6 +507,7 @@ class _Runner:
             fuzzy_accepted_count=self._fuzzy_accepted,
             resumed_count=self._resumed,
             imported_reuse_count=self._imported_reuse,
+            infile_reuse_count=self._infile_reuse,
             retranslated_count=self._retranslated,
             failed_count=self._failed,
             target_lang=self.target_lang,
@@ -593,7 +596,7 @@ class _Runner:
                 status=status,
             )
             summary.cached_rows += 1   # count as cache hit (no API call)
-            self._cached += 1
+            self._infile_reuse += 1
             self._translated += 1
             # Also populate the dedup cache so subsequent duplicates in the
             # same run also benefit.

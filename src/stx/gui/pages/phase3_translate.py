@@ -953,6 +953,7 @@ class Phase3TranslatePage(PhasePage):
         rows_successful = (
             done.translated_count + done.cached_count
             + done.deduped_count + done.skipped_count
+            + done.infile_reuse_count
         )
         rows_failed = done.failed_count
         elapsed_str = _format_eta(elapsed)
@@ -979,6 +980,8 @@ class Phase3TranslatePage(PhasePage):
         self._log.appendPlainText(f"  \u251c\u2500 Deduplicated (reused):    {done.deduped_count:>5,}")
         if done.imported_reuse_count:
             self._log.appendPlainText(f"  \u251c\u2500 From imported file:       {done.imported_reuse_count:>5,}")
+        if done.infile_reuse_count:
+            self._log.appendPlainText(f"  \u251c\u2500 Reused from file:         {done.infile_reuse_count:>5,}")
         if done.resumed_count:
             self._log.appendPlainText(f"  \u251c\u2500 Resumed from checkpoint:  {done.resumed_count:>5,}")
         self._log.appendPlainText(f"  \u2514\u2500 Already translated (kept):{done.skipped_count:>5,}")
@@ -1001,11 +1004,12 @@ class Phase3TranslatePage(PhasePage):
             # Don't auto-save: surface the "Save copy to..." button instead so
             # the user picks where to save.
             failed_note = f", {rows_failed:,} failed" if rows_failed else ""
+            infile_note = f" | InFile: {done.infile_reuse_count:,}" if done.infile_reuse_count else ""
             msg = (
                 f"Translation complete - {rows_successful:,} rows processed successfully{failed_note}.  "
                 f"Click 'Save a Copy...' to save.  "
                 f"[API: {done.translated_count:,} | TM: {done.cached_count:,} | "
-                f"Dedup: {done.deduped_count:,} | Kept: {done.skipped_count:,}] "
+                f"Dedup: {done.deduped_count:,}{infile_note} | Kept: {done.skipped_count:,}] "
                 f"in {elapsed_str}."
             )
 
