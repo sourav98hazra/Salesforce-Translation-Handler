@@ -314,11 +314,7 @@ Salesforce-Translation-Handler/
 ├── launch.command                    # macOS double-click launcher
 ├── launch.sh                         # Linux double-click launcher
 ├── SalesforceTranslationHandler.desktop  # Linux desktop entry
-├── build_exe.py                      # PyInstaller standalone-binary builder
-└── (legacy scripts kept for reference)
-    ├── stftoexcel_v2.ps1
-    ├── translate_excel_fixed.py
-    └── ExcelToSTFV2.ps1
+└── build_exe.py                      # PyInstaller standalone-binary builder
 ```
 
 ---
@@ -861,12 +857,12 @@ stx replace input.xlsx --find "v\d+" --replace "v2" --regex --case-sensitive --s
 
 ### 3. Undo / Redo
 
-Phase 4 (Browse and Review) now has a full undo/redo stack:
+The app has **two independent undo systems**:
 
-- `Ctrl+Z` -- undo the last edit
-- `Ctrl+Y` -- redo
+- **Per-edit undo (Phase 4)** — `Ctrl+Z` / `Ctrl+Y` undo and redo individual translation cell edits, bulk find-and-replace operations, apply/reset, and approval changes. Unlimited depth within a session.
+- **App-wide major-action undo** — `Ctrl+Shift+Z` / `Ctrl+Shift+Y` reverse whole steps such as loading a file, running a translation, applying auto-fix, or resetting.
 
-The stack tracks individual cell edits, bulk replacements, and apply/reset operations.  Stack depth is unlimited within a session.
+Both pairs appear in the **Edit** menu so it is always clear which one you are using.
 
 ### 4. Resume after crash (checkpoint persistence)
 
@@ -929,7 +925,7 @@ stx translate input.xlsx output.xlsx --target ja \
     --import-translations previous_translated.xlsx
 ```
 
-In the GUI, use the "Import Translations" button in Phase 3 to select the source workbook.
+In the GUI, use the **"Import existing translations..."** button in Phase 3 to select the source workbook, then enable the **"Use imports"** checkbox (also available as **Translation → Use imported translations**).
 
 ### 8. Retranslation control
 
@@ -943,7 +939,7 @@ stx translate input.xlsx output.xlsx --target ja
 stx translate input.xlsx output.xlsx --target ja --retranslate-existing
 ```
 
-In the GUI, a "Retranslate existing" checkbox is available in Phase 3.
+In the GUI, a **"Retranslate existing translations"** checkbox is available in Phase 3 (shown when the file already has translated rows), and the same toggle lives under **Translation → Retranslate existing rows**.
 
 ### 9. Secure credential storage
 
@@ -1040,3 +1036,79 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+
+
+---
+
+# v2.0.x -- Translation controls, in-file reuse, and UI polish
+
+These refinements ship as part of the 2.0 line and are reflected throughout the
+in-app **About**, **Help → User Guide**, and **Help → FAQ** screens.
+
+## Translation menu (grouped option toggles)
+
+All translation-behaviour switches now live in a dedicated **Translation** menu in
+the menu bar, so Phase 3 stays focused on the few inputs a translator actually needs.
+Every toggle persists between sessions.
+
+| Option | Default | What it does |
+|---|---|---|
+| Use in-file translations | On | Before calling the API for an untranslated row, reuse a translation that already exists for the **same label text** elsewhere in the same STF/Excel file — no API call. |
+| Use Translation Memory cache | On | Reuse translations from the local SQLite TM (previous runs). |
+| Use Fuzzy matching | On | Accept approximate TM matches above the configured threshold. |
+| Use imported translations | Off | Apply translations from a separately imported Excel with highest priority. |
+| Retranslate existing rows | Off | Send ALL rows (including already-translated ones) to the backend. |
+
+The menu also exposes **Settings...** (`Ctrl+,`) and **Re-enable pre-flight confirmation**.
+
+## In-file translation reuse (label-based)
+
+When *Use in-file translations* is on, a row whose label matches an
+already-translated label elsewhere in the same file is filled from that
+translation directly. The live feed marks these rows:
+
+```
+[Reused from file] EN: Save -> JA: 保存
+```
+
+Matching is by **label text**, not key, so different keys that share the same label
+(e.g. several "Save" buttons) all reuse the one existing translation. When
+*Retranslate existing rows* is on, in-file reuse is skipped.
+
+## Pre-flight confirmation dialog
+
+Before each translation run a **"Ready to translate?"** dialog summarises the active
+options (in-file reuse, TM, fuzzy, imports, retranslate), the backend, worker count,
+and how many of the total rows will be translated. Proceed with **Start translation**
+or **Cancel — review settings**. Tick **"Don't show this dialog again"** to skip it;
+re-enable from **Translation → Re-enable pre-flight confirmation**.
+
+## Approved status
+
+Individual translations can be marked **Approved** (reviewed and accepted):
+
+- Phase 4 shows an **Approved** column with a per-row checkbox and a Status filter value.
+- Phase 5 **skips approved rows** during per-entry validation (document-level duplicate-key checks still run on everything).
+- Persisted in Excel (an `Approved` column) and in STF (a trailing `# APPROVED` marker).
+- CLI: `stx approve` / `stx unapprove` (by `--keys`, or `--all-translated` / `--all`).
+
+## Themes
+
+Six selectable themes via **View** menu or **Edit → Settings → Appearance**:
+**Light**, **Dark**, **Ocean** (blue/teal), **Forest** (green), **Sunset** (warm amber),
+and **Auto** (follows the OS). The choice is remembered across sessions.
+
+## Keyboard shortcuts (current)
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+0..5` | Jump to Phase 1–6 |
+| `Ctrl+O` / `Ctrl+S` | Open file / Save current phase |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo a Phase 4 cell edit |
+| `Ctrl+Shift+Z` / `Ctrl+Shift+Y` | Undo / Redo a major action (app-wide) |
+| `Ctrl+H` | Find & Replace (Phase 4) |
+| `Ctrl+B` | Previous phase |
+| `Ctrl+,` | Settings |
+| `Ctrl+L` | Toggle the Status Log dock |
+| `F1` / `Ctrl+F1` | User Guide / FAQ & Troubleshooting |
+| `Ctrl+Q` | Quit |

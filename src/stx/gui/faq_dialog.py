@@ -25,9 +25,18 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Getting started",
         "How do I install the app?",
-        "On Windows, double-click launch.bat. It creates a virtual environment, installs all "
-        "dependencies, and launches the app automatically. On macOS double-click launch.command; "
-        "on Linux run chmod +x launch.sh then double-click it.",
+        "On Windows, double-click setup_desktop_app.bat the first time — it creates a virtual "
+        "environment, installs all dependencies, and adds a desktop shortcut you can use from then on. "
+        "(launch.bat works too if you just want to run it without a shortcut.) "
+        "On macOS double-click launch.command; on Linux run chmod +x launch.sh then double-click it.",
+    ),
+    (
+        "Getting started",
+        "Is there a standalone installer or .exe I can share with non-technical users?",
+        "Yes. On Windows run 'python build_secure_setup.py --exe' to produce a single self-contained "
+        ".exe (no Python needed on the target machine), or 'python build_secure_setup.py' to build a "
+        "full Setup installer (requires Inno Setup 6). Both emit a matching .sha256 file so recipients "
+        "can verify the download with 'certutil -hashfile <file> SHA256'. See docs/INSTALLER.md.",
     ),
     (
         "Getting started",
@@ -76,11 +85,15 @@ _FAQ: list[tuple[str, str, str]] = [
     ),
     (
         "Phase 1 — Import STF",
-        "What does the 'Keep existing translations' option do?",
-        "This appears when your STF has both translated and untranslated rows (a mixed file). "
-        "Checked (default): existing translations are kept and only blank rows are sent for "
-        "translation. Unchecked: all rows including already-translated ones will be retranslated, "
-        "overwriting existing translations.",
+        "My STF has both translated and untranslated rows. How are existing translations handled?",
+        "By default only blank/untranslated rows are translated — existing translations are kept "
+        "untouched. There is no checkbox for this in Phase 1; the behaviour is controlled in Phase 3 "
+        "via the Translation menu:\n"
+        "• 'Use in-file translations' (on by default) reuses a translation already present "
+        "elsewhere in the same file for matching labels.\n"
+        "• 'Retranslate existing rows' (off by default) sends ALL rows — including translated "
+        "ones — to the backend, overwriting them. In Phase 3 this also appears as the "
+        "'Retranslate existing translations' checkbox when the file already has translated rows.",
     ),
     (
         "Phase 1 — Import STF",
@@ -205,7 +218,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "Can I resume a translation that was interrupted?",
         "Yes. The checkpoint feature saves progress after each row. If you cancel or the app "
         "crashes, restarting will continue from where it left off. "
-        "Click 'Reset progress' to start fresh instead of resuming.",
+        "Click 'Reset checkpoint' to start fresh instead of resuming.",
     ),
     (
         "Phase 3 — Translate",
@@ -288,7 +301,7 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Phase 5 — Validate & Fix",
         "How do I export a validation report?",
-        "Click 'Export Validation Report' in Phase 5. Choose CSV (for spreadsheets), "
+        "Click 'Export Report' in Phase 5. Choose CSV (for spreadsheets), "
         "JSON (for programmatic use), or HTML (for sharing in a browser).",
     ),
     (

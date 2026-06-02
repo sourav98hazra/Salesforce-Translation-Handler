@@ -80,7 +80,7 @@ class TestIssFileContent:
         assert '#define MyAppName "Salesforce Translation Handler"' in iss_content
 
     def test_app_version_defined(self, iss_content: str):
-        assert '#define MyAppVersion "1.5.0"' in iss_content
+        assert '#define MyAppVersion "2.0.0"' in iss_content
 
     def test_app_exe_name(self, iss_content: str):
         assert "SalesforceTranslationHandler.exe" in iss_content

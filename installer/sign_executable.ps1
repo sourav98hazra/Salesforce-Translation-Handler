@@ -10,7 +10,7 @@
 #
 # Usage:
 #   .\sign_executable.ps1 -FilePath "path\to\file.exe"
-#   .\sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_1.5.0.exe"
+#   .\sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_2.0.0.exe"
 
 param(
     [Parameter(Mandatory=$true)]

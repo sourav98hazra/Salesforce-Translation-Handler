@@ -9,7 +9,7 @@
 ; or --onefile output as dist/SalesforceTranslationHandler.exe
 
 #define MyAppName "Salesforce Translation Handler"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Salesforce Translation Handler Contributors"
 #define MyAppURL "https://github.com/sourav98hazra/Salesforce-Translation-Handler"
 #define MyAppExeName "SalesforceTranslationHandler.exe"

@@ -62,7 +62,7 @@ python installer/build_installer.py
 This runs the complete pipeline:
 1. Builds the executable with PyInstaller (--onedir mode)
 2. Compiles the installer with Inno Setup
-3. Produces `dist/installer/SalesforceTranslationHandler_Setup_1.5.0.exe`
+3. Produces `dist/installer/SalesforceTranslationHandler_Setup_2.0.0.exe`
 
 ### Build options
 
@@ -92,7 +92,7 @@ python build_exe.py
 iscc installer/stx_installer.iss
 
 # Step 3 (optional): Sign the installer
-powershell -File installer/sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_1.5.0.exe"
+powershell -File installer/sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_2.0.0.exe"
 ```
 
 ---
@@ -129,7 +129,7 @@ $env:SIGN_TIMESTAMP_URL = "http://timestamp.digicert.com"
 ### Running the signing script
 
 ```powershell
-.\installer\sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_1.5.0.exe"
+.\installer\sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_2.0.0.exe"
 ```
 
 The script will:
@@ -188,7 +188,7 @@ After a successful workflow run:
 The version is defined in the `.iss` script header:
 
 ```inno
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "2.0.0"
 ```
 
 This should match the version in `src/stx/__init__.py` and `pyproject.toml`.

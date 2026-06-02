@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "Salesforce Translation Manager" },
+    { name = "Sourav Hazra" },
 ]
 keywords = ["salesforce", "translation", "stf", "i18n", "localization"]
 classifiers = [

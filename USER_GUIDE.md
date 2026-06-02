@@ -373,6 +373,7 @@ UTF-8, LF line endings, no BOM.  Section separators (`------------------TRANSLAT
 | `Ctrl+Shift+Z / Ctrl+Shift+Y` | Undo / Redo last major action (app-wide) |
 | `Ctrl+B` | Go to previous phase |
 | `Ctrl+,` | Open Settings |
+| `Ctrl+L` | Toggle the Status Log dock |
 | `Ctrl+F1` | FAQ & Troubleshooting |
 | `F1` | This user guide |
 | `Ctrl+Q` | Quit |
@@ -781,8 +782,8 @@ A: On Windows, run `python build_secure_setup.py --exe` for a standalone .exe, o
 | App won't start | Ensure Python 3.9+ is installed and on PATH. Run `pip install -e ".[gui]"` to install dependencies. Check that PySide6 installed correctly. |
 | Translation fails with HTTP 429 | You are hitting the API rate limit. Go to Settings > Translation > Performance and reduce the rate limit (try 2-4 req/s). |
 | Exported STF looks wrong | Double-check that the target language code (e.g. `ja`, `de`, `fr`) matches your Salesforce Translation Workbench setup exactly. |
-| Window opens off-screen | The app saves window geometry. Delete the QSettings file and restart. On Windows: delete registry key under `HKCU\Software\SalesforceTranslationManager`. On macOS/Linux: delete `~/.config/SalesforceTranslationManager/`. |
-| Undo not working as expected | Phase 4 Ctrl+Z only works for translation cell edits. For undoing major actions (load file, translate, auto-fix), use Ctrl+Shift+Z (Edit > Undo Last Action). |
+| Window opens off-screen | The app saves window geometry. Delete the QSettings file and restart. On Windows: delete registry key under `HKCU\Software\SalesforceTranslationHandler`. On macOS/Linux: delete `~/.config/SalesforceTranslationHandler/`. |
+| Undo not working as expected | Phase 4 Ctrl+Z only works for translation cell edits. For undoing major actions (load file, translate, auto-fix), use Ctrl+Shift+Z (Edit → Undo last major action). |
 | Reset Session clears everything? | Yes, that is by design. "Reset Session" = full clear. Use "Reset Current Phase" (File menu) to only reset the active phase and downstream. |
 | Standalone .exe crashes immediately | Check `%TEMP%\stx_crash.log` (Windows) or `/tmp/stx_crash.log` (Mac/Linux) for the error message. Common cause: missing hidden imports -- ensure build_exe.py includes all required modules. |
 | "No module named stx" when running .exe | Rebuild with `python build_exe.py` after installing `pip install -e ".[gui]" pyinstaller`. |
