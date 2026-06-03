@@ -286,9 +286,21 @@ class Phase5ValidatePage(PhasePage):
         # Show "data loaded" state before running validation
         stats = self._state.document.stats()
         if self._state.translation_scope_indices:
-            failed = len(self._state.translation_failed_indices)
+            # Re-derive live failed count: only count indices where translation
+            # is still empty (manual edits in Phase 4 reduce this count).
+            failed = sum(
+                1 for idx in self._state.translation_failed_indices
+                if idx < len(self._state.document.entries)
+                and not self._state.document.entries[idx].translation.strip()
+            )
             excluded = stats['untranslated'] - failed
             if excluded < 0:
+                import logging as _logging
+                _logging.getLogger(__name__).debug(
+                    "Excluded count went negative (untranslated=%d, failed=%d); "
+                    "clamping to 0. This may indicate scope/index drift.",
+                    stats['untranslated'], failed,
+                )
                 excluded = 0
             self._banner.setText(
                 f"Document loaded: {stats['total']:,} rows "

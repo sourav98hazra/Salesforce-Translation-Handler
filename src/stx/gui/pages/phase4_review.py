@@ -703,9 +703,21 @@ class Phase4ReviewPage(PhasePage):
         self._stat_translated["value"].setText(f"{stats['translated']:,}")
         # Show Failed/Excluded breakdown when translation scope info is available
         if self._state.translation_scope_indices:
-            failed = len(self._state.translation_failed_indices)
+            # Re-derive live failed count: only count indices where translation
+            # is still empty (manual edits in Phase 4 reduce this count).
+            failed = sum(
+                1 for idx in self._state.translation_failed_indices
+                if idx < len(self._state.document.entries)
+                and not self._state.document.entries[idx].translation.strip()
+            )
             excluded = stats['untranslated'] - failed
             if excluded < 0:
+                import logging as _logging
+                _logging.getLogger(__name__).debug(
+                    "Excluded count went negative (untranslated=%d, failed=%d); "
+                    "clamping to 0. This may indicate scope/index drift.",
+                    stats['untranslated'], failed,
+                )
                 excluded = 0
             self._stat_untranslated["value"].setText(
                 f"{stats['untranslated']:,} (Failed: {failed:,} | Excluded: {excluded:,})"

@@ -991,15 +991,41 @@ class Phase3TranslatePage(PhasePage):
         self._state.translation_summaries = done.summaries
         self._state.translation_statuses = done.statuses
 
-        # Compute scope and failed indices for downstream phases
+        # Compute scope and failed indices for downstream phases.
+        # We replicate the component + include/exclude key/pattern filters
+        # from the Scope, but NOT the status filter (since successfully
+        # translated rows now have non-empty translations and would be
+        # excluded by the UNTRANSLATED status check).
         if self._state.document is not None and self._state.scope is not None:
+            import fnmatch as _fnmatch
+
+            scope = self._state.scope
             scope_indices: set[int] = set()
             failed_indices: set[int] = set()
+            has_includes = bool(scope.include_keys) or bool(scope.include_patterns)
             for idx, entry in enumerate(self._state.document.entries):
-                if self._state.scope.components is None or entry.component_type in self._state.scope.components:
-                    scope_indices.add(idx)
-                    if not entry.translation.strip():
-                        failed_indices.add(idx)
+                # 1. Component filter
+                if scope.components is not None and entry.component_type not in scope.components:
+                    continue
+                # 2. Exclude lists win over include lists
+                if entry.key in scope.exclude_keys:
+                    continue
+                if any(_fnmatch.fnmatchcase(entry.key, p) for p in scope.exclude_patterns):
+                    continue
+                # 3. Include lists -- only enforced if configured
+                if has_includes:
+                    in_include = (
+                        entry.key in scope.include_keys
+                        or any(
+                            _fnmatch.fnmatchcase(entry.key, p)
+                            for p in scope.include_patterns
+                        )
+                    )
+                    if not in_include:
+                        continue
+                scope_indices.add(idx)
+                if not entry.translation.strip():
+                    failed_indices.add(idx)
             self._state.translation_scope_indices = scope_indices
             self._state.translation_failed_indices = failed_indices
 
