@@ -1129,22 +1129,22 @@ class MainWindow(QMainWindow):
 
         self._settings_dialog = SettingsDialog(self)
         self._settings_dialog.accepted.connect(self._on_settings_accepted)
+        self._settings_dialog.finished.connect(self._on_settings_dialog_closed)
         self._settings_dialog.show()
 
     def _on_settings_accepted(self) -> None:
         """Refresh UI after settings are saved."""
-        # Apply theme if changed
-        try:
-            from . import theme as theme_module
-
-            theme_module.apply_theme(gui_settings.get_theme())
-        except Exception:  # noqa: BLE001
-            pass
         self._log("Settings saved.")
         # Refresh the active phase so it picks up changed values
         current = self._stack.currentIndex()
         if 0 <= current < len(self._pages):
             self._pages[current].on_enter()
+
+    def _on_settings_dialog_closed(self) -> None:
+        """Clear settings dialog reference when closed/rejected."""
+        if self._settings_dialog is not None:
+            self._settings_dialog.deleteLater()
+            self._settings_dialog = None
 
     def _snapshot_settings(self) -> dict:
         """Capture current key settings values for change detection."""

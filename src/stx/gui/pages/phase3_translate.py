@@ -991,7 +991,7 @@ class Phase3TranslatePage(PhasePage):
         self._log.appendPlainText(f"  Rows Process Failed:         {rows_failed:>5,}")
         self._log.appendPlainText("")
         self._log.appendPlainText(
-            f"  Successfully Translated:     {done.translated_count:>5,}"
+            f"  Successfully Translated:     {rows_successful:>5,}"
         )
         self._log.appendPlainText(
             f"  \u251c\u2500 Via Translation API:        {api_count:>5,}"

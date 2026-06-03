@@ -560,9 +560,3 @@ class SettingsDialog(QDialog):
         )
         if path:
             self._memory_field.setText(path)
-
-
-def open_settings(parent: Optional[QWidget] = None) -> bool:
-    """Open the dialog modally.  Returns True if the user clicked OK."""
-    dialog = SettingsDialog(parent)
-    return dialog.exec() == QDialog.DialogCode.Accepted
