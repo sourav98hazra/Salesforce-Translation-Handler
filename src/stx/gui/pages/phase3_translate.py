@@ -996,11 +996,10 @@ class Phase3TranslatePage(PhasePage):
                 # Cap unreasonable ETAs
                 eta_sec = min(eta_sec, 24 * 3600)  # Max 24 hours
                 
-                # Show enhanced progress with better rate info
+                # Show enhanced progress with clean format
                 actual_rate = self._current_row / elapsed if elapsed > 0 else 0
                 self._eta_label.setText(
-                    f"Translating... {percent}% | {actual_rate:.1f} rows/s "
-                    f"({recent_rate:.1f} recent) | API: {api_ratio:.0%} | ETA: {_format_eta(eta_sec)}"
+                    f"Translating... {percent}% | {recent_rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
                 )
             else:
                 self._eta_label.setText(f"Translating... {percent}% | Calculating ETA...")
