@@ -964,40 +964,16 @@ class Phase3TranslatePage(PhasePage):
             else:
                 recent_rate = self._current_row / elapsed if elapsed > 0 else 0
             
-            # Factor in work complexity based on translation method ratios
-            # API calls are slower than cache/dedup hits
-            api_ratio = (self._current_row - self._cached_count - self._deduped_count) / max(self._current_row, 1)
-            cache_ratio = 1 - api_ratio
-            
-            # Estimate remaining work complexity
             remaining = self._total_rows - self._current_row
-            # Assume remaining work has similar API ratio, but with slight adjustment
-            # (early rows often have more cache hits due to deduplication)
-            estimated_api_remaining = remaining * min(api_ratio * 1.2, 1.0)
-            estimated_cache_remaining = remaining - estimated_api_remaining
             
-            # Different time factors for different work types
-            api_factor = 1.0      # API calls are baseline
-            cache_factor = 0.1    # Cache/dedup hits are much faster
-            
-            if recent_rate > 0:
-                # Weighted ETA based on work complexity
-                weighted_remaining = (estimated_api_remaining * api_factor + 
-                                    estimated_cache_remaining * cache_factor)
-                current_work_factor = (self._current_row - self._cached_count - self._deduped_count) * api_factor + \
-                                    (self._cached_count + self._deduped_count) * cache_factor
-                avg_work_rate = current_work_factor / elapsed if elapsed > 0 else 0
-                
-                if avg_work_rate > 0:
-                    eta_sec = weighted_remaining / avg_work_rate
-                else:
-                    eta_sec = remaining / recent_rate
-                    
+            # Simple, reliable ETA calculation
+            if recent_rate > 0 and remaining > 0:
+                eta_sec = remaining / recent_rate
                 # Cap unreasonable ETAs
                 eta_sec = min(eta_sec, 24 * 3600)  # Max 24 hours
+                eta_sec = max(eta_sec, 0)          # Don't show negative time
                 
-                # Show enhanced progress with clean format
-                actual_rate = self._current_row / elapsed if elapsed > 0 else 0
+                # Clean, simple display format
                 self._eta_label.setText(
                     f"Translating... {percent}% | {recent_rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
                 )
@@ -1051,42 +1027,22 @@ class Phase3TranslatePage(PhasePage):
         if self._current_row % 50 == 0 and self._start_time is not None:
             elapsed = time.time() - self._start_time
             rate = self._current_row / elapsed if elapsed > 0 else 0
-            
-            # Use same enhanced ETA calculation for intermittent summaries
-            if hasattr(self, '_progress_history') and len(self._progress_history) >= 2:
-                recent_start_time, recent_start_row = self._progress_history[0]
-                time_span = time.time() - recent_start_time
-                row_span = self._current_row - recent_start_row
-                recent_rate = row_span / time_span if time_span > 0 else rate
-            else:
-                recent_rate = rate
-                
             remaining = self._total_rows - self._current_row
             
-            # Enhanced ETA calculation
-            api_ratio = (self._current_row - self._cached_count - self._deduped_count) / max(self._current_row, 1)
-            cache_ratio = 1 - api_ratio
-            estimated_api_remaining = remaining * min(api_ratio * 1.2, 1.0)
-            estimated_cache_remaining = remaining - estimated_api_remaining
-            
-            weighted_remaining = estimated_api_remaining + estimated_cache_remaining * 0.1
-            current_work_factor = (self._current_row - self._cached_count - self._deduped_count) + \
-                                (self._cached_count + self._deduped_count) * 0.1
-            avg_work_rate = current_work_factor / elapsed if elapsed > 0 else 0
-            
-            if avg_work_rate > 0:
-                eta = weighted_remaining / avg_work_rate
+            # Simple ETA calculation for summary
+            if rate > 0 and remaining > 0:
+                eta = remaining / rate
+                eta = min(eta, 24 * 3600)  # Cap at 24 hours
+                eta = max(eta, 0)          # Don't show negative time
             else:
-                eta = remaining / rate if rate > 0 else 0
+                eta = 0
                 
-            eta = min(eta, 24 * 3600)  # Cap at 24 hours
             pct = (self._current_row * 100 // self._total_rows) if self._total_rows > 0 else 100
             
             self._log.appendPlainText(
                 f"  --- {self._current_row}/{self._total_rows} "
                 f"({pct}%) | "
-                f"{rate:.1f} rows/s ({recent_rate:.1f} recent) | "
-                f"API: {api_ratio:.0%} | ETA: {_format_eta(eta)} ---"
+                f"{rate:.1f} rows/s | ETA: {_format_eta(eta)} ---"
             )
 
     def _on_translation_done(self, done) -> None:
