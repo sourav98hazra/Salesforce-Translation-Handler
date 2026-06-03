@@ -533,6 +533,18 @@ class Phase5ValidatePage(PhasePage):
             "Proceed?"
         ):
             return
+
+        # Disable fix buttons to prevent re-entrant clicks during processEvents
+        self._fix_all_btn.setEnabled(False)
+        self._fix_selected_btn.setEnabled(False)
+        try:
+            self._do_fix_all()
+        finally:
+            self._fix_all_btn.setEnabled(True)
+            self._fix_selected_btn.setEnabled(True)
+
+    def _do_fix_all(self) -> None:
+        """Internal implementation of fix-all, called with buttons disabled."""
         # Capture before-state for fix tracking
         before_translations: dict[str, tuple[str, str]] = {}
         for entry in self._state.document.entries:
