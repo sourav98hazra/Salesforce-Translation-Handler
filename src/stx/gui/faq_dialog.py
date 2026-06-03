@@ -173,23 +173,26 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Phase 3 — Translate",
         "What do API/Cached/Repeated mean in the live feed?",
-        "API = row was sent to the translation API and translated. "
-        "Cached = row was found in the Translation Memory cache from a previous run — no API call "
-        "made. "
-        "Repeated = the same label appeared multiple times; translated once and reused for "
-        "duplicates.",
+        "API = row was sent to the translation backend (Google/DeepL/Azure/OpenAI) and received "
+        "a translation. "
+        "Cached = row was found in the Translation Memory cache from a previous run - no API call "
+        "needed. "
+        "Repeated = the same label appeared earlier in THIS run and was already translated - that "
+        "result was reused. "
+        "These are shown as inline counters in each live feed line: "
+        "[42/1000 | API:30 Cached:5 Repeated:7]",
     ),
     (
         "Phase 3 — Translate",
         "What is the Translation Memory (TM)?",
         "The TM is a local SQLite database that caches every successful translation. "
-        "On future runs, rows with identical source text are reused from the cache — "
+        "On future runs, rows with identical source text are reused from the cache - "
         "no API call, no quota consumed, and much faster (shown as 'Cached' in the live feed). "
-        "Configure the TM path in Edit → Settings → Resources.",
+        "Configure the TM path in Edit \u2192 Settings \u2192 Resources.",
     ),
     (
         "Phase 3 — Translate",
-        "What does Dedup mean?",
+        "What does Dedup (Repeated) mean?",
         "Deduplication (shown as 'Repeated' in the live feed): within a single run, if the same "
         "source label appears in multiple rows, "
         "it is translated only once. All duplicate rows are filled with the same result. "
@@ -599,7 +602,18 @@ class FaqDialog(QDialog):
             "speed": ["workers", "rate limit", "dedup", "tm", "cache"],
             "error": ["fail", "crash", "not working", "issue", "problem"],
             "crash": ["error", "fail", "close", "stx_crash"],
-            "api": ["key", "backend", "deepl", "azure", "openai", "google"],
+            "not working": ["error", "bug", "broken", "crash", "fail", "issue"],
+            "broken": ["error", "bug", "not working", "crash", "fail"],
+            "queue": ["slow", "wait", "performance", "rate limit"],
+            "wait": ["slow", "queue", "performance", "rate limit"],
+            "cached": ["tm", "translation memory", "cache", "previous run", "reuse"],
+            "repeated": [
+                "dedup", "duplicate", "same label", "reuse", "repeated label",
+            ],
+            "api": [
+                "key", "backend", "deepl", "azure", "openai", "google",
+                "translated",
+            ],
             "key": ["api", "backend", "deepl", "azure", "openai", "secret"],
             "backend": ["google", "deepl", "azure", "openai", "translator"],
             "cache": ["tm", "translation memory", "dedup", "reuse"],
@@ -637,6 +651,13 @@ class FaqDialog(QDialog):
                     expanded_terms.add(keyword)
                     expanded_terms.update(synonyms)
 
+        # Determine categories whose name matches the needle directly
+        matching_categories: set[str] = set()
+        all_categories = {cat for cat, _q, _a, _w in self._items}
+        for cat in all_categories:
+            if needle in cat.lower():
+                matching_categories.add(cat)
+
         cat_visible: dict[str, bool] = {}
 
         for category, question, answer, widget in self._items:
@@ -645,9 +666,15 @@ class FaqDialog(QDialog):
                 cat_visible[category] = True
                 visible_count += 1
             else:
-                # Check if any expanded term matches question, answer, or category
-                haystack = f"{question} {answer} {category}".lower()
-                matches = any(term in haystack for term in expanded_terms if term)
+                # Show item if its category matches the needle directly
+                if category in matching_categories:
+                    matches = True
+                else:
+                    # Check if any expanded term matches question, answer, or category
+                    haystack = f"{question} {answer} {category}".lower()
+                    matches = any(
+                        term in haystack for term in expanded_terms if term
+                    )
                 widget.setVisible(matches)
                 if matches:
                     widget._q_btn.setChecked(True)  # type: ignore[attr-defined]
