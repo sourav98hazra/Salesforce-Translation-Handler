@@ -344,7 +344,6 @@ class Phase5ValidatePage(PhasePage):
             return
         if not self.check_workflow_override(path):
             return
-        self._clear_tm_on_file_change()
         from ..workers import ImportExcelWorker
 
         self.set_busy(True)

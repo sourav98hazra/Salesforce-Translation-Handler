@@ -954,7 +954,6 @@ class Phase4ReviewPage(PhasePage):
             return
         if not self.check_workflow_override(path):
             return
-        self._clear_tm_on_file_change()
         self.set_busy(True)
         self.status_message.emit(f"Loading {path.name} as the latest version ...")
         worker = ImportExcelWorker(

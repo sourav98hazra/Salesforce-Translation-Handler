@@ -276,7 +276,6 @@ class Phase2ExcelPage(PhasePage):
             return
         if not self.check_workflow_override(path):
             return
-        self._clear_tm_on_file_change()
         self.status_message.emit(f"Loading {path.name} ...")
         worker = ImportExcelWorker(
             path,
