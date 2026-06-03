@@ -59,10 +59,12 @@ roughly 5-10 concurrent requests so we stay well below that ceiling."""
 
 # Matches labels that should NOT be sent to the translator API because they
 # are codes, numbers, IDs, or symbols that would be corrupted by translation.
-_NUMERIC_RE = re.compile(r"^[\d.,\s\-+/]+$")  # pure numbers: 1606, 1,234.56, +1-800
+_NUMERIC_RE = re.compile(r"^[\d.,\s\-+/()%$#@!:;]+$")  # numbers with formatting: 1606, 1,234.56, +1-800, (123), 45%
 _VERSION_RE = re.compile(r"^\d+(\.\d+)+$")  # version strings: 1.0.0, 2.3
 _CODE_RE = re.compile(r"^[A-Z0-9_\-./]+$")  # all-caps codes: API_KEY, HTTP/1.1
 _SINGLE_CHAR_RE = re.compile(r"^.$")  # single characters
+# CamelCase or short identifiers with separators (underscore, hyphen, dot)
+_ID_RE = re.compile(r"^[A-Za-z0-9]+([_\-.][A-Za-z0-9]+)+$")  # IDs: my_field, some-id, v1.2
 
 
 def _is_untranslatable(text: str) -> bool:
@@ -78,6 +80,9 @@ def _is_untranslatable(text: str) -> bool:
     if _CODE_RE.match(text) and len(text) <= 30:
         return True
     if _SINGLE_CHAR_RE.match(text):
+        return True
+    # Identifiers with separators (my_field, some-id) are likely code, not prose
+    if _ID_RE.match(text) and len(text) <= 40:
         return True
     # Labels that are purely punctuation/symbols (no letters)
     if not any(c.isalpha() for c in text):
