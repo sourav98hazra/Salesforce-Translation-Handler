@@ -348,7 +348,14 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_check.setEnabled(False)   # disabled until a file is imported
         self._import_trans_check.toggled.connect(self._on_import_trans_toggled)
 
-
+        self._retranslate_check = QCheckBox("Retranslate all (overwrite existing)")
+        self._retranslate_check.setToolTip(
+            "When checked, ALL rows (including already-translated ones) are sent for translation.\n"
+            "When unchecked (default), only blank/untranslated rows are translated."
+        )
+        self._retranslate_check.setChecked(False)
+        self._retranslate_check.setVisible(False)  # hidden until document has translated entries
+        self._retranslate_check.toggled.connect(self._on_retranslate_toggled)
 
         # Single row: Filter Components | Import translations | Use imports | Retranslate | stretch | import status | Rows to translate
         self._import_trans_label = QLabel("")
@@ -363,6 +370,7 @@ class Phase3TranslatePage(PhasePage):
         btn_row.addWidget(self._filter_btn)
         btn_row.addWidget(self._import_trans_btn)
         btn_row.addWidget(self._import_trans_check)
+        btn_row.addWidget(self._retranslate_check)
         btn_row.addStretch(1)
         btn_row.addWidget(self._import_trans_label)
         btn_row.addWidget(self._estimate_label)
@@ -586,7 +594,18 @@ class Phase3TranslatePage(PhasePage):
 
         # Show retranslation checkbox only if document has any translated entries
         if self._state.document is not None:
-            pass  # retranslate is controlled via Translation menu only
+            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+            if translated_count > 0:
+                # Show the checkbox and sync its state with settings
+                from . import gui_settings
+                current_retranslate = gui_settings.get_retranslate_existing()
+                self._retranslate_check.setChecked(current_retranslate)
+                self._retranslate_check.setVisible(True)
+                self._state.retranslate_existing = current_retranslate
+            else:
+                self._retranslate_check.setVisible(False)
+        else:
+            self._retranslate_check.setVisible(False)
 
     def _refresh_settings_summary(self) -> None:
         backend = gui_settings.get_str(gui_settings.KEYS.backend, "google")
@@ -708,6 +727,22 @@ class Phase3TranslatePage(PhasePage):
             main_win._act_use_imported.blockSignals(True)
             main_win._act_use_imported.setChecked(checked)
             main_win._act_use_imported.blockSignals(False)
+
+    def _on_retranslate_toggled(self, checked: bool) -> None:
+        """Toggle whether to retranslate existing translated rows.
+        
+        Syncs with the Translation menu toggle and persistent settings.
+        """
+        from . import gui_settings
+        # Update the state and persistent settings
+        self._state.retranslate_existing = checked
+        gui_settings.set_retranslate_existing(checked)
+        # Keep Translation menu action in sync
+        main_win = self.window()
+        if hasattr(main_win, '_act_retranslate'):
+            main_win._act_retranslate.blockSignals(True)
+            main_win._act_retranslate.setChecked(checked)
+            main_win._act_retranslate.blockSignals(False)
 
     # ------------------------------------------------------------------ output path
 
