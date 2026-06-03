@@ -309,7 +309,7 @@ class AboutDialog(QDialog):
             "reused without any API call (Translation menu toggle)",
             "Glossary support -- protect brand and product terms from "
             "modification",
-            "In-run deduplication -- the same string is translated only once",
+            "In-run repeated label detection -- the same string is translated only once",
             "Fuzzy TM matching -- finds approximate matches in the TM "
             "(configurable threshold)",
             "Adaptive rate limiting -- auto-tunes to backend tolerance",

@@ -739,7 +739,7 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
 * **No more QSplitter.** The layout is now: compact form at top, progress bar, then the live feed takes all remaining space.
 * **Inline counters in the live feed.** Each line shows:
   ```
-  [42/1000 | T:30 TM:5 D:7] EN: Hello -> JA: こんにちは
+  [42/1000 | API:30 Cached:5 Repeated:7] EN: Hello -> JA: こんにちは
   ```
 * **Intermittent summary** every 50 rows showing progress percentage, translation rate, and ETA.
 * **Final summary block** when translation completes:
@@ -749,9 +749,9 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
   ═══════════════════════════════════════════
     Rows processed successfully:   800
     ├─ Translated via API:         500
-    ├─ From Translation Memory:    120
+    ├─ Via cached translation:     120
     │    (of which fuzzy match:     15)
-    ├─ Deduplicated (reused):       80
+    ├─ Via repeated label:          80
     ├─ From imported file:           5
     └─ Already translated (kept):   95
 

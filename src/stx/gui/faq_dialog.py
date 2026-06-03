@@ -172,23 +172,26 @@ _FAQ: list[tuple[str, str, str]] = [
     ),
     (
         "Phase 3 — Translate",
-        "What does Trans/TM/Dedup mean in the live feed?",
-        "Trans = row was sent to the translation API and translated. "
-        "TM = row was found in the Translation Memory cache from a previous run — no API call made. "
-        "Dedup = the same label appeared multiple times; translated once and reused for duplicates.",
+        "What do API/Cached/Repeated mean in the live feed?",
+        "API = row was sent to the translation API and translated. "
+        "Cached = row was found in the Translation Memory cache from a previous run — no API call "
+        "made. "
+        "Repeated = the same label appeared multiple times; translated once and reused for "
+        "duplicates.",
     ),
     (
         "Phase 3 — Translate",
         "What is the Translation Memory (TM)?",
         "The TM is a local SQLite database that caches every successful translation. "
         "On future runs, rows with identical source text are reused from the cache — "
-        "no API call, no quota consumed, and much faster. "
+        "no API call, no quota consumed, and much faster (shown as 'Cached' in the live feed). "
         "Configure the TM path in Edit → Settings → Resources.",
     ),
     (
         "Phase 3 — Translate",
         "What does Dedup mean?",
-        "Deduplication: within a single run, if the same source label appears in multiple rows, "
+        "Deduplication (shown as 'Repeated' in the live feed): within a single run, if the same "
+        "source label appears in multiple rows, "
         "it is translated only once. All duplicate rows are filled with the same result. "
         "This reduces API calls significantly for large Salesforce orgs.",
     ),

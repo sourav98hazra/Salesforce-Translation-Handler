@@ -106,8 +106,8 @@ class SheetSummary:
             "Total Rows": self.total_rows,
             "Translated Rows": self.translated_rows,
             "Skipped Rows": self.skipped_rows,
-            "TM Hits": self.cached_rows,
-            "Dedup Hits": self.deduped_rows,
+            "Cached Hits": self.cached_rows,
+            "Repeated Hits": self.deduped_rows,
         }
 
 

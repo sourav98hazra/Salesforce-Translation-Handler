@@ -827,8 +827,8 @@ class Phase3TranslatePage(PhasePage):
             f"\u2500\u2500  scope: {self._total_rows:,} rows  |  workers: {workers}"
         )
         self._log.appendPlainText(
-            "  Legend: Trans = via API  |  TM = via Translation Memory  "
-            "|  Dedup = via deduplication (same label in run)"
+            "  Legend: API = via API  |  Cached = via cached translation  "
+            "|  Repeated = via repeated label (same label in run)"
         )
         self._log.appendPlainText("")
 
@@ -906,7 +906,8 @@ class Phase3TranslatePage(PhasePage):
         tgt_code = (self._state.target_language_code or "ja").upper()
         prefix = (
             f"[{self._current_row}/{self._total_rows} | "
-            f"Trans:{self._translated_count} TM:{self._cached_count} Dedup:{self._deduped_count}]"
+            f"API:{self._translated_count} Cached:{self._cached_count} "
+            f"Repeated:{self._deduped_count}]"
         )
 
         # Show [FUZZY] prefix for fuzzy TM matches using structured flag
@@ -978,12 +979,12 @@ class Phase3TranslatePage(PhasePage):
             - done.infile_reuse_count - done.resumed_count
         )
         self._log.appendPlainText(f"  \u251c\u2500 Via Translation API:        {api_count:>5,}")
-        self._log.appendPlainText(f"  \u251c\u2500 Via Translation Memory:     {done.cached_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Via cached translation:     {done.cached_count:>5,}")
         if done.fuzzy_accepted_count:
             self._log.appendPlainText(f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})")
         if done.infile_reuse_count:
             self._log.appendPlainText(f"  \u251c\u2500 Via in-file label match:   {done.infile_reuse_count:>5,}")
-        self._log.appendPlainText(f"  \u251c\u2500 Via deduplication:          {done.deduped_count:>5,}")
+        self._log.appendPlainText(f"  \u251c\u2500 Via repeated label:         {done.deduped_count:>5,}")
         if done.imported_reuse_count:
             self._log.appendPlainText(f"  \u251c\u2500 Via imported reference:     {done.imported_reuse_count:>5,}")
         if done.resumed_count:
@@ -1010,10 +1011,12 @@ class Phase3TranslatePage(PhasePage):
             failed_note = f", {rows_failed:,} failed" if rows_failed else ""
             infile_note = f" | InFile: {done.infile_reuse_count:,}" if done.infile_reuse_count else ""
             msg = (
-                f"Translation complete - {rows_successful:,} rows processed successfully{failed_note}.  "
+                f"Translation complete - {rows_successful:,} rows processed successfully"
+                f"{failed_note}.  "
                 f"Click 'Save a Copy...' to save.  "
-                f"[API: {api_count:,} | TM: {done.cached_count:,} | "
-                f"Dedup: {done.deduped_count:,}{infile_note} | Kept: {done.skipped_count:,}] "
+                f"[API: {api_count:,} | Cached: {done.cached_count:,} | "
+                f"Repeated: {done.deduped_count:,}{infile_note} | "
+                f"Kept: {done.skipped_count:,}] "
                 f"in {elapsed_str}."
             )
 
