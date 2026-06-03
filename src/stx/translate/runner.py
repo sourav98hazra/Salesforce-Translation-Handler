@@ -83,6 +83,65 @@ class TranslationResult:
     statuses: List[StatusEntry] = field(default_factory=list)
     translated_count: int = 0
     skipped_count: int = 0
+    
+    # Detailed translation method counts
+    api_count: int = 0
+    cached_count: int = 0  # Via Translation Memory
+    deduped_count: int = 0  # Via repeated label
+    fuzzy_accepted_count: int = 0  # Via fuzzy match subset of cached
+    imported_reuse_count: int = 0  # Via imported reference
+    infile_reuse_count: int = 0  # Via in-file label match
+    resumed_count: int = 0  # Pre-existing (unchanged)
+    failed_count: int = 0
+    
+    @property
+    def rows_attempted(self) -> int:
+        """Total rows that were attempted for translation (excludes pre-existing)."""
+        return self.translated_count + self.failed_count
+    
+    @property
+    def total_with_translation(self) -> int:
+        """Total rows that have a translation (including pre-existing)."""
+        return self.translated_count + self.resumed_count
+    
+    @property
+    def total_rows_processed(self) -> int:
+        """Total rows in the document."""
+        return self.translated_count + self.resumed_count + self.skipped_count + self.failed_count
+    
+    def format_summary(self) -> str:
+        """Format the improved summary with separated pre-existing and attempted rows."""
+        lines = []
+        
+        # Top section - attempted vs pre-existing
+        lines.append(f"Rows attempted:              {self.rows_attempted:,}")
+        lines.append(f"Rows translated:             {self.translated_count:,}")
+        lines.append(f"Rows failed:                 {self.failed_count:,}")
+        lines.append("")
+        
+        # Successfully translated breakdown
+        lines.append(f"Successfully Translated:     {self.translated_count:,}")
+        if self.api_count > 0:
+            lines.append(f"├─ Via Translation API:      {self.api_count:,}")
+        if self.cached_count > 0:
+            cache_line = f"├─ Via cached translation:   {self.cached_count:,}"
+            if self.fuzzy_accepted_count > 0:
+                cache_line += f"  (via fuzzy match: {self.fuzzy_accepted_count})"
+            lines.append(cache_line)
+        if self.deduped_count > 0:
+            lines.append(f"├─ Via repeated label:       {self.deduped_count:,}")
+        if self.infile_reuse_count > 0:
+            lines.append(f"├─ Via in-file label match:  {self.infile_reuse_count:,}")
+        if self.imported_reuse_count > 0:
+            lines.append(f"├─ Via imported reference:   {self.imported_reuse_count:,}")
+        lines.append("")
+        
+        # Pre-existing and totals
+        lines.append(f"Pre-existing (kept as-is): {self.resumed_count:,}")
+        lines.append(f"Failed Translations:       {self.failed_count:,}")
+        lines.append(f"Total with translation:   {self.total_with_translation:,} / {self.total_rows_processed:,}")
+        
+        return "\n".join(lines)
 
 
 ProgressCallback = Callable[[TranslationProgress], None]
@@ -94,6 +153,7 @@ def translate_document(
     *,
     source_lang: str = "en",
     target_lang: str = "ja",
+    retranslate_all: bool = False,
     progress: Optional[ProgressCallback] = None,
     cancel: Optional[Callable[[], bool]] = None,
 ) -> TranslationResult:
@@ -118,6 +178,14 @@ def translate_document(
     statuses: List[StatusEntry] = []
     translated_count = 0
     skipped_count = 0
+    api_count = 0
+    cached_count = 0
+    deduped_count = 0
+    fuzzy_accepted_count = 0
+    imported_reuse_count = 0
+    infile_reuse_count = 0
+    resumed_count = 0
+    failed_count = 0
     total_rows = len(doc.entries)
 
     new_entries: List[Entry] = []
@@ -140,22 +208,24 @@ def translate_document(
             )
             continue
 
-        if entry.translation.strip():
+        # Handle pre-existing translations
+        if entry.translation.strip() and not retranslate_all:
             summary.skipped_rows += 1
-            skipped_count += 1
+            resumed_count += 1
             statuses.append(
                 StatusEntry(
                     sheet_name=sheet_name,
                     row_index=index + 2,
                     key=entry.key,
                     label=entry.label,
-                    status="Skipped (already translated)",
+                    status="Pre-existing (unchanged)",
                 )
             )
             new_entries.append(entry)
-            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Skipped")
+            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Pre-existing")
             continue
 
+        # Skip blank labels
         if not entry.label.strip():
             summary.skipped_rows += 1
             skipped_count += 1
@@ -172,20 +242,24 @@ def translate_document(
             _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Skipped")
             continue
 
+        # Attempt translation via API
         try:
             translated = translator.translate(entry.label, source_lang, target_lang)
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Translation failed for %s: %s", entry.key, exc)
             translated = entry.label
-            status = f"Fallback to original ({exc})"
+            status = f"Failed: {exc}"
+            failed_count += 1
         else:
             if not translated or translated.strip() == "":
                 translated = entry.label
-                status = "Fallback to original (empty result)"
+                status = "Failed: empty result"
+                failed_count += 1
             else:
-                status = "Translated"
+                status = "Via Translation API"
                 summary.translated_rows += 1
                 translated_count += 1
+                api_count += 1
 
         new_entries.append(Entry(key=entry.key, label=entry.label, translation=translated))
         statuses.append(
@@ -207,6 +281,14 @@ def translate_document(
         statuses=statuses,
         translated_count=translated_count,
         skipped_count=skipped_count,
+        api_count=api_count,
+        cached_count=cached_count,
+        deduped_count=deduped_count,
+        fuzzy_accepted_count=fuzzy_accepted_count,
+        imported_reuse_count=imported_reuse_count,
+        infile_reuse_count=infile_reuse_count,
+        resumed_count=resumed_count,
+        failed_count=failed_count,
     )
 
 

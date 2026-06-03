@@ -125,6 +125,49 @@ class TranslationDone:
     statuses: list
     translated_count: int
     skipped_count: int
+    api_count: int = 0
+    cached_count: int = 0
+    deduped_count: int = 0
+    fuzzy_accepted_count: int = 0
+    imported_reuse_count: int = 0
+    infile_reuse_count: int = 0
+    resumed_count: int = 0
+    failed_count: int = 0
+    
+    def format_summary(self) -> str:
+        """Format the summary for display."""
+        lines = []
+        
+        rows_attempted = self.translated_count + self.failed_count
+        total_with_translation = self.translated_count + self.resumed_count
+        total_rows_processed = self.translated_count + self.resumed_count + self.skipped_count + self.failed_count
+        
+        lines.append(f"Rows attempted:              {rows_attempted:,}")
+        lines.append(f"Rows translated:             {self.translated_count:,}")
+        lines.append(f"Rows failed:                 {self.failed_count:,}")
+        lines.append("")
+        
+        lines.append(f"Successfully Translated:     {self.translated_count:,}")
+        if self.api_count > 0:
+            lines.append(f"├─ Via Translation API:      {self.api_count:,}")
+        if self.cached_count > 0:
+            cache_line = f"├─ Via cached translation:   {self.cached_count:,}"
+            if self.fuzzy_accepted_count > 0:
+                cache_line += f"  (via fuzzy match: {self.fuzzy_accepted_count})"
+            lines.append(cache_line)
+        if self.deduped_count > 0:
+            lines.append(f"├─ Via repeated label:       {self.deduped_count:,}")
+        if self.infile_reuse_count > 0:
+            lines.append(f"├─ Via in-file label match:  {self.infile_reuse_count:,}")
+        if self.imported_reuse_count > 0:
+            lines.append(f"├─ Via imported reference:   {self.imported_reuse_count:,}")
+        lines.append("")
+        
+        lines.append(f"Pre-existing (kept as-is): {self.resumed_count:,}")
+        lines.append(f"Failed Translations:       {self.failed_count:,}")
+        lines.append(f"Total with translation:   {total_with_translation:,} / {total_rows_processed:,}")
+        
+        return "\n".join(lines)
 
 
 class TranslationWorker(QThread):
@@ -151,12 +194,14 @@ class TranslationWorker(QThread):
         doc: Document,
         source_code: str,
         target_code: str,
+        retranslate_all: bool = False,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._doc = doc
         self._source = to_google_code(source_code)
         self._target = to_google_code(target_code)
+        self._retranslate_all = retranslate_all
         self._cancel = False
 
     def cancel(self) -> None:
@@ -178,6 +223,7 @@ class TranslationWorker(QThread):
                 translator,
                 source_lang=self._source,
                 target_lang=self._target,
+                retranslate_all=self._retranslate_all,
                 progress=on_progress,
                 cancel=lambda: self._cancel,
             )
@@ -191,6 +237,14 @@ class TranslationWorker(QThread):
                 statuses=result.statuses,
                 translated_count=result.translated_count,
                 skipped_count=result.skipped_count,
+                api_count=result.api_count,
+                cached_count=result.cached_count,
+                deduped_count=result.deduped_count,
+                fuzzy_accepted_count=result.fuzzy_accepted_count,
+                imported_reuse_count=result.imported_reuse_count,
+                infile_reuse_count=result.infile_reuse_count,
+                resumed_count=result.resumed_count,
+                failed_count=result.failed_count,
             )
         )
 

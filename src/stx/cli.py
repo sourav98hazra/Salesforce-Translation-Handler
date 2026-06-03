@@ -184,9 +184,9 @@ def translate(
     )
 
     console.print(
-        f"[green]OK[/green] Translated {result.translated_count}, "
-        f"skipped {result.skipped_count}; output: [bold]{xlsx_out}[/bold]"
+        f"[green]OK[/green] Translation completed!\n"
     )
+    console.print(result.format_summary())
 
 
 @app.command("xlsx2stf")
@@ -292,9 +292,9 @@ def run_pipeline(
             status_rows=[s.as_audit_row() for s in result.statuses],
         )
         console.print(
-            f"  [green]written[/green] {translated} "
-            f"(translated={result.translated_count}, skipped={result.skipped_count})"
+            f"  [green]written[/green] {translated}\n"
         )
+        console.print(result.format_summary())
     else:
         console.print("[yellow]skipping translation as requested[/yellow]")
 

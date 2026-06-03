@@ -186,9 +186,18 @@ class Phase3TranslatePage(PhasePage):
     def _on_translation_done(self, done) -> None:
         self._state.translation_summaries = done.summaries
         self._state.translation_statuses = done.statuses
+        
+        # Display the improved summary format
+        summary_text = done.format_summary()
+        self._log.appendPlainText("\n" + "="*50)
+        self._log.appendPlainText("TRANSLATION COMPLETE - SUMMARY")
+        self._log.appendPlainText("="*50)
+        self._log.appendPlainText(summary_text)
+        self._log.appendPlainText("="*50)
+        
         self.status_message.emit(
             f"Translation complete: {done.translated_count} translated, "
-            f"{done.skipped_count} skipped."
+            f"{done.resumed_count} pre-existing, {done.failed_count} failed."
         )
         self._save_translated()
 
