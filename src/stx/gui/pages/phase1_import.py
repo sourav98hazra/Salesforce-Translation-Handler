@@ -90,8 +90,9 @@ class Phase1ImportPage(PhasePage):
 
         # ---------- Actions
         self._save_stf_btn = self._make_button("Save copy as STF...", self._on_save_stf, enabled=False)
+        self._reset_btn = self.create_reset_button(1)
         self._next_btn = self._make_button("Continue to Phase 2 \u2192", self._on_next, enabled=False, primary=True)
-        actions = make_action_row(self._save_stf_btn, self._next_btn)
+        actions = make_action_row(self._save_stf_btn, self._reset_btn, self._next_btn)
         self.add_layout(actions)
 
     def _make_button(self, label: str, handler, *, enabled: bool = True, primary: bool = False, key: str | None = None) -> QPushButton:
@@ -198,3 +199,22 @@ class Phase1ImportPage(PhasePage):
         if self._language_code_field.text().strip():
             self._state.target_language_code = self._language_code_field.text().strip()
         self.request_navigate.emit(1)
+
+    def on_reset(self) -> None:
+        """Reset Phase 1 UI to initial state."""
+        self._path_label.setText("No file selected.")
+        self._language_field.clear()
+        self._language_code_field.clear()
+        self._stf_type_field.clear()
+        self._total_field.clear()
+        self._translated_field.clear()
+        self._untranslated_field.clear()
+        self._components_field.clear()
+        
+        # Clear preview table
+        self._preview.setRowCount(0)
+        
+        # Reset button states
+        self.reparse_btn.setEnabled(False)
+        self._save_stf_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)

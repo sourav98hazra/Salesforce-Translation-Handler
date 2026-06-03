@@ -152,6 +152,15 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         bar = self.menuBar()
         file_menu = bar.addMenu("&File")
+        
+        # Add reset current phase action
+        reset_action = QAction("&Reset Current Phase", self)
+        reset_action.setShortcut("Ctrl+R")
+        reset_action.triggered.connect(self._reset_current_phase)
+        file_menu.addAction(reset_action)
+        
+        file_menu.addSeparator()
+        
         quit_action = QAction("&Quit", self)
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.close)
@@ -193,3 +202,11 @@ class MainWindow(QMainWindow):
                 f"outside the app.</p>"
             ),
         )
+
+    def _reset_current_phase(self) -> None:
+        """Reset the current active phase."""
+        current_index = self._stack.currentIndex()
+        if current_index >= 0 and current_index < len(self._pages):
+            current_page = self._pages[current_index]
+            # Call the reset method on the current page which handles confirmation
+            current_page._on_reset_phase(current_index + 1)

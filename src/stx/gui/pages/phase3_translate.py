@@ -134,11 +134,13 @@ class Phase3TranslatePage(PhasePage):
         self._load_btn = QPushButton("Load translated .xlsx ...")
         self._load_btn.clicked.connect(self._on_load_existing)
 
+        self._reset_btn = self.create_reset_button(3)
+
         self._next_btn = QPushButton("Continue to Phase 4 \u2192")
         self._next_btn.setEnabled(False)
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
-        self.add_layout(make_action_row(self._start_btn, self._retranslate_btn, self._cancel_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(self._start_btn, self._retranslate_btn, self._cancel_btn, self._load_btn, self._reset_btn, self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -443,3 +445,26 @@ class Phase3TranslatePage(PhasePage):
         self._load_btn.setEnabled(not running)
         self._target_combo.setEnabled(not running)
         self._source_combo.setEnabled(not running)
+
+    def on_reset(self) -> None:
+        """Reset Phase 3 UI to initial state."""
+        self._path_field.clear()
+        self._log.clear()
+        self._progress.setValue(0)
+        self._eta_label.setText("ETA: --:--")
+        self._elapsed_label.setText("Elapsed: 00:00")
+        
+        # Stop any running timer
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        
+        # Reset button states
+        self._start_btn.setEnabled(self._state.document is not None)
+        self._retranslate_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(False)
+        self._load_btn.setEnabled(True)
+        self._next_btn.setEnabled(False)
+        
+        # Update button visibility
+        self._update_button_visibility()

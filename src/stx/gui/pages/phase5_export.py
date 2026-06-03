@@ -94,7 +94,10 @@ class Phase5ExportPage(PhasePage):
         self._export_btn = QPushButton("Export 3 STF files")
         self._export_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
         self._export_btn.clicked.connect(self._on_export)
-        self.add_layout(make_action_row(self._export_btn))
+        
+        self._reset_btn = self.create_reset_button(5)
+        
+        self.add_layout(make_action_row(self._export_btn, self._reset_btn))
 
         # ---------- Result
         self._result_table = QTableWidget(0, 2)
@@ -185,3 +188,20 @@ class Phase5ExportPage(PhasePage):
             f"STF export complete:\n  - {res.full.name}\n  - {res.translated_only.name}\n  - {res.untranslated_only.name}",
             "Export complete",
         )
+
+    def on_reset(self) -> None:
+        """Reset Phase 5 UI to initial state."""
+        self._dir_field.clear()
+        self._code_field.clear()
+        self._lang_combo.setCurrentText("Japanese")
+        
+        # Clear validation results
+        self._validation_summary.setText("Validation has not been run yet.")
+        self._issues_table.setRowCount(0)
+        
+        # Clear export results
+        self._result_table.setRowCount(0)
+        
+        # Reset button states
+        self._export_btn.setEnabled(False)
+        self._validate_btn.setEnabled(False)

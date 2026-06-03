@@ -203,10 +203,12 @@ class Phase4ReviewPage(PhasePage):
         self._save_btn.clicked.connect(self._on_save)
         self._save_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
 
+        self._reset_btn = self.create_reset_button(4)
+
         self._next_btn = QPushButton("Continue to Phase 5 \u2192")
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(4))
 
-        self.add_layout(make_action_row(self._save_btn, self._next_btn))
+        self.add_layout(make_action_row(self._save_btn, self._reset_btn, self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -300,3 +302,25 @@ class Phase4ReviewPage(PhasePage):
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
         self.status_message.emit(f"Reviewed workbook saved: {path}")
+
+    def on_reset(self) -> None:
+        """Reset Phase 4 UI to initial state."""
+        # Clear the table model if it exists
+        if self._model is not None:
+            self._model.beginResetModel()
+            self._model.endResetModel()
+            
+        # Reset filters
+        self._component_combo.blockSignals(True)
+        self._component_combo.clear()
+        self._component_combo.addItem("All")
+        self._component_combo.blockSignals(False)
+        
+        self._status_combo.setCurrentText("All")
+        self._search.clear()
+        
+        # Clear counters
+        self._counters.setText("")
+        
+        # Reset button state
+        self._save_btn.setEnabled(False)

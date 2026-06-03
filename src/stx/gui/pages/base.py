@@ -132,6 +132,46 @@ class PhasePage(QWidget):
         Subclasses override to refresh state-dependent widgets.
         """
 
+    def on_reset(self) -> None:
+        """Called when the reset button is clicked.
+        
+        Subclasses should override to reset their UI state.
+        Base implementation resets the application state.
+        """
+        pass
+
+    # ------------------------------------------------------------------ reset functionality
+    
+    def create_reset_button(self, phase_number: int) -> QPushButton:
+        """Create a reset button for the current phase."""
+        btn = QPushButton(f"Reset Phase {phase_number}")
+        btn.setStyleSheet("QPushButton { background:#dc2626; color:white; padding:6px 16px; border-radius:6px; }")
+        btn.clicked.connect(lambda: self._on_reset_phase(phase_number))
+        return btn
+    
+    def _on_reset_phase(self, phase_number: int) -> None:
+        """Handle reset button click with user confirmation."""
+        reply = QMessageBox.question(
+            self,
+            f"Reset Phase {phase_number}",
+            f"This will reset Phase {phase_number} and clear all associated data, files, and UI state.\n\n"
+            f"Are you sure you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # Reset application state from this phase onwards
+            self._state.reset_from_phase(phase_number)
+            
+            # Call subclass-specific reset
+            self.on_reset()
+            
+            # Refresh the UI
+            self.on_enter()
+            
+            self.status_message.emit(f"Phase {phase_number} has been reset")
+
 
 # ---------------------------------------------------------------------------
 # Re-usable widgets

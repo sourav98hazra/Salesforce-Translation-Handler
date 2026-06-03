@@ -73,11 +73,13 @@ class Phase2ExcelPage(PhasePage):
         self._load_btn = QPushButton("Load existing organised .xlsx ...")
         self._load_btn.clicked.connect(self._on_load_existing)
 
+        self._reset_btn = self.create_reset_button(2)
+
         self._next_btn = QPushButton("Continue to Phase 3 \u2192")
         self._next_btn.setEnabled(False)
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(2))
 
-        self.add_layout(make_action_row(self._convert_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(self._convert_btn, self._load_btn, self._reset_btn, self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -180,3 +182,11 @@ class Phase2ExcelPage(PhasePage):
         self.on_enter()
         self.status_message.emit(f"Loaded {len(doc.entries):,} rows from {path.name}")
         self._next_btn.setEnabled(True)
+
+    def on_reset(self) -> None:
+        """Reset Phase 2 UI to initial state."""
+        self._path_field.clear()
+        self._summary_label.setText("No document loaded yet \u2014 complete Phase 1 first.")
+        self._details.setRowCount(0)
+        self._convert_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)

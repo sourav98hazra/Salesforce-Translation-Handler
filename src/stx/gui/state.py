@@ -56,3 +56,43 @@ class AppState:
     def reset_translation_audit(self) -> None:
         self.translation_summaries = []
         self.translation_statuses = []
+    
+    def reset_all(self) -> None:
+        """Reset all application state to initial values."""
+        self.document = None
+        self.source_stf_path = None
+        self.organized_xlsx_path = None
+        self.translated_xlsx_path = None
+        self.reviewed_xlsx_path = None
+        self.output_dir = None
+        self.translation_summaries = []
+        self.translation_statuses = []
+        self.source_language_code = "en"
+        self.target_language_code = "ja"
+        self.target_language_name = "Japanese"
+    
+    def reset_from_phase(self, phase: int) -> None:
+        """Reset state starting from a specific phase onwards."""
+        if phase <= 1:
+            # Reset everything from Phase 1 onwards
+            self.reset_all()
+        elif phase <= 2:
+            # Reset from Phase 2 onwards - keep source STF and document
+            self.organized_xlsx_path = None
+            self.translated_xlsx_path = None
+            self.reviewed_xlsx_path = None
+            self.output_dir = None
+            self.translation_summaries = []
+            self.translation_statuses = []
+        elif phase <= 3:
+            # Reset from Phase 3 onwards - keep source and organized workbook
+            self.translated_xlsx_path = None
+            self.reviewed_xlsx_path = None
+            self.translation_summaries = []
+            self.translation_statuses = []
+        elif phase <= 4:
+            # Reset from Phase 4 onwards - keep everything up to translation
+            self.reviewed_xlsx_path = None
+        elif phase <= 5:
+            # Reset Phase 5 - keep everything up to review
+            pass
