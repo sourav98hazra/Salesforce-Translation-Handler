@@ -648,6 +648,16 @@ class MainWindow(QMainWindow):
         )
         trans_menu.addAction(re_enable_preflight)
 
+        trans_menu.addSeparator()
+
+        clear_tm_action = QAction("Clear Translation Memory...", self)
+        clear_tm_action.setToolTip(
+            "Delete the Translation Memory database. "
+            "All cached translations from previous runs will be lost."
+        )
+        clear_tm_action.triggered.connect(self._action_clear_tm)
+        trans_menu.addAction(clear_tm_action)
+
     def _build_validation_menu(self, bar) -> None:
         """Build the Validation menu with limit override actions."""
         from ..validate import clear_limit_overrides, get_limit_overrides
@@ -1406,6 +1416,37 @@ class MainWindow(QMainWindow):
 
     def _action_restart_session(self) -> None:
         """Clear the current session and reset to defaults (Reset All)."""
+        from PySide6.QtWidgets import QMessageBox
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Reset Session")
+        msg_box.setText("Reset the entire session to defaults?")
+        msg_box.setInformativeText(
+            "This will clear:\n"
+            "  \u2022 All loaded documents and translations\n"
+            "  \u2022 All phase progress and results\n"
+            "  \u2022 Checkpoints, imported translations, scope\n\n"
+            "Would you also like to clear the Translation Memory database?\n"
+            "(TM stores translations from previous runs for reuse)"
+        )
+
+        # Custom buttons
+        msg_box.addButton("Reset (keep TM)", QMessageBox.ButtonRole.AcceptRole)
+        reset_clear_tm = msg_box.addButton(
+            "Reset + Clear TM", QMessageBox.ButtonRole.DestructiveRole
+        )
+        cancel_btn = msg_box.addButton(QMessageBox.StandardButton.Cancel)
+
+        msg_box.setDefaultButton(cancel_btn)
+        msg_box.exec()
+
+        clicked = msg_box.clickedButton()
+        if clicked == cancel_btn:
+            return
+
+        clear_tm = clicked == reset_clear_tm
+
         # Clear auto-save
         if self._state.source_stf_path is not None:
             self._session_manager.clear_session(self._state.source_stf_path)
@@ -1455,6 +1496,29 @@ class MainWindow(QMainWindow):
         self._state.memory = None
         self._state.memory_path = None
 
+        # Clear TM database file if user chose to
+        if clear_tm:
+            import logging as _logging
+
+            from .. import settings as gui_settings
+
+            memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
+            if memory_path_str:
+                tm_path = Path(memory_path_str)
+            else:
+                try:
+                    from ..memory import default_tm_path
+                    tm_path = default_tm_path()
+                except (ImportError, AttributeError):
+                    tm_path = Path.home() / ".stx" / "translation_memory.db"
+            try:
+                if tm_path.exists():
+                    tm_path.unlink()
+                    self._log("Translation Memory database cleared.")
+            except Exception as exc:
+                _logging.getLogger(__name__).warning("Failed to clear TM: %s", exc)
+                self._log(f"Warning: Could not clear Translation Memory: {exc}")
+
         # Clear other settings
         self._state.retranslate_existing = False
         self._state.target_languages_batch = []
@@ -1480,6 +1544,60 @@ class MainWindow(QMainWindow):
         self._app_history.clear()
         self._app_history.record(capture_snapshot(self._state, "Initial state"))
         self._refresh_app_history_actions()
+
+    def _action_clear_tm(self) -> None:
+        """Clear the Translation Memory database file after confirmation."""
+        from PySide6.QtWidgets import QMessageBox
+
+        from .. import settings as gui_settings
+
+        memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
+        if memory_path_str:
+            tm_path = Path(memory_path_str)
+        else:
+            try:
+                from ..memory import default_tm_path
+                tm_path = default_tm_path()
+            except (ImportError, AttributeError):
+                tm_path = Path.home() / ".stx" / "translation_memory.db"
+
+        if not tm_path.exists():
+            QMessageBox.information(
+                self, "Translation Memory",
+                "No Translation Memory database found.\n"
+                f"Expected at: {tm_path}"
+            )
+            return
+
+        # Show file size for context
+        size_kb = tm_path.stat().st_size / 1024
+        reply = QMessageBox.warning(
+            self,
+            "Clear Translation Memory",
+            f"Delete the Translation Memory database?\n\n"
+            f"File: {tm_path.name} ({size_kb:.0f} KB)\n\n"
+            f"All cached translations from previous runs will be permanently lost.\n"
+            f"This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            tm_path.unlink()
+            self._state.memory = None
+            self._state.memory_path = None
+            self._log("Translation Memory database cleared.")
+            QMessageBox.information(
+                self, "Translation Memory",
+                "Translation Memory has been cleared successfully."
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Error",
+                f"Could not delete Translation Memory:\n{exc}"
+            )
 
     def _action_reset_current_phase(self) -> None:
         """Reset the current phase status and all downstream phases."""
