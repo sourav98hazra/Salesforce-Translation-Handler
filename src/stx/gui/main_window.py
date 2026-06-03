@@ -1422,10 +1422,15 @@ class MainWindow(QMainWindow):
             self._state.phase_status[i] = PS.IDLE
 
         # Clear phase-specific state for current and downstream
+        if current <= 1:
+            # Clear organized xlsx path so Phase 2 re-converts on re-entry
+            self._state.organized_xlsx_path = None
+            self._state.translated_xlsx_path = None
         if current <= 2:
             # Clear translation audit data
             self._state.translation_summaries = []
             self._state.translation_statuses = []
+            self._state.translated_xlsx_path = None
 
             # Clear Phase 3 checkpoint when resetting Phase 3 or upstream
             from ..checkpoint import CheckpointStore
