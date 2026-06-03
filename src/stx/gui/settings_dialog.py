@@ -60,18 +60,12 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setMinimumWidth(560)
         self.setMinimumHeight(400)
+        # Non-blocking: the user can interact with the main window while Settings is open.
+        self.setModal(False)
         # Make the dialog a proper top-level window so it is:
         # - movable independently of the main window
         # - resizable by dragging the edges
         # - has minimize / maximize / close buttons in the title bar
-        self.setWindowFlags(
-            Qt.WindowType.Window
-            | Qt.WindowType.WindowMinimizeButtonHint
-            | Qt.WindowType.WindowMaximizeButtonHint
-            | Qt.WindowType.WindowCloseButtonHint
-        )
-        # Non-blocking: the user can interact with the main window while Settings is open.
-        self.setModal(False)
         self.setWindowFlags(
             Qt.WindowType.Window
             | Qt.WindowType.WindowMinimizeButtonHint
@@ -84,6 +78,13 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
+
+        self._stay_on_top_check = QCheckBox("Keep on top of main window")
+        self._stay_on_top_check.setToolTip(
+            "Pin this dialog above the main window while you work."
+        )
+        self._stay_on_top_check.toggled.connect(self._toggle_stay_on_top)
+        layout.addWidget(self._stay_on_top_check)
 
         intro = QLabel(
             "Advanced options.  Most users can leave these alone -- defaults "
@@ -496,6 +497,15 @@ class SettingsDialog(QDialog):
         self._session_check.setChecked(False)
 
     # ------------------------------------------------------------------ helpers
+
+    def _toggle_stay_on_top(self, checked: bool) -> None:
+        flags = self.windowFlags()
+        if checked:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        else:
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        self.show()  # Required after setWindowFlags to re-show the widget
 
     def _update_backend_help(self) -> None:
         key = self._backend_combo.currentData()

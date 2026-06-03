@@ -1116,26 +1116,35 @@ class MainWindow(QMainWindow):
         self._log(f"Theme switched to {name}.")
 
     def _action_open_settings(self) -> None:
-        """Open the Settings dialog (Edit -> Settings... or Ctrl+,).
+        """Open the Settings dialog as a non-modal, movable window."""
+        if (
+            hasattr(self, "_settings_dialog")
+            and self._settings_dialog is not None
+            and self._settings_dialog.isVisible()
+        ):
+            self._settings_dialog.raise_()
+            self._settings_dialog.activateWindow()
+            return
+        from .settings_dialog import SettingsDialog
 
-        On accept, refresh the active phase so it picks up any changed
-        values immediately (e.g. Phase 3's settings summary line).
-        """
-        from .settings_dialog import open_settings
+        self._settings_dialog = SettingsDialog(self)
+        self._settings_dialog.accepted.connect(self._on_settings_accepted)
+        self._settings_dialog.show()
 
-        # Snapshot key settings before the dialog opens
-        before = self._snapshot_settings()
+    def _on_settings_accepted(self) -> None:
+        """Refresh UI after settings are saved."""
+        # Apply theme if changed
+        try:
+            from . import theme as theme_module
 
-        if open_settings(self):
-            after = self._snapshot_settings()
-            changes = self._describe_settings_changes(before, after)
-            if changes:
-                self._log(f"Settings updated: {changes}")
-            else:
-                self._log("Settings updated (no value changes detected).")
-            current = self._stack.currentIndex()
-            if 0 <= current < len(self._pages):
-                self._pages[current].on_enter()
+            theme_module.apply_theme(gui_settings.get_theme())
+        except Exception:  # noqa: BLE001
+            pass
+        self._log("Settings saved.")
+        # Refresh the active phase so it picks up changed values
+        current = self._stack.currentIndex()
+        if 0 <= current < len(self._pages):
+            self._pages[current].on_enter()
 
     def _snapshot_settings(self) -> dict:
         """Capture current key settings values for change detection."""
