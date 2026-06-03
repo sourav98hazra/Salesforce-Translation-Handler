@@ -1348,36 +1348,51 @@ class Phase3TranslatePage(PhasePage):
         )
 
     def _on_reset_checkpoint(self) -> None:
-        """Clear checkpoint if one exists, otherwise offer to reset Phase 3 entirely."""
+        """Clear progress: reset Phase 3 to initial state and clear any checkpoint.
+
+        Always resets Phase 3 back to the document-loaded state (as if arriving
+        from Phase 2 fresh). If a checkpoint exists, it is also cleared so the
+        next translation run starts from row 1.
+        """
         cp = self._build_checkpoint()
-        if cp is not None and cp.exists():
-            # Checkpoint exists: confirm clearing it
-            reply = QMessageBox.question(
-                self,
-                "Clear Checkpoint",
-                "Clear the saved checkpoint?\n"
-                "Translation will start from the beginning next time.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
+        has_checkpoint = cp is not None and cp.exists()
+
+        if has_checkpoint:
+            msg = (
+                "Clear all translation progress and reset Phase 3?\n\n"
+                "This will:\n"
+                "  • Clear the saved checkpoint (resume data)\n"
+                "  • Clear the live feed and translation results\n"
+                "  • Reload the document from Phase 2\n\n"
+                "The next translation run will start from the beginning."
             )
-            if reply == QMessageBox.StandardButton.Yes:
-                cp.clear()
-                self.status_message.emit("Checkpoint cleared -- next run will start fresh.")
         else:
-            # No checkpoint: offer to reset Phase 3 to initial state
-            reply = QMessageBox.question(
-                self,
-                "Reset Phase 3",
-                "No checkpoint found.\n\n"
-                "Reset Phase 3 to initial state? This will clear the live feed "
-                "and translation results.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
+            msg = (
+                "Reset Phase 3 to initial state?\n\n"
+                "This will:\n"
+                "  • Clear the live feed and translation results\n"
+                "  • Reload the document from Phase 2\n\n"
+                "You can then start a fresh translation run."
             )
-            if reply == QMessageBox.StandardButton.Yes:
-                self.reset_page()
-                self.on_enter()
-                self.status_message.emit("Phase 3 reset to initial state -- document reloaded.")
+
+        reply = QMessageBox.question(
+            self,
+            "Clear Progress",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Clear checkpoint if it exists
+        if has_checkpoint:
+            cp.clear()
+
+        # Reset Phase 3 UI and reload document from state
+        self.reset_page()
+        self.on_enter()
+        self.status_message.emit("Phase 3 cleared -- document reloaded, ready for fresh translation.")
 
     def _get_fuzzy_threshold(self) -> Optional[float]:
         """Read fuzzy threshold from settings; returns None if disabled (0)."""
