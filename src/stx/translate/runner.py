@@ -826,9 +826,9 @@ class _Runner:
         if self.glossary is not None:
             translated = self.glossary.apply_forced(translated)
 
-        if translated == entry.label:
-            self._mark_failed(index, "Fallback to original (no change)")
-            return
+        # If API returns the same text as the source, it's a valid identity
+        # translation (e.g. "URL" stays "URL", numbers stay unchanged).
+        # This is NOT a failure — count it as a successful translation.
 
         # Persist to TM (under the *original* source).
         if self.memory is not None:
