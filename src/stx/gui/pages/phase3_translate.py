@@ -441,10 +441,12 @@ class Phase3TranslatePage(PhasePage):
         )
         self._cancel_btn.clicked.connect(self._on_cancel)
         self._retry_btn = QPushButton("Retry 0 failed rows")
-        # Tooltip will be updated dynamically based on button mode
-        self._retry_btn.setToolTip("")
+        self._retry_btn.setToolTip(
+            "Retry translation for rows that failed in the previous run.\n"
+            "Only untranslated rows will be sent to the API."
+        )
         self._retry_btn.setVisible(False)  # hidden until failures occur
-        self._retry_btn.clicked.connect(self._on_retry_or_retranslate)  # separate handler for retry vs retranslate
+        self._retry_btn.clicked.connect(self._on_start)  # reuses the same start logic
         self._retry_btn.setStyleSheet(
             "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
             "border-radius: 6px; font-weight: bold; }"
@@ -574,37 +576,11 @@ class Phase3TranslatePage(PhasePage):
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
 
         # Show retry button if there are known failed rows from the last translation run
-        # Show retranslate button if there are translated rows but no failures
         if self._state.document is not None:
             failed_count = len(self._state.translation_failed_indices)
-            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
-            
             if failed_count > 0:
                 self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
-                self._retry_btn.setToolTip(
-                    "Retry translation for rows that failed in the previous run.\n"
-                    "Only untranslated rows will be sent to the API."
-                )
                 self._retry_btn.setVisible(True)
-                self._retry_btn.setStyleSheet(
-                    "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
-                    "border: 1px solid #d97706; border-radius: 4px; font-weight: 600; }"
-                    "QPushButton:hover { background: #d97706; }"
-                    "QPushButton:pressed { background: #b45309; }"
-                )
-            elif translated_count > 0:
-                self._retry_btn.setText(f"Retranslate all rows")
-                self._retry_btn.setToolTip(
-                    f"Retranslate ALL {translated_count:,} rows, overwriting existing translations.\n"
-                    "All rows (including already-translated ones) will be sent to the API."
-                )
-                self._retry_btn.setVisible(True)
-                self._retry_btn.setStyleSheet(
-                    "QPushButton { background: #3b82f6; color: white; padding: 6px 14px; "
-                    "border: 1px solid #2563eb; border-radius: 4px; font-weight: 600; }"
-                    "QPushButton:hover { background: #2563eb; }"
-                    "QPushButton:pressed { background: #1d4ed8; }"
-                )
             else:
                 self._retry_btn.setVisible(False)
 
@@ -960,37 +936,6 @@ class Phase3TranslatePage(PhasePage):
         self._worker.failed.connect(self._on_translation_failed)
         self._worker.start()
 
-    def _on_retry_or_retranslate(self) -> None:
-        """Handle retry failed rows or retranslate all rows button click."""
-        if self._state.document is None:
-            return
-            
-        failed_count = len(self._state.translation_failed_indices)
-        
-        if failed_count > 0:
-            # This is a retry operation - use current retranslate setting
-            self._on_start()
-        else:
-            # This is a retranslate all operation
-            # Confirm retranslate all operation
-            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
-            if not self.confirm(
-                f"Retranslate all {translated_count:,} rows?\n\n"
-                "This will overwrite existing translations by sending ALL rows "
-                "(including already-translated ones) to the translation API.\n\n"
-                "Continue?"
-            ):
-                return
-                
-            # Temporarily override the retranslate setting for this run only
-            original_retranslate = self._state.retranslate_existing
-            self._state.retranslate_existing = True
-            try:
-                self._on_start()
-            finally:
-                # Restore the original setting
-                self._state.retranslate_existing = original_retranslate
-
     def _on_progress(self, percent: int, message: str) -> None:
         if self._worker is None:
             return  # Ignore queued signals after force stop
@@ -1235,32 +1180,29 @@ class Phase3TranslatePage(PhasePage):
         def _line(label: str, value: int, ann: str = "") -> str:
             return f"{label:<{_W}}{value:>9,}{ann}"
 
-        self._log.appendPlainText(_line("  Rows attempted:", rows_successful - done.skipped_count))
-        self._log.appendPlainText(_line("  Rows translated:", done.translated_count))
-        self._log.appendPlainText(_line("  Rows failed:", rows_failed))
+        self._log.appendPlainText(_line("Rows attempted:", rows_successful - done.skipped_count))
+        self._log.appendPlainText(_line("Rows translated:", done.translated_count))
+        self._log.appendPlainText(_line("Rows failed:", rows_failed))
         self._log.appendPlainText("")
-        self._log.appendPlainText(_line("  Successfully Translated:", done.translated_count))
-        self._log.appendPlainText(_line("  \u251c\u2500 Via Translation API:", api_count))
-        self._log.appendPlainText(_line("  \u251c\u2500 Via cached translation:", done.cached_count))
+        self._log.appendPlainText(_line("Successfully Translated:", done.translated_count))
+        self._log.appendPlainText(_line("\u251c\u2500 Via Translation API:", api_count))
+        self._log.appendPlainText(_line("\u251c\u2500 Via Translation Memory:", done.cached_count))
         if fuzzy_enabled:
-            self._log.appendPlainText(_line("  \u2502    (via fuzzy match:", done.fuzzy_accepted_count, ")"))
-        self._log.appendPlainText(_line("  \u251c\u2500 Via repeated label:", done.deduped_count))
+            self._log.appendPlainText(_line("\u2502    (via fuzzy match:", done.fuzzy_accepted_count, ")"))
+        self._log.appendPlainText(_line("\u251c\u2500 Via deduplication:", done.deduped_count))
         # In-file label match: always show, annotate when retranslate is ON
         infile_ann = "   (disabled when retranslate=ON)" if retranslate_on else ""
-        self._log.appendPlainText(_line("  \u251c\u2500 Via in-file label match:", done.infile_reuse_count, infile_ann))
+        self._log.appendPlainText(_line("\u251c\u2500 Via in-file label match:", done.infile_reuse_count, infile_ann))
         # Imported reference: always show
-        self._log.appendPlainText(_line("  \u2514\u2500 Via imported reference:", done.imported_reuse_count))
+        self._log.appendPlainText(_line("\u2514\u2500 Via imported reference:", done.imported_reuse_count))
         self._log.appendPlainText("")
         # Pre-existing shown separately now
         preexist_ann = "   (nothing skipped when retranslate=ON)" if retranslate_on else ""
-        self._log.appendPlainText(_line("  Pre-existing (kept as-is):", done.skipped_count, preexist_ann))
-        self._log.appendPlainText("")
-        self._log.appendPlainText(_line("  Failed Translations:", rows_failed))
-        self._log.appendPlainText("")
+        self._log.appendPlainText(_line("Pre-existing (kept as-is):", done.skipped_count, preexist_ann))
+        self._log.appendPlainText(_line("Failed Translations:", rows_failed))
         total_translated = done.translated_count + done.skipped_count
         total_rows = total_translated + rows_failed
-        self._log.appendPlainText(_line("  Total with translation:", f"{total_translated:,} / {total_rows:,}"))
-        self._log.appendPlainText("")
+        self._log.appendPlainText(_line("Total with translation:", f"{total_translated:,} / {total_rows:,}"))
         self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:
             self._log.appendPlainText(f"  Rate:                    {rate:>5.1f} rows/s")
@@ -1309,34 +1251,9 @@ class Phase3TranslatePage(PhasePage):
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
         failed_count = len(self._state.translation_failed_indices)
-        translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
-        
         if failed_count > 0:
             self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
-            self._retry_btn.setToolTip(
-                "Retry translation for rows that failed in the previous run.\n"
-                "Only untranslated rows will be sent to the API."
-            )
             self._retry_btn.setVisible(True)
-            self._retry_btn.setStyleSheet(
-                "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
-                "border: 1px solid #d97706; border-radius: 4px; font-weight: 600; }"
-                "QPushButton:hover { background: #d97706; }"
-                "QPushButton:pressed { background: #b45309; }"
-            )
-        elif translated_count > 0:
-            self._retry_btn.setText(f"Retranslate all rows")
-            self._retry_btn.setToolTip(
-                f"Retranslate ALL {translated_count:,} rows, overwriting existing translations.\n"
-                "All rows (including already-translated ones) will be sent to the API."
-            )
-            self._retry_btn.setVisible(True)
-            self._retry_btn.setStyleSheet(
-                "QPushButton { background: #3b82f6; color: white; padding: 6px 14px; "
-                "border: 1px solid #2563eb; border-radius: 4px; font-weight: 600; }"
-                "QPushButton:hover { background: #2563eb; }"
-                "QPushButton:pressed { background: #1d4ed8; }"
-            )
         else:
             self._retry_btn.setVisible(False)
         self._save_copy_btn.setEnabled(True)
