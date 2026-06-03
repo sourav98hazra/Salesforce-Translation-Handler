@@ -140,9 +140,9 @@ def _smart_truncate(text: str, max_len: int, preserve_tokens: list | None = None
     # Step 3: Available length = max_len - reserved - 1 (for ellipsis char).
     available = max_len - reserved - 1
     if available < 1:
-        # Edge case: tokens alone exceed max_len, hard-truncate.
-        result = text[: max_len - 1] + "\u2026"
-        return result[:max_len]
+        # Edge case: tokens alone nearly exceed max_len.
+        # Allow at least 1 char of text; Step 6 will hard-truncate if needed.
+        available = 1
 
     # Step 4: Truncate and find word boundary.
     truncated = text[:available]
@@ -348,11 +348,13 @@ def fix_restore_html_tags(entry: Entry) -> Optional[FixResult]:
     """If tags present in the source are missing from the translation, restore them."""
     if not entry.translation.strip():
         return None
-    src_tags = sorted(set(_HTML_TAG_RE.findall(entry.label)))
-    tgt_tags = sorted(set(_HTML_TAG_RE.findall(entry.translation)))
-    if src_tags == tgt_tags or not src_tags:
+    src_tags = _HTML_TAG_RE.findall(entry.label)
+    tgt_tags = _HTML_TAG_RE.findall(entry.translation)
+    if sorted(set(src_tags)) == sorted(set(tgt_tags)) or not src_tags:
         return None
-    missing_tags = sorted(set(src_tags) - set(tgt_tags))
+    # Preserve source order: deduplicate while keeping first-occurrence order.
+    tgt_set = set(tgt_tags)
+    missing_tags = [t for t in dict.fromkeys(src_tags) if t not in tgt_set]
     if not missing_tags:
         return None
     # Safety limit: more than 3 missing tags is too complex for auto-fix.
@@ -372,7 +374,7 @@ def fix_restore_html_tags(entry: Entry) -> Optional[FixResult]:
     paired_tags = [t for t in missing_tags if t not in self_closing_in_source]
     sc_tags = [t for t in missing_tags if t in self_closing_in_source]
 
-    # Wrap in paired tags (outermost first, alphabetical for determinism).
+    # Wrap in paired tags (outermost first, source order).
     for tag in paired_tags:
         new_translation = f"<{tag}>{new_translation}</{tag}>"
 

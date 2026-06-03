@@ -94,6 +94,8 @@ def get_all_limits() -> dict[str, int]:
             # CustomField sub-types are listed individually
             for suffix, suffix_limit in _CUSTOM_FIELD_SUFFIX_LIMITS.items():
                 result[f"CustomField.{suffix}"] = suffix_limit
+            # Also include the base entry for unrecognized suffixes
+            result["CustomField"] = limit
         else:
             result[comp_type] = limit
     return result
