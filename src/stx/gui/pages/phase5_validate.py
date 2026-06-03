@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...autofix import auto_fix_document, auto_fix_entry
+from ...autofix import AutoFixReport, auto_fix_document, auto_fix_entry
 from ...model import Entry
 from ...validate import (
     ValidationIssue,
@@ -52,6 +52,56 @@ from ...validate import (
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
+
+
+class AutoFixResultsDialog(QDialog):
+    """Resizable, movable dialog showing auto-fix results."""
+
+    def __init__(self, report: AutoFixReport, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Auto-Fix Results")
+        self.setMinimumSize(600, 400)
+        self.resize(700, 500)
+        self.setWindowFlags(
+            self.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+
+        layout = QVBoxLayout(self)
+
+        # Summary header
+        summary = QLabel(
+            f"<b>Fixed:</b> {report.fixed_count} row(s) &nbsp;&nbsp;"
+            f"<b>Unfixable:</b> {report.unfixable_count} row(s) &nbsp;&nbsp;"
+            f"<b>Manual review:</b> {len(report.manual_review)} row(s)"
+        )
+        summary.setStyleSheet(
+            "padding: 8px; background: #f1f5f9; border-radius: 6px; font-size: 13px;"
+        )
+        summary.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(summary)
+
+        # Details text area (scrollable)
+        details = QPlainTextEdit()
+        details.setReadOnly(True)
+        if report.details:
+            details.appendPlainText("=== Fixes Applied ===\n")
+            for key, desc in report.details:
+                details.appendPlainText(f"  {key}: {desc}")
+        if report.manual_review:
+            details.appendPlainText("\n=== Needs Manual Review ===\n")
+            for key, reason in report.manual_review:
+                details.appendPlainText(f"  {key}: {reason}")
+        if not report.details and not report.manual_review:
+            details.appendPlainText("No issues found - document is clean.")
+        layout.addWidget(details, stretch=1)
+
+        # Close button
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch(1)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
 
 
 class Phase5ValidatePage(PhasePage):
@@ -603,28 +653,13 @@ class Phase5ValidatePage(PhasePage):
                     "fix_description": description,
                 })
 
-            self.info(
-                f"Applied {report.fixed_count} fix(es).\n\n"
-                + "\n".join(f"  \u2022 {key}: {desc}" for key, desc in report.details[:20])
-                + ("\n  ..." if len(report.details) > 20 else "")
-                + (
-                    "\n\nManual review needed:\n"
-                    + "\n".join(f"  \u26a0 {key}: {desc}" for key, desc in report.manual_review[:10])
-                    + ("\n  ..." if len(report.manual_review) > 10 else "")
-                    if report.manual_review else ""
-                ),
-                "Auto-fix results",
-            )
+            dlg = AutoFixResultsDialog(report, self)
+            dlg.exec()
             self.action_recorded.emit(f"Auto-fix all ({report.fixed_count} fixes)")
         elif report.manual_review:
             # No fixes applied but some items need manual review
-            self.info(
-                f"No automatic fixes applied.\n\n"
-                f"Manual review needed ({len(report.manual_review)} item(s)):\n"
-                + "\n".join(f"  \u26a0 {key}: {desc}" for key, desc in report.manual_review[:10])
-                + ("\n  ..." if len(report.manual_review) > 10 else ""),
-                "Auto-fix results",
-            )
+            dlg = AutoFixResultsDialog(report, self)
+            dlg.exec()
         # Re-validate to update the table.
         self._on_validate()
 

@@ -103,6 +103,7 @@ class WriteStfWorker(_CallableWorker):
         language_name: str,
         language_code: str,
         parent: Optional[QObject] = None,
+        source_name: str | None = None,
     ) -> None:
         super().__init__(
             lambda: write_stf_files(
@@ -110,6 +111,7 @@ class WriteStfWorker(_CallableWorker):
                 output_dir,
                 language_name=language_name,
                 language_code=language_code,
+                source_name=source_name,
             ),
             parent,
         )

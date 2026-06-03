@@ -399,7 +399,8 @@ def xlsx2stf(
         raise typer.Exit(code=2)
 
     doc = import_document_from_excel(xlsx_in, language=language_name, language_code=language_code)
-    res = write_stf_files(doc, output_dir, language_name=language_name, language_code=language_code)
+    source_name = xlsx_in.stem
+    res = write_stf_files(doc, output_dir, language_name=language_name, language_code=language_code, source_name=source_name)
 
     table = Table(title="STF files written", show_header=True, header_style="bold cyan")
     table.add_column("File")
@@ -583,13 +584,13 @@ def run_pipeline(
             tname = language_name if target_code == target else (language_for_code(target_code) or target_code)
             stf_out = output_dir / target_code if len(targets_list) > 1 else output_dir
             stf_out.mkdir(parents=True, exist_ok=True)
-            stf_res = write_stf_files(per_lang_doc, stf_out, language_name=tname, language_code=target_code)
+            stf_res = write_stf_files(per_lang_doc, stf_out, language_name=tname, language_code=target_code, source_name=stf_in.stem)
             for path in stf_res.as_list():
                 console.print(f"  [green]written[/green] {path}")
     else:
         console.print("[yellow]skipping translation as requested[/yellow]")
         console.rule("[bold]Phase 5: STF export[/bold]")
-        stf_res = write_stf_files(doc, output_dir, language_name=language_name, language_code=target)
+        stf_res = write_stf_files(doc, output_dir, language_name=language_name, language_code=target, source_name=stf_in.stem)
         for path in stf_res.as_list():
             console.print(f"  [green]written[/green] {path}")
 

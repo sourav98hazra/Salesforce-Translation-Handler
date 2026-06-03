@@ -470,7 +470,8 @@ class Phase1ImportPage(PhasePage):
         code = self._stf_lang_code_field.text().strip() or self._state.target_language_code
 
         self.status_message.emit(f"Writing STF files to {path} ...")
-        worker = WriteStfWorker(self._state.document, path, lang, code, self)
+        source_name = self._state.source_stf_path.stem if self._state.source_stf_path else None
+        worker = WriteStfWorker(self._state.document, path, lang, code, self, source_name=source_name)
         worker.finished_ok.connect(lambda res: self._on_stf_saved(res))
         worker.failed.connect(lambda msg: self.error(msg, "STF write failed"))
         worker.start()

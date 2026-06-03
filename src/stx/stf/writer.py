@@ -20,6 +20,7 @@ downstream tooling that pattern-matches them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Iterable
 
@@ -112,6 +113,7 @@ def write_stf_files(
     output_dir: Path | str,
     language_name: str | None = None,
     language_code: str | None = None,
+    source_name: str | None = None,
 ) -> STFWriteResult:
     """Emit the three STF files to ``output_dir``.
 
@@ -125,6 +127,10 @@ def write_stf_files(
     language_name, language_code:
         Optional overrides for the document's metadata.  Useful when the
         caller wants to retarget the export without mutating ``doc``.
+    source_name:
+        Optional stem name from the source file.  When provided, filenames
+        use ``<source_name>_Bilingual_<code>_<date>.stf`` format instead of
+        the simpler ``Bilingual_<code>.stf``.
 
     Returns
     -------
@@ -144,10 +150,18 @@ def write_stf_files(
             entries=list(doc.entries),
         )
 
-    code = doc.language_code or "xx"
-    full_path = target_dir / f"Bilingual_{code}.stf"
-    trans_path = target_dir / f"Translated_{code}.stf"
-    untrans_path = target_dir / f"Untranslated_{code}.stf"
+    code = language_code or doc.language_code or "xx"
+    today = date.today().strftime("%Y-%m-%d")
+
+    if source_name:
+        stem = source_name
+        full_path = target_dir / f"{stem}_Bilingual_{code}_{today}.stf"
+        trans_path = target_dir / f"{stem}_Translated_{code}_{today}.stf"
+        untrans_path = target_dir / f"{stem}_Untranslated_{code}_{today}.stf"
+    else:
+        full_path = target_dir / f"Bilingual_{code}.stf"
+        trans_path = target_dir / f"Translated_{code}.stf"
+        untrans_path = target_dir / f"Untranslated_{code}.stf"
 
     _write_lf_utf8(full_path, render_full_stf(doc))
     _write_lf_utf8(trans_path, render_translated_only_stf(doc))

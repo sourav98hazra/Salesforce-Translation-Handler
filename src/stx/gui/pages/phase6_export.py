@@ -266,7 +266,8 @@ class Phase6ExportPage(PhasePage):
         self.set_busy(True)
         self._state.set_phase(5, PhaseStatus.RUNNING)
         self.status_message.emit(f"Writing STF files to {out_dir} ...")
-        worker = WriteStfWorker(self._state.document, out_dir, lang_name, lang_code, self)
+        source_name = self._state.source_stf_path.stem if self._state.source_stf_path else None
+        worker = WriteStfWorker(self._state.document, out_dir, lang_name, lang_code, self, source_name=source_name)
         worker.finished_ok.connect(self._on_exported)
         worker.failed.connect(lambda msg: self._on_export_failed(msg))
         worker.start()
