@@ -705,6 +705,8 @@ class Phase3TranslatePage(PhasePage):
             self.status_message.emit("Translation already running -- ignoring duplicate click.")
             return
 
+        self._start_btn.setText("Start translation")
+
         if self._state.document is None:
             self.warn(
                 "No document loaded yet.\n\n"
@@ -1060,14 +1062,19 @@ class Phase3TranslatePage(PhasePage):
                 f"Dedup: {done.deduped_count:,}{infile_note} | "
                 f"Kept: {done.skipped_count:,}] in {elapsed_str}."
             )
+            if rows_failed > 0:
+                msg += (
+                    "\nTo retry failed rows: click 'Start translation' again"
+                    " (only untranslated rows will be re-attempted)."
+                )
 
         self._eta_label.setText(msg)
         self._eta_label.setVisible(True)
         # Style based on success/failure
         if rows_failed > 0:
             self._eta_label.setStyleSheet(
-                "color: #991b1b; font-size: 11px; font-weight: 700; "
-                "padding: 4px 8px; border-radius: 4px; background: #fee2e2;"
+                "color: #92400e; font-size: 11px; font-weight: 700; "
+                "padding: 4px 8px; border-radius: 4px; background: #fef3c7;"
             )
         else:
             self._eta_label.setStyleSheet(
@@ -1079,6 +1086,8 @@ class Phase3TranslatePage(PhasePage):
         # Mark the phase done so users can navigate forward; the Save
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
+        if rows_failed > 0:
+            self._start_btn.setText("Retry failed rows")
         self._save_copy_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
         self._state.set_phase(2, PhaseStatus.DONE)
@@ -1438,6 +1447,7 @@ class Phase3TranslatePage(PhasePage):
         self._cancel_btn.setEnabled(False)
         self._next_btn.setEnabled(False)
         self._start_btn.setEnabled(False)
+        self._start_btn.setText("Start translation")
         self._source_combo.setCurrentText("English")
         self._target_combo.setCurrentText("Japanese")
         self._selected_components = None
