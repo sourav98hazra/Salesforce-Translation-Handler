@@ -968,13 +968,10 @@ class Phase3TranslatePage(PhasePage):
         failed_count = len(self._state.translation_failed_indices)
         
         if failed_count > 0:
-            # This is a retry operation - keep current retranslate setting
+            # This is a retry operation - use current retranslate setting
             self._on_start()
         else:
-            # This is a retranslate all operation - temporarily enable retranslate
-            from . import gui_settings
-            original_retranslate = gui_settings.get_retranslate_existing()
-            
+            # This is a retranslate all operation
             # Confirm retranslate all operation
             translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
             if not self.confirm(
@@ -985,13 +982,14 @@ class Phase3TranslatePage(PhasePage):
             ):
                 return
                 
+            # Temporarily override the retranslate setting for this run only
+            original_retranslate = self._state.retranslate_existing
+            self._state.retranslate_existing = True
             try:
-                # Temporarily enable retranslate_existing
-                gui_settings.set_retranslate_existing(True)
                 self._on_start()
             finally:
-                # Restore original setting after starting
-                gui_settings.set_retranslate_existing(original_retranslate)
+                # Restore the original setting
+                self._state.retranslate_existing = original_retranslate
 
     def _on_progress(self, percent: int, message: str) -> None:
         if self._worker is None:
