@@ -31,7 +31,7 @@ from .model import Document, Entry
 # simply skip the length check for that row.
 _LENGTH_LIMITS: dict[str, int] = {
     "CustomLabel": 1000,
-    "CustomField": 80,
+    "CustomField": 80,          # default for field labels
     "ButtonOrLink": 1000,
     "CustomApp": 40,
     "CustomTab": 40,
@@ -45,6 +45,30 @@ _LENGTH_LIMITS: dict[str, int] = {
     "ApexSharingReason": 80,
     "PathAssistantStepInfo": 4000,
 }
+
+# CustomField has different limits depending on the key suffix.
+# HelpText/InlineHelpText/Description allow up to 255 chars; field labels are 80.
+_CUSTOM_FIELD_SUFFIX_LIMITS: dict[str, int] = {
+    "HelpText": 255,
+    "InlineHelpText": 255,
+    "Description": 255,
+    "RelatedListLabel": 80,
+    "FieldLabel": 80,
+}
+
+
+def _get_length_limit(component_type: str, key: str) -> int | None:
+    """Return the Salesforce length limit for a given component type and key.
+
+    For CustomField, the limit varies by suffix (HelpText=255, FieldLabel=80).
+    """
+    if component_type == "CustomField":
+        # Check key suffix after the last dot
+        suffix = key.rsplit(".", 1)[-1] if "." in key else ""
+        if suffix in _CUSTOM_FIELD_SUFFIX_LIMITS:
+            return _CUSTOM_FIELD_SUFFIX_LIMITS[suffix]
+        return _LENGTH_LIMITS.get(component_type)
+    return _LENGTH_LIMITS.get(component_type)
 
 _HTML_TAG_RE = re.compile(r"<\s*/?\s*([A-Za-z][\w-]*)\b")
 _PLACEHOLDER_RE = re.compile(r"\{![^}]+\}")
@@ -167,7 +191,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
         return
 
     # Length limit
-    limit = _LENGTH_LIMITS.get(entry.component_type)
+    limit = _get_length_limit(entry.component_type, entry.key)
     if limit is not None and len(entry.translation) > limit:
         report.issues.append(
             ValidationIssue(
