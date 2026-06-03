@@ -31,7 +31,7 @@ from .model import Document, Entry
 # simply skip the length check for that row.
 _LENGTH_LIMITS: dict[str, int] = {
     "CustomLabel": 1000,
-    "CustomField": 80,          # default for field labels
+    "CustomField": 40,          # default for field labels
     "ButtonOrLink": 1000,
     "CustomApp": 40,
     "CustomTab": 40,
@@ -44,31 +44,89 @@ _LENGTH_LIMITS: dict[str, int] = {
     "ManagedContentNodeType": 4000,
     "ApexSharingReason": 80,
     "PathAssistantStepInfo": 4000,
+    "GlobalValueSet": 255,
+    "StandardValueSet": 255,
+    "ValidationRule": 255,
+    "Flow": 4000,
 }
 
 # CustomField has different limits depending on the key suffix.
-# HelpText/InlineHelpText/Description allow up to 255 chars; field labels are 80.
+# HelpText/InlineHelpText allow up to 255 chars; Description up to 1000;
+# field labels and RelatedListLabel are 40.
 _CUSTOM_FIELD_SUFFIX_LIMITS: dict[str, int] = {
+    "FieldLabel": 40,
     "HelpText": 255,
     "InlineHelpText": 255,
-    "Description": 255,
-    "RelatedListLabel": 80,
-    "FieldLabel": 80,
+    "Description": 1000,
+    "RelatedListLabel": 40,
 }
 
+# User-defined overrides. Keys use the format from get_all_limits(),
+# e.g. 'CustomField.FieldLabel', 'CustomLabel', etc.
+_limit_overrides: dict[str, int] = {}
 
-def _get_length_limit(component_type: str, key: str) -> int | None:
+
+def set_limit_overrides(overrides: dict[str, int]) -> None:
+    """Set user-defined limit overrides (replaces any existing overrides)."""
+    global _limit_overrides
+    _limit_overrides = dict(overrides)
+
+
+def clear_limit_overrides() -> None:
+    """Clear all user-defined limit overrides."""
+    global _limit_overrides
+    _limit_overrides = {}
+
+
+def get_limit_overrides() -> dict[str, int]:
+    """Return the current user-defined limit overrides."""
+    return dict(_limit_overrides)
+
+
+def get_all_limits() -> dict[str, int]:
+    """Return a merged view of all known limits including sub-types.
+
+    Format: {'CustomField.FieldLabel': 40, 'CustomField.HelpText': 255, ...}
+    """
+    result: dict[str, int] = {}
+    for comp_type, limit in _LENGTH_LIMITS.items():
+        if comp_type == "CustomField":
+            # CustomField sub-types are listed individually
+            for suffix, suffix_limit in _CUSTOM_FIELD_SUFFIX_LIMITS.items():
+                result[f"CustomField.{suffix}"] = suffix_limit
+        else:
+            result[comp_type] = limit
+    return result
+
+
+def get_length_limit(component_type: str, key: str) -> int | None:
     """Return the Salesforce length limit for a given component type and key.
 
-    For CustomField, the limit varies by suffix (HelpText=255, FieldLabel=80).
+    Checks user-defined overrides first, then falls back to built-in defaults.
+    For CustomField, the limit varies by suffix (FieldLabel=40, HelpText=255,
+    Description=1000).
     """
     if component_type == "CustomField":
         # Check key suffix after the last dot
         suffix = key.rsplit(".", 1)[-1] if "." in key else ""
+        # Check override for specific sub-type first
+        override_key = f"CustomField.{suffix}" if suffix in _CUSTOM_FIELD_SUFFIX_LIMITS else None
+        if override_key and override_key in _limit_overrides:
+            return _limit_overrides[override_key]
         if suffix in _CUSTOM_FIELD_SUFFIX_LIMITS:
             return _CUSTOM_FIELD_SUFFIX_LIMITS[suffix]
+        # Fall through to default CustomField limit
+        if "CustomField" in _limit_overrides:
+            return _limit_overrides["CustomField"]
         return _LENGTH_LIMITS.get(component_type)
+    # Non-CustomField types: check override, then default
+    if component_type in _limit_overrides:
+        return _limit_overrides[component_type]
     return _LENGTH_LIMITS.get(component_type)
+
+
+# Keep private alias for internal/backward compatibility
+_get_length_limit = get_length_limit
 
 _HTML_TAG_RE = re.compile(r"<\s*/?\s*([A-Za-z][\w-]*)\b")
 _PLACEHOLDER_RE = re.compile(r"\{![^}]+\}")
@@ -191,7 +249,7 @@ def _check_entry(entry: Entry, report: ValidationReport) -> None:
         return
 
     # Length limit
-    limit = _get_length_limit(entry.component_type, entry.key)
+    limit = get_length_limit(entry.component_type, entry.key)
     if limit is not None and len(entry.translation) > limit:
         report.issues.append(
             ValidationIssue(

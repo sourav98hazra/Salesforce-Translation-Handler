@@ -39,7 +39,7 @@ def test_trim_to_length_for_custom_field() -> None:
     e = Entry(key="CustomField.A.B.FieldLabel", label="hi", translation="x" * 200)
     result = fix_trim_to_length(e)
     assert result is not None
-    assert len(result.entry.translation) <= 80
+    assert len(result.entry.translation) <= 40
     assert result.entry.translation.endswith("…")
 
 
@@ -146,5 +146,14 @@ def test_fix_trim_to_length_still_works_standalone() -> None:
     e = Entry(key="CustomField.A.B.FieldLabel", label="hi", translation="x" * 200)
     result = fix_trim_to_length(e)
     assert result is not None
-    assert len(result.entry.translation) <= 80
+    assert len(result.entry.translation) <= 40
+    assert result.entry.translation.endswith("\u2026")
+
+
+def test_trim_to_length_respects_help_text_limit() -> None:
+    """Entry with key ending in .HelpText and 300-char translation should be trimmed to <= 255."""
+    e = Entry(key="CustomField.Obj.MyField.HelpText", label="Help", translation="x" * 300)
+    result = fix_trim_to_length(e)
+    assert result is not None
+    assert len(result.entry.translation) <= 255
     assert result.entry.translation.endswith("\u2026")

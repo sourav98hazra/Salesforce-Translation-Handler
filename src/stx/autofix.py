@@ -41,9 +41,9 @@ from .validate import (
     ValidationIssue,
     ValidationReport,
     _HTML_TAG_RE,
-    _LENGTH_LIMITS,
     _MESSAGE_FORMAT_RE,
     _PLACEHOLDER_RE,
+    get_length_limit,
     validate_document,
 )
 
@@ -120,7 +120,7 @@ def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
     This is the fallback fixer used when no translator backend is available.
     It truncates at a word boundary and appends an ellipsis character.
     """
-    limit = _LENGTH_LIMITS.get(entry.component_type)
+    limit = get_length_limit(entry.component_type, entry.key)
     if limit is None or not entry.translation.strip():
         return None
     if len(entry.translation) <= limit:
@@ -171,7 +171,7 @@ def fix_length_with_retranslation(
     FixResult
         Either a successfully shortened translation or a manual-review flag.
     """
-    limit = _LENGTH_LIMITS.get(entry.component_type)
+    limit = get_length_limit(entry.component_type, entry.key)
     if limit is None:
         return FixResult(fixed=False, entry=entry, description="")
 
@@ -376,7 +376,7 @@ def auto_fix_document(
         for fixer in _ENTRY_FIXERS:
             if fixer is fix_trim_to_length and use_smart_length:
                 # Use smart re-translation for length issues instead of truncation
-                limit = _LENGTH_LIMITS.get(current.component_type)
+                limit = get_length_limit(current.component_type, current.key)
                 if limit is not None and current.translation.strip() and len(current.translation) > limit:
                     result = fix_length_with_retranslation(
                         current,
