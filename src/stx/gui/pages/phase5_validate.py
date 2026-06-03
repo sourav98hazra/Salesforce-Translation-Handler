@@ -46,7 +46,7 @@ from ...model import Entry
 from ...validate import ValidationIssue, ValidationReport, validate_document
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
-from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
 
 
 class Phase5ValidatePage(PhasePage):
@@ -112,8 +112,8 @@ class Phase5ValidatePage(PhasePage):
 
         # Primary workflow actions row — load, validate, fix (before the table)
         self.add_layout(make_action_row(
-            self._load_btn, self._validate_btn,
-            self._fix_all_btn, self._fix_selected_btn,
+            compact_btn(self._load_btn), compact_btn(self._validate_btn),
+            self._fix_all_btn, compact_btn(self._fix_selected_btn),
         ))
 
         # ---------- Splitter: issues table (top) + inline editor (bottom)
@@ -252,7 +252,7 @@ class Phase5ValidatePage(PhasePage):
         self._next_btn.setToolTip("Move to the next phase (Export STF).")
         self._next_btn.clicked.connect(self._on_continue_to_phase6)
         self.add_layout(make_action_row(
-            self._save_btn, self._download_report_btn, self._next_btn,
+            self._save_btn, compact_btn(self._download_report_btn), self._next_btn,
         ))
 
     # ------------------------------------------------------------------ continue to Phase 6

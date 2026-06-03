@@ -384,6 +384,14 @@ def primary(button: QPushButton) -> QPushButton:
     return button
 
 
+def compact_btn(btn: QPushButton) -> QPushButton:
+    """Apply compact styling to a secondary button (smaller padding)."""
+    btn.setStyleSheet(
+        "QPushButton { padding: 4px 10px; font-size: 12px; }"
+    )
+    return btn
+
+
 def danger(button: QPushButton) -> QPushButton:
     """Mark a button as destructive."""
     button.setProperty("danger", True)

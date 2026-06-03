@@ -54,7 +54,7 @@ from ..find_replace_dialog import FindReplaceDialog
 from ..state import AppState, PhaseStatus
 from ..undo import UndoCommand, UndoStack
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
-from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
 
 _HEADERS = ["#", "Key", "Component", "Status", "Label", "Translation", "Approved"]
 _TRANSLATION_COL = 5
@@ -340,7 +340,7 @@ class Phase4ReviewPage(PhasePage):
 
         tb_layout.addStretch(1)
 
-        self._load_btn = QPushButton("Load reviewed Excel...")
+        self._load_btn = compact_btn(QPushButton("Load reviewed Excel..."))
         self._load_btn.setToolTip(
             "Replace the current document with an externally edited workbook.  "
             "It becomes the latest version used by all subsequent phases."
@@ -348,7 +348,7 @@ class Phase4ReviewPage(PhasePage):
         self._load_btn.clicked.connect(self._on_load_excel)
         tb_layout.addWidget(self._load_btn)
 
-        self._find_replace_btn = QPushButton("Find & Replace...")
+        self._find_replace_btn = compact_btn(QPushButton("Find & Replace..."))
         self._find_replace_btn.setToolTip(
             "Open Find & Replace dialog to search and perform bulk text replacements "
             "across translations (Ctrl+H)."

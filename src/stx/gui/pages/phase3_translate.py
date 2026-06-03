@@ -45,7 +45,7 @@ from .. import settings as gui_settings
 from .. import secrets as gui_secrets
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
-from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
+from .base import PhasePage, add_popout_to_groupbox, compact_btn, primary
 
 
 # ---------------------------------------------------------------------------
@@ -451,14 +451,24 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.setToolTip("Move to the next phase (Browse & Review).")
         self._next_btn.clicked.connect(self._on_continue_to_phase4)
 
-        self.add_layout(make_action_row(
-            self._start_btn,
-            self._reset_checkpoint_btn,
-            self._cancel_btn,
-            self._save_copy_btn,
-            self._load_btn,
+        # Custom action row: left group (primary actions) | stretch | right group (secondary)
+        action_row = QHBoxLayout()
+        action_row.setSpacing(6)
+        # Left group: Start (primary) + Cancel
+        for btn in (self._start_btn, self._cancel_btn):
+            btn.setMinimumHeight(28)
+            action_row.addWidget(btn)
+        action_row.addStretch(1)
+        # Right group: Clear progress, Save a Copy, Load Excel, Continue
+        for btn in (
+            compact_btn(self._reset_checkpoint_btn),
+            compact_btn(self._save_copy_btn),
+            compact_btn(self._load_btn),
             self._next_btn,
-        ))
+        ):
+            btn.setMinimumHeight(28)
+            action_row.addWidget(btn)
+        self.add_layout(action_row)
 
     # ------------------------------------------------------------------ lifecycle
 
