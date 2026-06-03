@@ -43,7 +43,12 @@ from PySide6.QtWidgets import (
 
 from ...autofix import auto_fix_document, auto_fix_entry
 from ...model import Entry
-from ...validate import ValidationIssue, ValidationReport, validate_document
+from ...validate import (
+    ValidationIssue,
+    ValidationReport,
+    get_limit_overrides,
+    validate_document,
+)
 from ..state import AppState, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
@@ -373,10 +378,16 @@ class Phase5ValidatePage(PhasePage):
             return
         errors = self._report.errors
         warnings = self._report.warnings
+
+        # Check if custom overrides are active
+        _overrides_suffix = ""
+        if get_limit_overrides():
+            _overrides_suffix = " (custom limits active)"
+
         if not errors and not warnings:
             self._banner.setText(
                 "\u2713  All clear \u2014 no validation issues.  "
-                "You can proceed to export."
+                "You can proceed to export." + _overrides_suffix
             )
             self._banner.setStyleSheet(
                 "padding: 10px; border-radius: 6px; font-weight: 600; "
@@ -387,6 +398,7 @@ class Phase5ValidatePage(PhasePage):
                 f"\u26a0  {len(errors)} error(s) must be fixed "
                 f"before Salesforce import.  {len(warnings)} warning(s) "
                 f"are advisory.  Use 'Auto-fix all' or edit rows below."
+                + _overrides_suffix
             )
             self._banner.setStyleSheet(
                 "padding: 10px; border-radius: 6px; font-weight: 600; "
@@ -395,7 +407,7 @@ class Phase5ValidatePage(PhasePage):
         else:
             self._banner.setText(
                 f"\u26a0  {len(warnings)} warning(s) found (advisory).  "
-                f"No errors.  Safe to export."
+                f"No errors.  Safe to export." + _overrides_suffix
             )
             self._banner.setStyleSheet(
                 "padding: 10px; border-radius: 6px; font-weight: 600; "

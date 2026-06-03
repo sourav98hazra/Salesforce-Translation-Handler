@@ -507,6 +507,9 @@ class MainWindow(QMainWindow):
         # ------------------------------------------------------------------ Translation menu
         self._build_translation_menu(bar)
 
+        # ------------------------------------------------------------------ Validation menu
+        self._build_validation_menu(bar)
+
         view_menu = bar.addMenu("&View")
         themes = [
             ("light", "&Light theme"),
@@ -644,6 +647,54 @@ class MainWindow(QMainWindow):
             )
         )
         trans_menu.addAction(re_enable_preflight)
+
+    def _build_validation_menu(self, bar) -> None:
+        """Build the Validation menu with limit override actions."""
+        from ..validate import clear_limit_overrides, get_limit_overrides
+
+        validation_menu = bar.addMenu("V&alidation")
+
+        limits_action = QAction("Custom Length Limits...", self)
+        limits_action.setToolTip(
+            "Override default Salesforce character limits for this session."
+        )
+        limits_action.triggered.connect(self._action_open_limits_dialog)
+        validation_menu.addAction(limits_action)
+
+        clear_action = QAction("Clear All Overrides", self)
+        clear_action.setToolTip("Reset all character limits to Salesforce defaults.")
+        clear_action.triggered.connect(self._action_clear_overrides)
+        validation_menu.addAction(clear_action)
+
+    def _action_open_limits_dialog(self) -> None:
+        """Open the Custom Length Limits dialog."""
+        from .dialogs.limits_override_dialog import LimitsOverrideDialog
+
+        dlg = LimitsOverrideDialog(self)
+        dlg.exec()
+        self._update_override_indicator()
+
+    def _action_clear_overrides(self) -> None:
+        """Clear all custom limit overrides."""
+        from ..validate import clear_limit_overrides
+
+        clear_limit_overrides()
+        self._log("All custom character limit overrides cleared.")
+        self._update_override_indicator()
+
+    def _update_override_indicator(self) -> None:
+        """Show or hide the override indicator in the status bar."""
+        from ..validate import get_limit_overrides
+
+        overrides = get_limit_overrides()
+        if overrides:
+            count = len(overrides)
+            self.statusBar().showMessage(
+                f"Custom limits active ({count} override{'s' if count != 1 else ''})",
+                0,
+            )
+        else:
+            self.statusBar().showMessage(f"Ready  (stx {__version__})", 3000)
 
     def _wire_shortcuts(self) -> None:
         # Ctrl+0..6 to switch phases.
