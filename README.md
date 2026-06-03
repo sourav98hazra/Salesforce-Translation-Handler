@@ -733,7 +733,7 @@ Focused on reducing visual clutter and making translation progress more informat
 
 The previous layout (counter boxes + inline component list + QSplitter) was replaced with a much simpler structure:
 
-* **Counter boxes removed.** Translated / From TM / Deduped / Skipped are no longer separate UI widgets.
+* **Counter boxes removed.** Translated / Cached / Repeated / Skipped are no longer separate UI widgets.
 * **Component selection via dialog.** A "Filter Components..." button opens a selection dialog instead of showing the full component list inline.
 * **Source and Target language fields side by side** in a compact form at the top.
 * **No more QSplitter.** The layout is now: compact form at top, progress bar, then the live feed takes all remaining space.

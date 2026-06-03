@@ -567,10 +567,10 @@ stx translate input.xlsx output.xlsx --target ja \
 
 ### Live feed indicators
 
-During translation, fuzzy-matched entries appear in the live feed with a `FM` (Fuzzy Match) indicator and the match score:
+During translation, fuzzy-matched entries appear in the live feed with a `Fuzzy` indicator and the match score:
 
 ```
-[42/1000 | T:30 TM:5 FM:3 D:7] EN: Hello world -> JA: ...
+[42/1000 | API:30 Cached:5 Fuzzy:3 Repeated:7] EN: Hello world -> JA: ...
 ```
 
 ---
