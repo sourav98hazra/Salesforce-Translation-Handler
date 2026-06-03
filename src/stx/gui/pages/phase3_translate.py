@@ -441,12 +441,10 @@ class Phase3TranslatePage(PhasePage):
         )
         self._cancel_btn.clicked.connect(self._on_cancel)
         self._retry_btn = QPushButton("Retry 0 failed rows")
-        self._retry_btn.setToolTip(
-            "Retry translation for rows that failed in the previous run.\n"
-            "Only untranslated rows will be sent to the API."
-        )
+        # Tooltip will be updated dynamically based on button mode
+        self._retry_btn.setToolTip("")
         self._retry_btn.setVisible(False)  # hidden until failures occur
-        self._retry_btn.clicked.connect(self._on_start)  # reuses the same start logic
+        self._retry_btn.clicked.connect(self._on_retry_or_retranslate)  # separate handler for retry vs retranslate
         self._retry_btn.setStyleSheet(
             "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
             "border-radius: 6px; font-weight: bold; }"
@@ -576,11 +574,37 @@ class Phase3TranslatePage(PhasePage):
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
 
         # Show retry button if there are known failed rows from the last translation run
+        # Show retranslate button if there are translated rows but no failures
         if self._state.document is not None:
             failed_count = len(self._state.translation_failed_indices)
+            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+            
             if failed_count > 0:
                 self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
+                self._retry_btn.setToolTip(
+                    "Retry translation for rows that failed in the previous run.\n"
+                    "Only untranslated rows will be sent to the API."
+                )
                 self._retry_btn.setVisible(True)
+                self._retry_btn.setStyleSheet(
+                    "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
+                    "border: 1px solid #d97706; border-radius: 4px; font-weight: 600; }"
+                    "QPushButton:hover { background: #d97706; }"
+                    "QPushButton:pressed { background: #b45309; }"
+                )
+            elif translated_count > 0:
+                self._retry_btn.setText(f"Retranslate all rows")
+                self._retry_btn.setToolTip(
+                    f"Retranslate ALL {translated_count:,} rows, overwriting existing translations.\n"
+                    "All rows (including already-translated ones) will be sent to the API."
+                )
+                self._retry_btn.setVisible(True)
+                self._retry_btn.setStyleSheet(
+                    "QPushButton { background: #3b82f6; color: white; padding: 6px 14px; "
+                    "border: 1px solid #2563eb; border-radius: 4px; font-weight: 600; }"
+                    "QPushButton:hover { background: #2563eb; }"
+                    "QPushButton:pressed { background: #1d4ed8; }"
+                )
             else:
                 self._retry_btn.setVisible(False)
 
@@ -881,6 +905,7 @@ class Phase3TranslatePage(PhasePage):
         scope_count = scope.estimate_count(self._state.document) if scope else len(self._state.document.entries)
         self._total_rows = scope_count
         self._start_time = time.time()
+        self._progress_history = []  # Reset progress history for ETA calculation
         self._log.clear()
 
         # ---- Live feed header showing language pair
@@ -935,18 +960,105 @@ class Phase3TranslatePage(PhasePage):
         self._worker.failed.connect(self._on_translation_failed)
         self._worker.start()
 
+    def _on_retry_or_retranslate(self) -> None:
+        """Handle retry failed rows or retranslate all rows button click."""
+        if self._state.document is None:
+            return
+            
+        failed_count = len(self._state.translation_failed_indices)
+        
+        if failed_count > 0:
+            # This is a retry operation - keep current retranslate setting
+            self._on_start()
+        else:
+            # This is a retranslate all operation - temporarily enable retranslate
+            from . import gui_settings
+            original_retranslate = gui_settings.get_retranslate_existing()
+            
+            # Confirm retranslate all operation
+            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+            if not self.confirm(
+                f"Retranslate all {translated_count:,} rows?\n\n"
+                "This will overwrite existing translations by sending ALL rows "
+                "(including already-translated ones) to the translation API.\n\n"
+                "Continue?"
+            ):
+                return
+                
+            try:
+                # Temporarily enable retranslate_existing
+                gui_settings.set_retranslate_existing(True)
+                self._on_start()
+            finally:
+                # Restore original setting after starting
+                gui_settings.set_retranslate_existing(original_retranslate)
+
     def _on_progress(self, percent: int, message: str) -> None:
         if self._worker is None:
             return  # Ignore queued signals after force stop
         self._progress.setValue(percent)
         if self._start_time is not None and self._current_row > 0:
             elapsed = time.time() - self._start_time
-            rate = self._current_row / elapsed if elapsed > 0 else 0
+            
+            # Enhanced ETA calculation with smoothing and complexity awareness
+            if hasattr(self, '_progress_history'):
+                self._progress_history.append((time.time(), self._current_row))
+                # Keep only recent progress points (last 30 seconds)
+                cutoff = time.time() - 30
+                self._progress_history = [(t, r) for t, r in self._progress_history if t >= cutoff]
+            else:
+                self._progress_history = [(time.time(), self._current_row)]
+            
+            # Use recent progress for rate calculation (more stable)
+            if len(self._progress_history) >= 2:
+                recent_start_time, recent_start_row = self._progress_history[0]
+                time_span = time.time() - recent_start_time
+                row_span = self._current_row - recent_start_row
+                recent_rate = row_span / time_span if time_span > 0 else 0
+            else:
+                recent_rate = self._current_row / elapsed if elapsed > 0 else 0
+            
+            # Factor in work complexity based on translation method ratios
+            # API calls are slower than cache/dedup hits
+            api_ratio = (self._current_row - self._cached_count - self._deduped_count) / max(self._current_row, 1)
+            cache_ratio = 1 - api_ratio
+            
+            # Estimate remaining work complexity
             remaining = self._total_rows - self._current_row
-            eta_sec = remaining / rate if rate > 0 else 0
-            self._eta_label.setText(
-                f"Translating... {percent}% | {rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
-            )
+            # Assume remaining work has similar API ratio, but with slight adjustment
+            # (early rows often have more cache hits due to deduplication)
+            estimated_api_remaining = remaining * min(api_ratio * 1.2, 1.0)
+            estimated_cache_remaining = remaining - estimated_api_remaining
+            
+            # Different time factors for different work types
+            api_factor = 1.0      # API calls are baseline
+            cache_factor = 0.1    # Cache/dedup hits are much faster
+            
+            if recent_rate > 0:
+                # Weighted ETA based on work complexity
+                weighted_remaining = (estimated_api_remaining * api_factor + 
+                                    estimated_cache_remaining * cache_factor)
+                current_work_factor = (self._current_row - self._cached_count - self._deduped_count) * api_factor + \
+                                    (self._cached_count + self._deduped_count) * cache_factor
+                avg_work_rate = current_work_factor / elapsed if elapsed > 0 else 0
+                
+                if avg_work_rate > 0:
+                    eta_sec = weighted_remaining / avg_work_rate
+                else:
+                    eta_sec = remaining / recent_rate
+                    
+                # Cap unreasonable ETAs
+                eta_sec = min(eta_sec, 24 * 3600)  # Max 24 hours
+                
+                # Show enhanced progress with better rate info
+                actual_rate = self._current_row / elapsed if elapsed > 0 else 0
+                self._eta_label.setText(
+                    f"Translating... {percent}% | {actual_rate:.1f} rows/s "
+                    f"({recent_rate:.1f} recent) | API: {api_ratio:.0%} | ETA: {_format_eta(eta_sec)}"
+                )
+            else:
+                self._eta_label.setText(f"Translating... {percent}% | Calculating ETA...")
+                
             self._eta_label.setStyleSheet(
                 "color: #64748b; font-size: 11px; font-weight: 700; "
                 "padding: 4px 8px; border-radius: 4px; background: #f1f5f9;"
@@ -994,13 +1106,42 @@ class Phase3TranslatePage(PhasePage):
         if self._current_row % 50 == 0 and self._start_time is not None:
             elapsed = time.time() - self._start_time
             rate = self._current_row / elapsed if elapsed > 0 else 0
+            
+            # Use same enhanced ETA calculation for intermittent summaries
+            if hasattr(self, '_progress_history') and len(self._progress_history) >= 2:
+                recent_start_time, recent_start_row = self._progress_history[0]
+                time_span = time.time() - recent_start_time
+                row_span = self._current_row - recent_start_row
+                recent_rate = row_span / time_span if time_span > 0 else rate
+            else:
+                recent_rate = rate
+                
             remaining = self._total_rows - self._current_row
-            eta = remaining / rate if rate > 0 else 0
+            
+            # Enhanced ETA calculation
+            api_ratio = (self._current_row - self._cached_count - self._deduped_count) / max(self._current_row, 1)
+            cache_ratio = 1 - api_ratio
+            estimated_api_remaining = remaining * min(api_ratio * 1.2, 1.0)
+            estimated_cache_remaining = remaining - estimated_api_remaining
+            
+            weighted_remaining = estimated_api_remaining + estimated_cache_remaining * 0.1
+            current_work_factor = (self._current_row - self._cached_count - self._deduped_count) + \
+                                (self._cached_count + self._deduped_count) * 0.1
+            avg_work_rate = current_work_factor / elapsed if elapsed > 0 else 0
+            
+            if avg_work_rate > 0:
+                eta = weighted_remaining / avg_work_rate
+            else:
+                eta = remaining / rate if rate > 0 else 0
+                
+            eta = min(eta, 24 * 3600)  # Cap at 24 hours
             pct = (self._current_row * 100 // self._total_rows) if self._total_rows > 0 else 100
+            
             self._log.appendPlainText(
                 f"  --- {self._current_row}/{self._total_rows} "
                 f"({pct}%) | "
-                f"{rate:.1f} rows/s | ETA: {_format_eta(eta)} ---"
+                f"{rate:.1f} rows/s ({recent_rate:.1f} recent) | "
+                f"API: {api_ratio:.0%} | ETA: {_format_eta(eta)} ---"
             )
 
     def _on_translation_done(self, done) -> None:
@@ -1170,9 +1311,34 @@ class Phase3TranslatePage(PhasePage):
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
         failed_count = len(self._state.translation_failed_indices)
+        translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+        
         if failed_count > 0:
             self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
+            self._retry_btn.setToolTip(
+                "Retry translation for rows that failed in the previous run.\n"
+                "Only untranslated rows will be sent to the API."
+            )
             self._retry_btn.setVisible(True)
+            self._retry_btn.setStyleSheet(
+                "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
+                "border: 1px solid #d97706; border-radius: 4px; font-weight: 600; }"
+                "QPushButton:hover { background: #d97706; }"
+                "QPushButton:pressed { background: #b45309; }"
+            )
+        elif translated_count > 0:
+            self._retry_btn.setText(f"Retranslate all rows")
+            self._retry_btn.setToolTip(
+                f"Retranslate ALL {translated_count:,} rows, overwriting existing translations.\n"
+                "All rows (including already-translated ones) will be sent to the API."
+            )
+            self._retry_btn.setVisible(True)
+            self._retry_btn.setStyleSheet(
+                "QPushButton { background: #3b82f6; color: white; padding: 6px 14px; "
+                "border: 1px solid #2563eb; border-radius: 4px; font-weight: 600; }"
+                "QPushButton:hover { background: #2563eb; }"
+                "QPushButton:pressed { background: #1d4ed8; }"
+            )
         else:
             self._retry_btn.setVisible(False)
         self._save_copy_btn.setEnabled(True)
