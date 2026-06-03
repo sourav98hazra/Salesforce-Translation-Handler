@@ -46,6 +46,20 @@ class Entry:
     def status(self) -> str:
         """``"Translated"`` if a non-blank translation exists, else ``"Untranslated"``."""
         return "Translated" if self.translation.strip() else "Untranslated"
+    
+    def status_with_details(self, doc_stats: dict = None) -> str:
+        """Enhanced status showing preexisting vs newly included translations."""
+        if not self.translation.strip():
+            return "Untranslated"
+        
+        # If we have document statistics, show the breakdown
+        if doc_stats:
+            preexisting = doc_stats.get('pre_existing', 0)
+            included = doc_stats.get('newly_translated', 0) 
+            if preexisting > 0 or included > 0:
+                return f"Translated (Preexisting: {preexisting} | Included: {included})"
+        
+        return "Translated"
 
     @property
     def logical_sheet_name(self) -> str:
@@ -87,4 +101,7 @@ class Document:
             "translated": translated,
             "untranslated": total - translated,
             "components": len({e.component_type for e in self.entries}),
+            # These would be populated by translation results
+            "pre_existing": 0,  
+            "newly_translated": translated,
         }

@@ -122,6 +122,11 @@ class Phase3TranslatePage(PhasePage):
         self._start_btn.setStyleSheet("QPushButton { background:#2563eb; color:white; padding:6px 16px; border-radius:6px; }")
         self._start_btn.clicked.connect(self._on_start)
 
+        self._retranslate_btn = QPushButton("Retranslate all rows")
+        self._retranslate_btn.setStyleSheet("QPushButton { background:#dc2626; color:white; padding:6px 16px; border-radius:6px; }")
+        self._retranslate_btn.clicked.connect(self._on_retranslate)
+        self._retranslate_btn.setVisible(False)  # Hidden by default
+
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.clicked.connect(self._on_cancel)
@@ -133,7 +138,7 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.setEnabled(False)
         self._next_btn.clicked.connect(lambda: self.request_navigate.emit(3))
 
-        self.add_layout(make_action_row(self._start_btn, self._cancel_btn, self._load_btn, self._next_btn))
+        self.add_layout(make_action_row(self._start_btn, self._retranslate_btn, self._cancel_btn, self._load_btn, self._next_btn))
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -147,6 +152,7 @@ class Phase3TranslatePage(PhasePage):
                 self._path_field.setText(str(base.with_suffix("")) + "_translated.xlsx")
 
         self._start_btn.setEnabled(self._state.document is not None)
+        self._update_button_visibility()
 
     # ------------------------------------------------------------------ slots
 
@@ -160,6 +166,74 @@ class Phase3TranslatePage(PhasePage):
         path = self.pick_save_file("Save translated workbook as", "Excel files (*.xlsx)", "translated.xlsx")
         if path:
             self._path_field.setText(str(path))
+
+    def _on_retranslate(self) -> None:
+        """Start retranslation of all rows, including existing translations."""
+        if self._state.document is None:
+            self.warn("Load a document first (Phase 1 or load an organised .xlsx).")
+            return
+
+        target_name = self._target_combo.currentText()
+        target_code = code_for_language(target_name) or "ja"
+        source_name = self._source_combo.currentText()
+        source_code = code_for_language(source_name) or "en"
+
+        self._state.source_language_code = source_code
+        self._state.target_language_code = target_code
+        self._state.target_language_name = target_name
+
+        self._log.clear()
+        self._progress.setValue(0)
+        
+        # Initialize timing
+        self._start_time = time.time()
+        self._eta_label.setText("ETA: calculating...")
+        self._elapsed_label.setText("Elapsed: 00:00")
+        
+        # Setup timer to update elapsed time
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._update_elapsed_time)
+        self._timer.start(1000)  # Update every second
+        
+        self._set_running(True)
+        self.status_message.emit(
+            f"Retranslating ALL {len(self._state.document.entries):,} rows: "
+            f"{source_name} -> {target_name}"
+        )
+
+        # Use retranslate_all=True for this worker
+        self._worker = TranslationWorker(
+            self._state.document,
+            source_code=source_code,
+            target_code=target_code,
+            retranslate_all=True,  # This is the key difference
+            parent=self,
+        )
+        self._worker.progress.connect(self._on_progress)
+        self._worker.finished_ok.connect(self._on_translation_done)
+        self._worker.failed.connect(self._on_translation_failed)
+        self._worker.start()
+
+    def _update_button_visibility(self) -> None:
+        """Show/hide the retranslate button based on document state."""
+        if self._state.document is None:
+            self._retranslate_btn.setVisible(False)
+            return
+            
+        stats = self._state.document.stats()
+        has_translated = stats['translated'] > 0
+        has_untranslated = stats['untranslated'] > 0
+        
+        # Show retranslate button when there are translated rows but also some untranslated
+        # or when we want to retranslate existing translations
+        should_show = has_translated and (has_untranslated or stats['translated'] > 0)
+        self._retranslate_btn.setVisible(should_show)
+        
+        # Update button text based on state
+        if has_translated and has_untranslated:
+            self._retranslate_btn.setText("Retranslate all rows")
+        elif has_translated:
+            self._retranslate_btn.setText("Retranslate all rows")
 
     def _on_start(self) -> None:
         if self._state.document is None:
@@ -364,6 +438,7 @@ class Phase3TranslatePage(PhasePage):
 
     def _set_running(self, running: bool) -> None:
         self._start_btn.setEnabled(not running)
+        self._retranslate_btn.setEnabled(not running)
         self._cancel_btn.setEnabled(running)
         self._load_btn.setEnabled(not running)
         self._target_combo.setEnabled(not running)

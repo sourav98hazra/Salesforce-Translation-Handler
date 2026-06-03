@@ -12,6 +12,7 @@ sheets emitted by the legacy translator.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field, asdict
 from typing import Callable, List, Optional
 
@@ -68,10 +69,44 @@ class TranslationProgress:
     sheet: str
     key: str
     status: str
+    start_time: Optional[float] = None
 
     @property
     def percent(self) -> int:
         return int(self.completed * 100 / self.total) if self.total else 0
+
+    @property
+    def eta_seconds(self) -> Optional[float]:
+        """Calculate estimated time to completion in seconds."""
+        if (
+            self.start_time is None 
+            or self.completed <= 0 
+            or self.completed >= self.total
+        ):
+            return None
+            
+        elapsed = time.time() - self.start_time
+        if elapsed <= 0:
+            return None
+            
+        rate = self.completed / elapsed  # rows per second
+        if rate <= 0:
+            return None
+            
+        remaining_rows = self.total - self.completed
+        return remaining_rows / rate
+
+    @property 
+    def rows_per_second(self) -> Optional[float]:
+        """Calculate current translation rate in rows per second."""
+        if self.start_time is None or self.completed <= 0:
+            return None
+            
+        elapsed = time.time() - self.start_time
+        if elapsed <= 0:
+            return None
+            
+        return self.completed / elapsed
 
 
 @dataclass
@@ -188,6 +223,8 @@ def translate_document(
     failed_count = 0
     total_rows = len(doc.entries)
 
+    # Track start time for ETA calculation
+    start_time = time.time()
     new_entries: List[Entry] = []
 
     for index, entry in enumerate(doc.entries):
@@ -222,7 +259,7 @@ def translate_document(
                 )
             )
             new_entries.append(entry)
-            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Pre-existing")
+            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Pre-existing", start_time)
             continue
 
         # Skip blank labels
@@ -239,7 +276,7 @@ def translate_document(
                 )
             )
             new_entries.append(entry)
-            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Skipped")
+            _emit(progress, index + 1, total_rows, sheet_name, entry.key, "Skipped", start_time)
             continue
 
         # Attempt translation via API
@@ -271,7 +308,7 @@ def translate_document(
                 status=status,
             )
         )
-        _emit(progress, index + 1, total_rows, sheet_name, entry.key, status)
+        _emit(progress, index + 1, total_rows, sheet_name, entry.key, status, start_time)
 
     doc.entries = new_entries
 
@@ -299,11 +336,19 @@ def _emit(
     sheet: str,
     key: str,
     status: str,
+    start_time: float,
 ) -> None:
     if callback is None:
         return
     try:
-        callback(TranslationProgress(completed=completed, total=total, sheet=sheet, key=key, status=status))
+        callback(TranslationProgress(
+            completed=completed, 
+            total=total, 
+            sheet=sheet, 
+            key=key, 
+            status=status,
+            start_time=start_time
+        ))
     except Exception:  # noqa: BLE001
         LOGGER.debug("Progress callback raised; ignoring", exc_info=True)
 
