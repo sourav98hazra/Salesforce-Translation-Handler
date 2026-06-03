@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -39,6 +40,8 @@ class Phase3TranslatePage(PhasePage):
             parent=parent,
         )
         self._worker: TranslationWorker | None = None
+        self._start_time: float | None = None
+        self._timer: QTimer | None = None
         self._build()
 
     # ------------------------------------------------------------------ UI
@@ -87,10 +90,22 @@ class Phase3TranslatePage(PhasePage):
         # ---------- Progress + log
         progress_box = QGroupBox("Progress")
         progress_layout = QHBoxLayout(progress_box)
+        
+        # Progress bar
         self._progress = QProgressBar()
         self._progress.setRange(0, 100)
         self._progress.setValue(0)
         progress_layout.addWidget(self._progress)
+        
+        # ETA and timing display
+        self._eta_label = QLabel("ETA: --:--")
+        self._eta_label.setMinimumWidth(80)
+        self._elapsed_label = QLabel("Elapsed: 00:00")
+        self._elapsed_label.setMinimumWidth(80)
+        
+        progress_layout.addWidget(self._elapsed_label)
+        progress_layout.addWidget(self._eta_label)
+        
         self.add_widget(progress_box)
 
         log_box = QGroupBox("Live status (last 200 events)")
@@ -162,6 +177,17 @@ class Phase3TranslatePage(PhasePage):
 
         self._log.clear()
         self._progress.setValue(0)
+        
+        # Initialize timing
+        self._start_time = time.time()
+        self._eta_label.setText("ETA: calculating...")
+        self._elapsed_label.setText("Elapsed: 00:00")
+        
+        # Setup timer to update elapsed time
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._update_elapsed_time)
+        self._timer.start(1000)  # Update every second
+        
         self._set_running(True)
         self.status_message.emit(
             f"Translating {len(self._state.document.entries):,} rows: "
@@ -182,8 +208,53 @@ class Phase3TranslatePage(PhasePage):
     def _on_progress(self, percent: int, message: str) -> None:
         self._progress.setValue(percent)
         self._log.appendPlainText(message)
+        
+        # Calculate and update ETA
+        if self._start_time is not None and percent > 0:
+            elapsed = time.time() - self._start_time
+            if percent < 100:
+                total_estimated = elapsed * (100 / percent)
+                eta_seconds = total_estimated - elapsed
+                eta_text = self._format_duration(eta_seconds)
+                self._eta_label.setText(f"ETA: {eta_text}")
+            else:
+                self._eta_label.setText("ETA: complete")
+
+    def _update_elapsed_time(self) -> None:
+        """Update the elapsed time display."""
+        if self._start_time is not None:
+            elapsed = time.time() - self._start_time
+            elapsed_text = self._format_duration(elapsed)
+            self._elapsed_label.setText(f"Elapsed: {elapsed_text}")
+
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration in seconds to MM:SS or HH:MM:SS format."""
+        if seconds < 0:
+            return "--:--"
+        
+        total_seconds = int(seconds)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        else:
+            return f"{minutes:02d}:{secs:02d}"
 
     def _on_translation_done(self, done) -> None:
+        # Stop the timer
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        
+        # Final elapsed time update
+        if self._start_time is not None:
+            elapsed = time.time() - self._start_time
+            elapsed_text = self._format_duration(elapsed)
+            self._elapsed_label.setText(f"Completed in: {elapsed_text}")
+        self._eta_label.setText("ETA: complete")
+        
         self._state.translation_summaries = done.summaries
         self._state.translation_statuses = done.statuses
         
@@ -202,6 +273,12 @@ class Phase3TranslatePage(PhasePage):
         self._save_translated()
 
     def _on_translation_failed(self, message: str) -> None:
+        # Stop the timer
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        
+        self._eta_label.setText("ETA: failed")
         self._set_running(False)
         self.error(message, "Translation failed")
 
@@ -250,6 +327,13 @@ class Phase3TranslatePage(PhasePage):
         if self._worker is not None:
             self._worker.cancel()
             self.status_message.emit("Cancellation requested...")
+        
+        # Stop the timer
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        
+        self._eta_label.setText("ETA: cancelled")
 
     def _on_load_existing(self) -> None:
         from ..workers import ImportExcelWorker
