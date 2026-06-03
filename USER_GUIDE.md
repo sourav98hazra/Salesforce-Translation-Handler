@@ -121,9 +121,9 @@ The Preview panel in Phase 1 has a **"Pop out"** button that detaches the previe
 4. Click **"Start translation"**. A **pre-flight confirmation dialog** appears summarising the current options. Review them and click **"Start translation"** to proceed, or **"Cancel — review settings"** to adjust first.
 5. Watch the **live feed** below the progress bar. Each line shows inline counters and the translation pair:
    ```
-   [42/1000 | API:30 TM:5 Dedup:7] EN: Hello -> JA: こんにちは
+   [42/1000 | Translated:30 Memory:5 Dedup:7] EN: Hello -> JA: こんにちは
    ```
-   - `API` = translated via API, `TM` = from Translation Memory (no API call), `Dedup` = duplicate label reused from same run
+   - `Translated` = translated via API, `Memory` = from Translation Memory (no API call), `Dedup` = duplicate label reused from same run
 6. Rows that match an already-translated label **elsewhere in the same file** appear as:
    ```
    [Reused from file] EN: Save -> JA: 保存
@@ -570,7 +570,7 @@ stx translate input.xlsx output.xlsx --target ja \
 During translation, fuzzy-matched entries appear in the live feed with a `Fuzzy` indicator and the match score:
 
 ```
-[42/1000 | API:30 TM:5 Fuzzy:3 Dedup:7] EN: Hello world -> JA: ...
+[42/1000 | Translated:30 Memory:5 Dedup:7] [FUZZY] EN: Hello world -> JA: ...
 ```
 
 ---

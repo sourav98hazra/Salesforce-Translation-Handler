@@ -172,15 +172,15 @@ _FAQ: list[tuple[str, str, str]] = [
     ),
     (
         "Phase 3 — Translate",
-        "What do API/TM/Dedup mean in the live feed?",
-        "API = row was sent to the translation backend (Google/DeepL/Azure/OpenAI) and received "
+        "What do Translated/Memory/Dedup mean in the live feed?",
+        "Translated = row was sent to the translation backend (Google/DeepL/Azure/OpenAI) and received "
         "a translation. "
-        "TM = row was found in the Translation Memory from a previous run - no API call "
+        "Memory = row was found in the Translation Memory from a previous run - no API call "
         "needed. "
         "Dedup = the same label appeared earlier in THIS run and was already translated - that "
         "result was reused. "
         "These are shown as inline counters in each live feed line: "
-        "[42/1000 | API:30 TM:5 Dedup:7]",
+        "[42/1000 | Translated:30 Memory:5 Dedup:7]",
     ),
     (
         "Phase 3 — Translate",

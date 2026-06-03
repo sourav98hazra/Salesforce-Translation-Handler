@@ -282,6 +282,7 @@ class Phase3TranslatePage(PhasePage):
         self._total_rows = 0
         self._current_row = 0
         self._start_time: Optional[float] = None
+        self._use_fuzzy_this_run = False
         self._build()
 
     # ------------------------------------------------------------------ build
@@ -733,6 +734,7 @@ class Phase3TranslatePage(PhasePage):
         use_fuzzy = gui_settings.get_use_fuzzy_matching() and use_tm
         retranslate = gui_settings.get_retranslate_existing()
         self._state.retranslate_existing = retranslate
+        self._use_fuzzy_this_run = use_fuzzy
 
         # Imported translations: respect both the menu toggle and state
         use_imported_menu = gui_settings.get_use_imported_translations()
@@ -837,7 +839,7 @@ class Phase3TranslatePage(PhasePage):
             f"\u2500\u2500  scope: {self._total_rows:,} rows  |  workers: {workers}"
         )
         self._log.appendPlainText(
-            "  Legend: API = via API  |  TM = via Translation Memory  "
+            "  Legend: Translated = via API  |  Memory = via Translation Memory  "
             "|  Dedup = via deduplication (same label in run)"
         )
         self._log.appendPlainText("")
@@ -916,7 +918,7 @@ class Phase3TranslatePage(PhasePage):
         tgt_code = (self._state.target_language_code or "ja").upper()
         prefix = (
             f"[{self._current_row}/{self._total_rows} | "
-            f"API:{self._translated_count} TM:{self._cached_count} "
+            f"Translated:{self._translated_count} Memory:{self._cached_count} "
             f"Dedup:{self._deduped_count}]"
         )
 
@@ -977,6 +979,9 @@ class Phase3TranslatePage(PhasePage):
         )
 
         sep = "\u2550" * 43
+        retranslate_on = self._state.retranslate_existing
+        fuzzy_enabled = getattr(self, "_use_fuzzy_this_run", False)
+
         self._log.appendPlainText("")
         if was_cancelled:
             self._log.appendPlainText(sep)
@@ -994,32 +999,36 @@ class Phase3TranslatePage(PhasePage):
             f"  Successfully Translated:     {rows_successful:>5,}"
         )
         self._log.appendPlainText(
-            f"  \u251c\u2500 Via Translation API:        {api_count:>5,}"
+            f"  \u251c\u2500 Via Translation API:      {api_count:>7,}"
         )
         self._log.appendPlainText(
-            f"  \u251c\u2500 Via Translation Memory:     {done.cached_count:>5,}"
+            f"  \u251c\u2500 Via Translation Memory:   {done.cached_count:>7,}"
         )
-        if done.fuzzy_accepted_count:
+        if fuzzy_enabled:
             self._log.appendPlainText(
-                f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})"
-            )
-        if done.infile_reuse_count:
-            self._log.appendPlainText(
-                f"  \u251c\u2500 Via in-file label match:   {done.infile_reuse_count:>5,}"
+                f"  \u2502    (via fuzzy match:      {done.fuzzy_accepted_count:>7,})"
             )
         self._log.appendPlainText(
-            f"  \u251c\u2500 Via deduplication:           {done.deduped_count:>5,}"
+            f"  \u251c\u2500 Via deduplication:        {done.deduped_count:>7,}"
         )
-        if done.imported_reuse_count:
-            self._log.appendPlainText(
-                f"  \u251c\u2500 Via imported reference:     {done.imported_reuse_count:>5,}"
-            )
+        # In-file label match: always show, annotate when retranslate is ON
+        infile_ann = "   (disabled when retranslate=ON)" if retranslate_on else ""
+        self._log.appendPlainText(
+            f"  \u251c\u2500 Via in-file label match: {done.infile_reuse_count:>7,}{infile_ann}"
+        )
+        # Imported reference: always show
+        self._log.appendPlainText(
+            f"  \u251c\u2500 Via imported reference:   {done.imported_reuse_count:>7,}"
+        )
+        # Resumed from checkpoint: only show if count > 0
         if done.resumed_count:
             self._log.appendPlainText(
-                f"  \u251c\u2500 Resumed from checkpoint:   {done.resumed_count:>5,}"
+                f"  \u251c\u2500 Resumed from checkpoint: {done.resumed_count:>7,}"
             )
+        # Pre-existing (unchanged): always show, annotate when retranslate is ON
+        preexist_ann = "   (nothing skipped when retranslate=ON)" if retranslate_on else ""
         self._log.appendPlainText(
-            f"  \u2514\u2500 Pre-existing (unchanged):  {done.skipped_count:>5,}"
+            f"  \u2514\u2500 Pre-existing (unchanged):{done.skipped_count:>7,}{preexist_ann}"
         )
         self._log.appendPlainText("")
         self._log.appendPlainText(f"  Failed Translations:         {rows_failed:>5,}")
