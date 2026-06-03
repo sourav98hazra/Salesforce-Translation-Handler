@@ -251,6 +251,7 @@ class Phase5ValidatePage(PhasePage):
         self._next_btn = QPushButton("Continue to Phase 6 (Export STF) \u2192")
         self._next_btn.setToolTip("Move to the next phase (Export STF).")
         self._next_btn.clicked.connect(self._on_continue_to_phase6)
+        primary(self._next_btn)
         self.add_layout(make_action_row(
             self._save_btn, compact_btn(self._download_report_btn), self._next_btn,
         ))

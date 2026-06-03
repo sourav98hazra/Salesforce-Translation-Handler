@@ -720,6 +720,20 @@ class MainWindow(QMainWindow):
 
     def _sync_import_to_phase3(self, checked: bool) -> None:
         """Sync the Translation menu 'Use imported translations' state to Phase 3 checkbox."""
+        if checked and not self._state.imported_translations:
+            # No import file loaded -- block the toggle and warn
+            self._act_use_imported.blockSignals(True)
+            self._act_use_imported.setChecked(False)
+            self._act_use_imported.blockSignals(False)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "No Import File",
+                "No translations have been imported yet.\n\n"
+                "First import a file in Phase 3 using 'Import existing translations...' "
+                "before enabling this option.",
+            )
+            return
         page = self._pages[2]  # Phase3TranslatePage
         page._import_trans_check.blockSignals(True)
         page._import_trans_check.setChecked(checked)

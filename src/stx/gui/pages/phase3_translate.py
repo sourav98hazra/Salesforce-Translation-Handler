@@ -354,7 +354,7 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_label = QLabel("")
         self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px;")
 
-        self._estimate_label = QLabel("Rows to translate: --")
+        self._estimate_label = QLabel("Total Rows Loaded: -- | Rows to Translate: --")
         self._estimate_label.setStyleSheet("font-weight: 700; color: #94a3b8;")
 
         btn_row = QHBoxLayout()
@@ -451,6 +451,7 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.setEnabled(False)
         self._next_btn.setToolTip("Move to the next phase (Browse & Review).")
         self._next_btn.clicked.connect(self._on_continue_to_phase4)
+        primary(self._next_btn)
 
         # Custom action row: left group (primary actions) | stretch | right group (secondary)
         action_row = QHBoxLayout()
@@ -613,7 +614,10 @@ class Phase3TranslatePage(PhasePage):
             return
         count = scope.estimate_count(self._state.document)
         self._total_rows = count
-        self._estimate_label.setText(f"Rows to translate: <b>{count:,}</b>")
+        total = len(self._state.document.entries)
+        self._estimate_label.setText(
+            f"Total Rows Loaded: <b>{total:,}</b> | Rows to Translate: <b>{count:,}</b>"
+        )
         self._estimate_label.setTextFormat(Qt.TextFormat.RichText)
 
     # ------------------------------------------------------------------ import translations
@@ -1345,7 +1349,8 @@ class Phase3TranslatePage(PhasePage):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.reset_page()
-                self.status_message.emit("Phase 3 reset to initial state.")
+                self.on_enter()
+                self.status_message.emit("Phase 3 reset to initial state -- document reloaded.")
 
     def _get_fuzzy_threshold(self) -> Optional[float]:
         """Read fuzzy threshold from settings; returns None if disabled (0)."""
@@ -1393,7 +1398,7 @@ class Phase3TranslatePage(PhasePage):
         self._source_combo.setCurrentText("English")
         self._target_combo.setCurrentText("Japanese")
         self._selected_components = None
-        self._estimate_label.setText("Rows to translate: --")
+        self._estimate_label.setText("Total Rows Loaded: -- | Rows to Translate: --")
         self._import_trans_label.setText("")
         self._import_trans_check.setChecked(False)
         self._import_trans_check.setEnabled(False)

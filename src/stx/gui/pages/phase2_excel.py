@@ -95,6 +95,7 @@ class Phase2ExcelPage(PhasePage):
         self._next_btn.setEnabled(False)
         self._next_btn.setToolTip("Move to the next phase (Translate).")
         self._next_btn.clicked.connect(self._on_continue_to_phase3)
+        primary(self._next_btn)
 
         self.add_layout(make_action_row(
             self._convert_btn, self._save_copy_btn, self._load_btn, self._next_btn

@@ -565,6 +565,7 @@ class Phase4ReviewPage(PhasePage):
         self._next_btn = QPushButton("Continue to Phase 5 (Validate & Fix) \u2192")
         self._next_btn.setToolTip("Move to the next phase (Validate & Fix).")
         self._next_btn.clicked.connect(self._on_continue_to_phase5)
+        primary(self._next_btn)
         self.add_layout(make_action_row(self._save_btn, self._next_btn))
 
     def _make_inline_stat(self, label: str, value: str, accent: str) -> dict:
