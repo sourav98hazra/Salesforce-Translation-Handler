@@ -214,9 +214,9 @@ After translation completes, the live feed displays:
 
   Successfully Translated:       800
   ├─ Via Translation API:        500
-  ├─ Via cached translation:     120
+  ├─ Via Translation Memory:     120
   │    (via fuzzy match:          15)
-  ├─ Via repeated label:          80
+  ├─ Via deduplication:          80
   ├─ Via imported reference:       5
   └─ Pre-existing (unchanged):   95
 

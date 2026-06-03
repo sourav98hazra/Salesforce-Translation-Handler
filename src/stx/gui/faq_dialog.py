@@ -172,15 +172,15 @@ _FAQ: list[tuple[str, str, str]] = [
     ),
     (
         "Phase 3 — Translate",
-        "What do API/Cached/Repeated mean in the live feed?",
+        "What do API/TM/Dedup mean in the live feed?",
         "API = row was sent to the translation backend (Google/DeepL/Azure/OpenAI) and received "
         "a translation. "
-        "Cached = row was found in the Translation Memory cache from a previous run - no API call "
+        "TM = row was found in the Translation Memory from a previous run - no API call "
         "needed. "
-        "Repeated = the same label appeared earlier in THIS run and was already translated - that "
+        "Dedup = the same label appeared earlier in THIS run and was already translated - that "
         "result was reused. "
         "These are shown as inline counters in each live feed line: "
-        "[42/1000 | API:30 Cached:5 Repeated:7]",
+        "[42/1000 | API:30 TM:5 Dedup:7]",
     ),
     (
         "Phase 3 — Translate",
@@ -256,7 +256,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "After translation finishes, the live feed shows a structured summary:\n"
         "- 'Rows processed successfully' and 'Rows Process Failed' at the top.\n"
         "- 'Successfully Translated' with a tree breakdown showing the method "
-        "(API, cached translation, fuzzy match, repeated label, imported reference, "
+        "(API, Translation Memory, fuzzy match, deduplication, imported reference, "
         "pre-existing unchanged).\n"
         "- 'Failed Translations' — rows where the API failed and fallback was applied.\n"
         "- Elapsed time and translation rate (rows/second).",

@@ -117,6 +117,11 @@ class Phase2ExcelPage(PhasePage):
         )
         self._convert_btn.setEnabled(True)
 
+        # If conversion was already performed, re-enable downstream buttons
+        if self._state.organized_xlsx_path is not None:
+            self._next_btn.setEnabled(True)
+            self._save_copy_btn.setEnabled(True)
+
         # Auto-populate Content Details when arriving from Phase 1 (or any
         # navigation) if a document exists but the table is still empty.
         if self._details.rowCount() == 0:
