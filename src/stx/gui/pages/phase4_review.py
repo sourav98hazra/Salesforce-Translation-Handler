@@ -701,7 +701,17 @@ class Phase4ReviewPage(PhasePage):
             return
         stats = self._state.document.stats()
         self._stat_translated["value"].setText(f"{stats['translated']:,}")
-        self._stat_untranslated["value"].setText(f"{stats['untranslated']:,}")
+        # Show Failed/Excluded breakdown when translation scope info is available
+        if self._state.translation_scope_indices:
+            failed = len(self._state.translation_failed_indices)
+            excluded = stats['untranslated'] - failed
+            if excluded < 0:
+                excluded = 0
+            self._stat_untranslated["value"].setText(
+                f"{stats['untranslated']:,} (Failed: {failed:,} | Excluded: {excluded:,})"
+            )
+        else:
+            self._stat_untranslated["value"].setText(f"{stats['untranslated']:,}")
 
     def _run_auto_validation(self) -> None:
         if self._state.document is None:

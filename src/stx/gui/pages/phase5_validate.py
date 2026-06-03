@@ -285,11 +285,23 @@ class Phase5ValidatePage(PhasePage):
 
         # Show "data loaded" state before running validation
         stats = self._state.document.stats()
-        self._banner.setText(
-            f"Document loaded: {stats['total']:,} rows "
-            f"({stats['translated']:,} translated, {stats['untranslated']:,} untranslated). "
-            f"Running validation..."
-        )
+        if self._state.translation_scope_indices:
+            failed = len(self._state.translation_failed_indices)
+            excluded = stats['untranslated'] - failed
+            if excluded < 0:
+                excluded = 0
+            self._banner.setText(
+                f"Document loaded: {stats['total']:,} rows "
+                f"({stats['translated']:,} translated, {stats['untranslated']:,} untranslated "
+                f"- {failed:,} failed, {excluded:,} excluded). "
+                f"Running validation..."
+            )
+        else:
+            self._banner.setText(
+                f"Document loaded: {stats['total']:,} rows "
+                f"({stats['translated']:,} translated, {stats['untranslated']:,} untranslated). "
+                f"Running validation..."
+            )
         self._banner.setStyleSheet(
             "padding: 10px; border-radius: 6px; font-weight: 600; "
             "background-color: #e0e7ff; color: #3730a3;"
@@ -366,6 +378,19 @@ class Phase5ValidatePage(PhasePage):
             return
         self._report = validate_document(self._state.document)
         self._issues = list(self._report.issues)
+        # Flag rows that failed translation as warnings
+        if self._state.translation_failed_indices and self._state.document is not None:
+            for idx in sorted(self._state.translation_failed_indices):
+                if idx < len(self._state.document.entries):
+                    entry = self._state.document.entries[idx]
+                    if not entry.translation.strip():  # still untranslated
+                        self._issues.append(ValidationIssue(
+                            category="translation_failed",
+                            severity="warning",
+                            key=entry.key,
+                            message="Translation failed - needs manual input or retry in Phase 3.",
+                            component=entry.component_type,
+                        ))
         self._render_issues()
         self._update_banner()
         self.status_message.emit(

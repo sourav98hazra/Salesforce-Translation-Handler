@@ -103,6 +103,10 @@ class AppState:
 
     retranslate_existing: bool = False
 
+    # Phase 3 translation scope tracking
+    translation_failed_indices: Set[int] = field(default_factory=set)
+    translation_scope_indices: Set[int] = field(default_factory=set)
+
     phase_status: List[PhaseStatus] = field(
         default_factory=lambda: [PhaseStatus.IDLE for _ in range(6)]
     )

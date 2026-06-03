@@ -576,12 +576,11 @@ class Phase3TranslatePage(PhasePage):
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
 
-        # Show retry button if document has untranslated rows (from previous failed run)
+        # Show retry button if there are known failed rows from the last translation run
         if self._state.document is not None:
-            untranslated = len(self._state.document.untranslated())
-            if untranslated > 0 and untranslated < len(self._state.document.entries):
-                # Only show if SOME rows are translated (indicating a previous run happened)
-                self._retry_btn.setText(f"Retry {untranslated:,} untranslated rows")
+            failed_count = len(self._state.translation_failed_indices)
+            if failed_count > 0:
+                self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
                 self._retry_btn.setVisible(True)
             else:
                 self._retry_btn.setVisible(False)
@@ -991,6 +990,22 @@ class Phase3TranslatePage(PhasePage):
     def _on_translation_done(self, done) -> None:
         self._state.translation_summaries = done.summaries
         self._state.translation_statuses = done.statuses
+
+        # Compute scope and failed indices for downstream phases
+        if self._state.document is not None and self._state.scope is not None:
+            scope_indices: set[int] = set()
+            failed_indices: set[int] = set()
+            for idx, entry in enumerate(self._state.document.entries):
+                if self._state.scope.components is None or entry.component_type in self._state.scope.components:
+                    scope_indices.add(idx)
+                    if not entry.translation.strip():
+                        failed_indices.add(idx)
+            self._state.translation_scope_indices = scope_indices
+            self._state.translation_failed_indices = failed_indices
+
+        # Refresh the "Rows to Translate" counter
+        self._update_estimate()
+
         elapsed = done.elapsed_seconds
 
         # Set progress bar to 100% on completion
@@ -1109,8 +1124,9 @@ class Phase3TranslatePage(PhasePage):
         # Mark the phase done so users can navigate forward; the Save
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
-        if rows_failed > 0:
-            self._retry_btn.setText(f"Retry {rows_failed:,} failed rows")
+        failed_count = len(self._state.translation_failed_indices)
+        if failed_count > 0:
+            self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
             self._retry_btn.setVisible(True)
         else:
             self._retry_btn.setVisible(False)

@@ -1443,6 +1443,10 @@ class MainWindow(QMainWindow):
         self._state.imported_translations_path = None
         self._state.imported_translations_enabled = False
 
+        # Clear translation scope tracking
+        self._state.translation_failed_indices = set()
+        self._state.translation_scope_indices = set()
+
         # Clear scope, glossary, memory
         self._state.scope = None
         self._state.scope_path = None
@@ -1496,6 +1500,10 @@ class MainWindow(QMainWindow):
             self._state.translation_summaries = []
             self._state.translation_statuses = []
             self._state.translated_xlsx_path = None
+
+            # Clear translation scope tracking
+            self._state.translation_failed_indices = set()
+            self._state.translation_scope_indices = set()
 
             # Clear Phase 3 checkpoint when resetting Phase 3 or upstream
             from ..checkpoint import CheckpointStore
