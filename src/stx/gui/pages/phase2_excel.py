@@ -121,6 +121,11 @@ class Phase2ExcelPage(PhasePage):
         if self._state.organized_xlsx_path is not None:
             self._next_btn.setEnabled(True)
             self._save_copy_btn.setEnabled(True)
+        else:
+            # Auto-convert when arriving from Phase 1 with a document loaded.
+            # This avoids requiring the user to manually click Convert before
+            # they can proceed to Phase 3.
+            self._on_convert()
 
         # Auto-populate Content Details when arriving from Phase 1 (or any
         # navigation) if a document exists but the table is still empty.
