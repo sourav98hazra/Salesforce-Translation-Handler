@@ -167,6 +167,17 @@ class Phase2ExcelPage(PhasePage):
             gui_settings.add_recent_file(result.path)
             gui_settings.remember_output_dir(result.path.parent)
             self._state.set_phase(1, PhaseStatus.DONE)
+            # Set workflow context so override dialog works for subsequent loads
+            self._state.set_active_workflow_context(
+                document=self._state.document,
+                original_source_path=self._state.source_stf_path or result.path,
+                current_working_path=result.path,
+                current_working_artifact_type="organized_excel",
+                start_phase=0,
+                current_phase=1,
+                override_existing=False,
+                reset_downstream=False,
+            )
         except Exception:  # noqa: BLE001
             pass
         total_sheets = len(result.sheets_written)
