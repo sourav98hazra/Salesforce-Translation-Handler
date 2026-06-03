@@ -312,6 +312,32 @@ class PhasePage(QWidget):
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
 
+    # ------------------------------------------------------------------ TM auto-clear on file change
+
+    def _clear_tm_on_file_change(self) -> None:
+        """Delete the TM database file when a new file is loaded.
+
+        This ensures stale translation memory from a previous document
+        does not pollute the new workflow.
+        """
+        import logging as _logging
+
+        from ...memory import default_tm_path
+        from .. import settings as gui_settings
+
+        self._state.memory = None
+        self._state.memory_path = None
+
+        memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
+        tm_path = Path(memory_path_str) if memory_path_str else default_tm_path()
+
+        try:
+            if tm_path.exists():
+                tm_path.unlink()
+                _logging.getLogger(__name__).info("TM cleared on file change: %s", tm_path)
+        except Exception as exc:  # noqa: BLE001
+            _logging.getLogger(__name__).warning("Could not clear TM on file change: %s", exc)
+
     # ------------------------------------------------------------------ drag-and-drop
 
     def dragEnterEvent(self, event) -> None:  # noqa: N802 -- Qt API

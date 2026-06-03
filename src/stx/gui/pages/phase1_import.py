@@ -280,6 +280,7 @@ class Phase1ImportPage(PhasePage):
         # If another workflow is already active, ask the user before overriding.
         if not self.check_workflow_override(path):
             return
+        self._clear_tm_on_file_change()
         self._parse(path)
 
     def _on_reparse(self) -> None:

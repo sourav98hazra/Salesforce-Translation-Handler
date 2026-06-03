@@ -177,6 +177,7 @@ class Phase6ExportPage(PhasePage):
         # If another workflow is already active, ask the user before overriding.
         if not self.check_workflow_override(path):
             return
+        self._clear_tm_on_file_change()
         self.set_busy(True)
         self.status_message.emit(f"Loading {path.name} for direct export ...")
         worker = ImportExcelWorker(

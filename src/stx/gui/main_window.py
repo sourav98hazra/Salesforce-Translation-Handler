@@ -1602,7 +1602,36 @@ class MainWindow(QMainWindow):
     def _action_reset_current_phase(self) -> None:
         """Reset the current phase status and all downstream phases."""
         current = self._stack.currentIndex()
+        from PySide6.QtWidgets import QMessageBox
+
         from .state import PhaseStatus as PS
+
+        # Ask user about TM (same pattern as Reset Session)
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle("Reset Current Phase")
+        msg_box.setText(f"Reset Phase {current + 1} and all downstream phases?")
+        msg_box.setInformativeText(
+            "Would you also like to clear the Translation Memory database?\n"
+            "(TM stores translations from previous runs for reuse)"
+        )
+
+        keep_tm_btn = msg_box.addButton("Reset (keep TM)", QMessageBox.ButtonRole.AcceptRole)  # noqa: F841
+        clear_tm_btn = msg_box.addButton("Reset + Clear TM", QMessageBox.ButtonRole.DestructiveRole)
+        cancel_btn = msg_box.addButton(QMessageBox.StandardButton.Cancel)
+
+        msg_box.setDefaultButton(cancel_btn)
+        msg_box.exec()
+
+        clicked = msg_box.clickedButton()
+        if clicked == cancel_btn:
+            return
+
+        clear_tm = clicked == clear_tm_btn
+
+        # Clear memory references from state regardless of TM choice
+        self._state.memory = None
+        self._state.memory_path = None
 
         # Reset current phase and downstream to IDLE
         for i in range(current, len(self._state.phase_status)):
@@ -1649,6 +1678,29 @@ class MainWindow(QMainWindow):
         # also clear their displayed state so stale values never linger.
         for i in range(current, len(self._pages)):
             self._pages[i].reset_page()
+
+        # Delete TM database file if user chose "Reset + Clear TM"
+        if clear_tm:
+            import logging as _logging
+
+            from .. import settings as gui_settings
+
+            memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
+            if memory_path_str:
+                tm_path = Path(memory_path_str)
+            else:
+                try:
+                    from ..memory import default_tm_path
+                    tm_path = default_tm_path()
+                except (ImportError, AttributeError):
+                    tm_path = Path.home() / ".stx" / "translation_memory.db"
+            try:
+                if tm_path.exists():
+                    tm_path.unlink()
+                    self._log("Translation Memory database cleared.")
+            except Exception as exc:
+                _logging.getLogger(__name__).warning("Failed to clear TM: %s", exc)
+                self._log(f"Warning: Could not clear Translation Memory: {exc}")
 
         self._refresh_phase_badges()
         self._update_sidebar_footer()

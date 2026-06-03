@@ -427,11 +427,10 @@ class Phase3TranslatePage(PhasePage):
             "Progress and live source/translation pairs appear in the feed below."
         )
         self._start_btn.clicked.connect(self._on_start)
-        self._reset_checkpoint_btn = QPushButton("Clear progress")
+        self._reset_checkpoint_btn = QPushButton("Clear Checkpoint")
         self._reset_checkpoint_btn.setToolTip(
-            "Clear any saved resume point. Use this if you want to start translation\n"
-            "from scratch instead of continuing where it last stopped.\n"
-            "(The progress is only saved when translation is interrupted mid-run.)"
+            "Clear the saved checkpoint (resume data).\n"
+            "The next translation run will start from row 1 instead of resuming."
         )
         self._reset_checkpoint_btn.clicked.connect(self._on_reset_checkpoint)
         self._cancel_btn = QPushButton("Cancel")
@@ -1366,6 +1365,7 @@ class Phase3TranslatePage(PhasePage):
             return
         if not self.check_workflow_override(path):
             return
+        self._clear_tm_on_file_change()
         self.status_message.emit(f"Loading {path.name} ...")
         worker = ImportExcelWorker(
             path,
@@ -1431,36 +1431,30 @@ class Phase3TranslatePage(PhasePage):
         )
 
     def _on_reset_checkpoint(self) -> None:
-        """Clear all translation progress. Keeps setup (languages, scope, imports)."""
+        """Clear the saved checkpoint only. Does not reset run state."""
+        cp = self._build_checkpoint()
+        if cp is None or not cp.exists():
+            QMessageBox.information(
+                self,
+                "Clear Checkpoint",
+                "No checkpoint found.",
+            )
+            return
+
         reply = QMessageBox.question(
             self,
-            "Clear Progress",
-            "Clear all translation progress?\n\n"
-            "This will:\n"
-            "  \u2022 Clear the checkpoint (resume data)\n"
-            "  \u2022 Clear the live feed and results\n"
-            "  \u2022 Reset all counters\n\n"
-            "Your setup (languages, filters, imports) will be kept.\n"
-            "You can then start a fresh translation run.",
+            "Clear Checkpoint",
+            "Clear the saved checkpoint (resume data)?\n\n"
+            "The next translation run will start from row 1\n"
+            "instead of resuming where it left off.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Clear checkpoint
-        cp = self._build_checkpoint()
-        if cp is not None and cp.exists():
-            cp.clear()
-
-        # Clear run state
-        self._clear_run_state()
-
-        # Refresh estimate
-        self._update_estimate()
-        self._start_btn.setEnabled(self._state.document is not None)
-
-        self.status_message.emit("Progress cleared -- ready for a fresh translation run.")
+        cp.clear()
+        self.status_message.emit("Checkpoint cleared -- next run starts from row 1.")
 
     def _clear_run_state(self) -> None:
         """Clear translation run state (log, counters, banner, retry). Keeps setup."""
