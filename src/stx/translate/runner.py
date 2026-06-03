@@ -581,7 +581,7 @@ class _Runner:
             new_entry = Entry(key=entry.key, label=entry.label, translation=translation)
             self._new_entries[index] = new_entry
             cp_status = cp.get("status", "")
-            if cp_status.startswith("Fallback to original"):
+            if cp_status.startswith("Translation failed") or cp_status.startswith("Fallback to original"):
                 status = f"Resumed from checkpoint ({cp_status})"
             else:
                 status = "Resumed from checkpoint"
@@ -742,7 +742,7 @@ class _Runner:
                 # consistently.  We never leave a duplicate slot empty.
                 for dup in idxs[1:]:
                     if self._statuses[dup] is None:
-                        self._mark_failed(dup, "Fallback to original (primary unavailable)")
+                        self._mark_failed(dup, "Translation failed (primary unavailable)")
                 continue
             for dup in idxs[1:]:
                 if self._statuses[dup] is None:
@@ -849,13 +849,13 @@ class _Runner:
             LOGGER.warning("Translation failed for %s: %s", entry.key, exc)
             if self.limiter is not None:
                 self.limiter.report_failure()
-            self._mark_failed(index, f"Fallback to original ({exc})")
+            self._mark_failed(index, f"Translation failed ({exc})")
             return
 
         if not translated or not translated.strip():
             if self.limiter is not None:
                 self.limiter.report_failure()
-            self._mark_failed(index, "Fallback to original (empty result)")
+            self._mark_failed(index, "Translation failed (empty result)")
             return
 
         if self.limiter is not None:
@@ -867,7 +867,7 @@ class _Runner:
             if all_tokens_restored(restored, glossary_token_map):
                 translated = restored
             else:
-                self._mark_failed(index, "Fallback to original (glossary token lost)")
+                self._mark_failed(index, "Translation failed (glossary token lost)")
                 return
         if self.glossary is not None:
             translated = self.glossary.apply_forced(translated)
@@ -985,7 +985,6 @@ class _Runner:
         (network issues, rate limits) should be retried on resume.
         """
         permanent_indicators = (
-            "no change",
             "glossary token lost",
         )
         status_lower = status.lower()

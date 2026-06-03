@@ -719,6 +719,9 @@ class Phase4ReviewPage(PhasePage):
                     stats['untranslated'], failed,
                 )
                 excluded = 0
+                self.status_message.emit(
+                    "Note: Untranslated count may be imprecise — document was modified after translation."
+                )
             self._stat_untranslated["value"].setText(
                 f"{stats['untranslated']:,} (Failed: {failed:,} | Excluded: {excluded:,})"
             )

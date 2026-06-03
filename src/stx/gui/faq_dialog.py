@@ -246,9 +246,10 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Phase 3 — Translate",
         "What happens when the API fails for a specific row?",
-        "If a row fails all retries, the app applies a 'fallback to original' strategy: the translation "
-        "field is filled with the source label text (not left blank). This ensures no rows end up with "
-        "empty translations. The row is counted under 'Failed Translations' in the final summary.",
+        "If a row fails all retries, it stays untranslated (the translation field remains empty). "
+        "You can retry failed rows in Phase 3 using the Retry button, or manually translate them "
+        "in Phase 4. Phase 4 shows failed rows in the 'Untranslated' count with a "
+        "'(Failed: N)' breakdown so you can easily see how many need attention.",
     ),
     (
         "Phase 3 — Translate",
@@ -258,7 +259,7 @@ _FAQ: list[tuple[str, str, str]] = [
         "- 'Successfully Translated' with a tree breakdown showing the method "
         "(API, Translation Memory, fuzzy match, deduplication, imported reference, "
         "pre-existing unchanged).\n"
-        "- 'Failed Translations' — rows where the API failed and fallback was applied.\n"
+        "- 'Failed Translations' — rows where the API failed and the row was left untranslated.\n"
         "- Elapsed time and translation rate (rows/second).",
     ),
     (
@@ -637,7 +638,7 @@ class FaqDialog(QDialog):
             "reset": ["clear", "start over", "fresh", "clean"],
             "cancel": ["stop", "abort", "interrupt", "finish in-flight"],
             "summary": ["done", "complete", "finished", "result", "report", "total"],
-            "fallback": ["fail", "error", "blank", "original", "source"],
+            "fallback": ["fail", "error", "blank", "untranslated", "retry"],
             "progress": ["checkpoint", "resume", "clear", "restart"],
         }
 
