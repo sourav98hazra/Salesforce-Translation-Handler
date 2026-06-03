@@ -736,6 +736,22 @@ class Phase3TranslatePage(PhasePage):
             )
             return
 
+        # Language validation: both must be selected, and must differ.
+        src_lang = self._source_combo.currentText()
+        tgt_lang = self._target_combo.currentText()
+        if not src_lang or src_lang not in LANGUAGE_NAME_TO_CODE:
+            self.warn("Select a source language before starting translation.")
+            return
+        if not tgt_lang or tgt_lang not in LANGUAGE_NAME_TO_CODE:
+            self.warn("Select a target language before starting translation.")
+            return
+        if src_lang == tgt_lang:
+            self.warn(
+                "Source and target language cannot be the same.\n\n"
+                f"Both are set to '{src_lang}'. Please select a different target language."
+            )
+            return
+
         # Pre-flight: check backend availability.
         from ...translate.factory import check_backend_available
 
@@ -862,7 +878,8 @@ class Phase3TranslatePage(PhasePage):
         self._deduped_count = 0
         self._skipped_count = 0
         self._current_row = 0
-        self._total_rows = len(self._state.document.entries)
+        scope_count = scope.estimate_count(self._state.document) if scope else len(self._state.document.entries)
+        self._total_rows = scope_count
         self._start_time = time.time()
         self._log.clear()
 
@@ -870,7 +887,7 @@ class Phase3TranslatePage(PhasePage):
         src_code = code_for_language(self._source_combo.currentText()) or "en"
         self._log.appendPlainText(
             f"\u2500\u2500  {src_code.upper()} \u2192 {self._state.target_language_code.upper()}  "
-            f"\u2500\u2500  scope: {self._total_rows:,} rows  |  workers: {workers}"
+            f"\u2500\u2500  rows to translate: {self._total_rows:,}  |  workers: {workers}"
         )
         self._log.appendPlainText(
             "  Legend: Translated = via API  |  Memory = via Translation Memory  "
@@ -886,7 +903,7 @@ class Phase3TranslatePage(PhasePage):
 
         self.status_message.emit(
             f"Translating: {self._target_combo.currentText()}, "
-            f"workers={workers}, scope={self._total_rows} rows"
+            f"workers={workers}, rows_to_translate={self._total_rows}"
         )
 
         self._worker = TranslationWorker(

@@ -548,11 +548,18 @@ class Phase5ValidatePage(PhasePage):
         except Exception:  # noqa: BLE001
             pass
 
+        from PySide6.QtWidgets import QApplication
+
+        def _fix_progress(current: int, total: int) -> None:
+            self.status_message.emit(f"Auto-fixing: row {current:,} of {total:,}...")
+            QApplication.processEvents()
+
         report = auto_fix_document(
             self._state.document,
             target_lang=target_lang,
             backend_name=backend_name,
             api_key=api_key,
+            progress_callback=_fix_progress,
         )
 
         # Build status message including manual review count

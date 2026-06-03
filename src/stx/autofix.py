@@ -458,6 +458,7 @@ def auto_fix_document(
     target_lang: Optional[str] = None,
     backend_name: Optional[str] = None,
     api_key: Optional[str] = None,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> AutoFixReport:
     """Apply every safe fixer to ``doc`` in place.
 
@@ -495,7 +496,9 @@ def auto_fix_document(
 
     # Per-entry fixes.
     new_entries: list[Entry] = []
-    for entry in doc.entries:
+    for i, entry in enumerate(doc.entries):
+        if progress_callback is not None and i % 50 == 0:
+            progress_callback(i, len(doc.entries))
         current = entry
         for fixer in _ENTRY_FIXERS:
             if fixer is fix_trim_to_length and use_smart_length:
@@ -526,6 +529,8 @@ def auto_fix_document(
         new_entries.append(current)
 
     doc.entries = new_entries
+    if progress_callback is not None:
+        progress_callback(len(new_entries), len(new_entries))
     return report
 
 
