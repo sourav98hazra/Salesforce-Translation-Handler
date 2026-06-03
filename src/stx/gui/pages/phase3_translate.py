@@ -992,46 +992,34 @@ class Phase3TranslatePage(PhasePage):
             self._log.appendPlainText("  TRANSLATION COMPLETE")
             self._log.appendPlainText(sep)
 
-        self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
-        self._log.appendPlainText(f"  Rows Process Failed:         {rows_failed:>5,}")
+        # Helper for right-aligned numbers: pad label to fixed width, then :>9,
+        _W = 31  # all labels padded to this width before the number
+
+        def _line(label: str, value: int, ann: str = "") -> str:
+            return f"{label:<{_W}}{value:>9,}{ann}"
+
+        self._log.appendPlainText(_line("  Rows processed successfully:", rows_successful))
+        self._log.appendPlainText(_line("  Rows Process Failed:", rows_failed))
         self._log.appendPlainText("")
-        self._log.appendPlainText(
-            f"  Successfully Translated:     {rows_successful:>5,}"
-        )
-        self._log.appendPlainText(
-            f"  \u251c\u2500 Via Translation API:      {api_count:>7,}"
-        )
-        self._log.appendPlainText(
-            f"  \u251c\u2500 Via Translation Memory:   {done.cached_count:>7,}"
-        )
+        self._log.appendPlainText(_line("  Successfully Translated:", rows_successful))
+        self._log.appendPlainText(_line("  \u251c\u2500 Via Translation API:", api_count))
+        self._log.appendPlainText(_line("  \u251c\u2500 Via Translation Memory:", done.cached_count))
         if fuzzy_enabled:
-            self._log.appendPlainText(
-                f"  \u2502    (via fuzzy match:      {done.fuzzy_accepted_count:>7,})"
-            )
-        self._log.appendPlainText(
-            f"  \u251c\u2500 Via deduplication:        {done.deduped_count:>7,}"
-        )
+            self._log.appendPlainText(_line("  \u2502    (via fuzzy match:", done.fuzzy_accepted_count, ")"))
+        self._log.appendPlainText(_line("  \u251c\u2500 Via deduplication:", done.deduped_count))
         # In-file label match: always show, annotate when retranslate is ON
         infile_ann = "   (disabled when retranslate=ON)" if retranslate_on else ""
-        self._log.appendPlainText(
-            f"  \u251c\u2500 Via in-file label match: {done.infile_reuse_count:>7,}{infile_ann}"
-        )
+        self._log.appendPlainText(_line("  \u251c\u2500 Via in-file label match:", done.infile_reuse_count, infile_ann))
         # Imported reference: always show
-        self._log.appendPlainText(
-            f"  \u251c\u2500 Via imported reference:   {done.imported_reuse_count:>7,}"
-        )
+        self._log.appendPlainText(_line("  \u251c\u2500 Via imported reference:", done.imported_reuse_count))
         # Resumed from checkpoint: only show if count > 0
         if done.resumed_count:
-            self._log.appendPlainText(
-                f"  \u251c\u2500 Resumed from checkpoint: {done.resumed_count:>7,}"
-            )
+            self._log.appendPlainText(_line("  \u251c\u2500 Resumed from checkpoint:", done.resumed_count))
         # Pre-existing (unchanged): always show, annotate when retranslate is ON
         preexist_ann = "   (nothing skipped when retranslate=ON)" if retranslate_on else ""
-        self._log.appendPlainText(
-            f"  \u2514\u2500 Pre-existing (unchanged):{done.skipped_count:>7,}{preexist_ann}"
-        )
+        self._log.appendPlainText(_line("  \u2514\u2500 Pre-existing (unchanged):", done.skipped_count, preexist_ann))
         self._log.appendPlainText("")
-        self._log.appendPlainText(f"  Failed Translations:         {rows_failed:>5,}")
+        self._log.appendPlainText(_line("  Failed Translations:", rows_failed))
         self._log.appendPlainText("")
         self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:
