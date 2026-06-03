@@ -948,10 +948,12 @@ class _Runner:
         entry = self.doc.entries[index]
         sheet = entry.logical_sheet_name
         summary = self._summaries.setdefault(sheet, SheetSummary(sheet_name=sheet))
-        # "Fallback to original" means the API couldn't translate — use the
-        # source label as the translation so the row isn't left blank.
-        fallback_translation = entry.label if entry.label.strip() else entry.translation
-        new_entry = Entry(key=entry.key, label=entry.label, translation=fallback_translation)
+        # Failed rows keep their translation field empty (or unchanged from
+        # before). This ensures Phase 4 correctly shows them as "Untranslated"
+        # and validation can flag them. The status column records the failure
+        # reason for audit purposes.
+        failed_translation = entry.translation  # keep whatever was there before (usually empty)
+        new_entry = Entry(key=entry.key, label=entry.label, translation=failed_translation)
         with self._completion_lock:
             self._new_entries[index] = new_entry
             self._statuses[index] = StatusEntry(
@@ -959,7 +961,7 @@ class _Runner:
                 row_index=index + 2,
                 key=entry.key,
                 label=entry.label,
-                translation=fallback_translation,
+                translation=failed_translation,
                 status=status,
             )
             self._failed += 1
