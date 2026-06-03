@@ -1336,6 +1336,21 @@ class MainWindow(QMainWindow):
         if self._state.source_stf_path is not None:
             self._session_manager.clear_session(self._state.source_stf_path)
 
+        # Clear any checkpoint for the current document/target language
+        from ..checkpoint import CheckpointStore
+        source_path = self._state.organized_xlsx_path or self._state.source_stf_path
+        if source_path is not None:
+            target_code = self._state.target_language_code or "ja"
+            try:
+                cp = CheckpointStore(
+                    source_file=str(Path(source_path).resolve()),
+                    target_lang=target_code,
+                )
+                if cp.exists():
+                    cp.clear()
+            except Exception:  # noqa: BLE001
+                pass  # best effort
+
         # Reset state
         self._state.document = None
         self._state.source_stf_path = None
@@ -1366,6 +1381,9 @@ class MainWindow(QMainWindow):
         self._state.retranslate_existing = False
         self._state.target_languages_batch = []
         self._state.backend_options = {}
+
+        # Clear unsaved changes flag
+        self._state.has_unsaved_changes = False
 
         from .state import PhaseStatus as PS
         self._state.phase_status = [PS.IDLE for _ in range(6)]
@@ -1399,6 +1417,21 @@ class MainWindow(QMainWindow):
             # Clear translation audit data
             self._state.translation_summaries = []
             self._state.translation_statuses = []
+
+            # Clear Phase 3 checkpoint when resetting Phase 3 or upstream
+            from ..checkpoint import CheckpointStore
+            source_path = self._state.organized_xlsx_path or self._state.source_stf_path
+            if source_path is not None:
+                target_code = self._state.target_language_code or "ja"
+                try:
+                    cp = CheckpointStore(
+                        source_file=str(Path(source_path).resolve()),
+                        target_lang=target_code,
+                    )
+                    if cp.exists():
+                        cp.clear()
+                except Exception:  # noqa: BLE001
+                    pass  # best effort
         if current <= 3:
             # Clear review path
             self._state.reviewed_xlsx_path = None

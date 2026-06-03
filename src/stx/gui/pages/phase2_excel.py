@@ -117,6 +117,11 @@ class Phase2ExcelPage(PhasePage):
         )
         self._convert_btn.setEnabled(True)
 
+        # Auto-populate Content Details when arriving from Phase 1 (or any
+        # navigation) if a document exists but the table is still empty.
+        if self._details.rowCount() == 0:
+            self._populate_details_from_doc(self._state.document)
+
     # ------------------------------------------------------------------ slots
 
     def _on_convert(self) -> None:
