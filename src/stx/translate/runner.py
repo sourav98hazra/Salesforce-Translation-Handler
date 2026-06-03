@@ -30,6 +30,7 @@ Speed-ups
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -50,6 +51,38 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_WORKERS = 4
 """Sensible default concurrency.  Free tier translators rate-limit at
 roughly 5-10 concurrent requests so we stay well below that ceiling."""
+
+
+# ---------------------------------------------------------------------------
+# Untranslatable label detection
+# ---------------------------------------------------------------------------
+
+# Matches labels that should NOT be sent to the translator API because they
+# are codes, numbers, IDs, or symbols that would be corrupted by translation.
+_NUMERIC_RE = re.compile(r"^[\d.,\s\-+/]+$")  # pure numbers: 1606, 1,234.56, +1-800
+_VERSION_RE = re.compile(r"^\d+(\.\d+)+$")  # version strings: 1.0.0, 2.3
+_CODE_RE = re.compile(r"^[A-Z0-9_\-./]+$")  # all-caps codes: API_KEY, HTTP/1.1
+_SINGLE_CHAR_RE = re.compile(r"^.$")  # single characters
+
+
+def _is_untranslatable(text: str) -> bool:
+    """Return True if the text is a code/number/symbol that should not be translated.
+
+    These labels are passed through as identity translations (source = translation)
+    to prevent the API from appending script characters (e.g. 年 to numbers in Japanese).
+    """
+    if _NUMERIC_RE.match(text):
+        return True
+    if _VERSION_RE.match(text):
+        return True
+    if _CODE_RE.match(text) and len(text) <= 30:
+        return True
+    if _SINGLE_CHAR_RE.match(text):
+        return True
+    # Labels that are purely punctuation/symbols (no letters)
+    if not any(c.isalpha() for c in text):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -786,6 +819,14 @@ class _Runner:
                     best.score,
                     self.fuzzy_auto_accept_threshold,
                 )
+
+        # ---- skip API for labels that should not be translated (numbers, codes, IDs)
+        # Pure numbers, version strings (1.2.3), codes (ABC-123), single characters,
+        # or labels consisting only of punctuation/symbols should pass through as-is.
+        label_stripped = entry.label.strip()
+        if label_stripped and _is_untranslatable(label_stripped):
+            self._fill_translated(index, label_stripped, "Translated (identity — not translatable)")
+            return
 
         # ---- glossary DNT protection
         glossary_text = entry.label
