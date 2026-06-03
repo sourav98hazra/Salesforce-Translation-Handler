@@ -441,6 +441,18 @@ class Phase3TranslatePage(PhasePage):
             "translated portion is still saved."
         )
         self._cancel_btn.clicked.connect(self._on_cancel)
+        self._retry_btn = QPushButton("Retry 0 failed rows")
+        self._retry_btn.setToolTip(
+            "Retry translation for rows that failed in the previous run.\n"
+            "Only untranslated rows will be sent to the API."
+        )
+        self._retry_btn.setVisible(False)  # hidden until failures occur
+        self._retry_btn.clicked.connect(self._on_start)  # reuses the same start logic
+        self._retry_btn.setStyleSheet(
+            "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
+            "border-radius: 6px; font-weight: bold; }"
+            "QPushButton:hover { background: #d97706; }"
+        )
         self._save_copy_btn = QPushButton("Save a Copy...")
         self._save_copy_btn.setEnabled(False)
         self._save_copy_btn.setToolTip(
@@ -463,8 +475,8 @@ class Phase3TranslatePage(PhasePage):
         # Custom action row: left group (primary actions) | stretch | right group (secondary)
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
-        # Left group: Start (primary) + Cancel
-        for btn in (self._start_btn, self._cancel_btn):
+        # Left group: Start (primary) + Cancel + Retry (retry is hidden until failures)
+        for btn in (self._start_btn, self._cancel_btn, self._retry_btn):
             btn.setMinimumHeight(28)
             action_row.addWidget(btn)
         action_row.addStretch(1)
@@ -563,6 +575,16 @@ class Phase3TranslatePage(PhasePage):
         self._update_estimate()
         self._refresh_settings_summary()
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
+
+        # Show retry button if document has untranslated rows (from previous failed run)
+        if self._state.document is not None:
+            untranslated = len(self._state.document.untranslated())
+            if untranslated > 0 and untranslated < len(self._state.document.entries):
+                # Only show if SOME rows are translated (indicating a previous run happened)
+                self._retry_btn.setText(f"Retry {untranslated:,} untranslated rows")
+                self._retry_btn.setVisible(True)
+            else:
+                self._retry_btn.setVisible(False)
 
         # Show retranslation checkbox only if document has any translated entries
         if self._state.document is not None:
@@ -706,6 +728,7 @@ class Phase3TranslatePage(PhasePage):
             return
 
         self._start_btn.setText("Start translation")
+        self._retry_btn.setVisible(False)
 
         if self._state.document is None:
             self.warn(
@@ -1087,7 +1110,10 @@ class Phase3TranslatePage(PhasePage):
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
         if rows_failed > 0:
-            self._start_btn.setText("Retry failed rows")
+            self._retry_btn.setText(f"Retry {rows_failed:,} failed rows")
+            self._retry_btn.setVisible(True)
+        else:
+            self._retry_btn.setVisible(False)
         self._save_copy_btn.setEnabled(True)
         self._next_btn.setEnabled(True)
         self._state.set_phase(2, PhaseStatus.DONE)
@@ -1448,6 +1474,7 @@ class Phase3TranslatePage(PhasePage):
         self._next_btn.setEnabled(False)
         self._start_btn.setEnabled(False)
         self._start_btn.setText("Start translation")
+        self._retry_btn.setVisible(False)
         self._source_combo.setCurrentText("English")
         self._target_combo.setCurrentText("Japanese")
         self._selected_components = None
