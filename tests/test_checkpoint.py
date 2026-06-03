@@ -315,8 +315,8 @@ class TestCheckpointThreadSafety:
 class TestPermanentFailureCheckpoint:
     """Verify that permanent failures are checkpointed so they are not retried."""
 
-    def test_no_change_failure_is_checkpointed(self, tmp_path: Path) -> None:
-        """A row where translator returns source text verbatim is checkpointed."""
+    def test_identity_translation_is_checkpointed_as_success(self, tmp_path: Path) -> None:
+        """A row where translator returns source text verbatim is a successful identity translation."""
 
         class EchoTranslator(Translator):
             """Returns the source text unchanged (simulates 'no change' failure)."""
@@ -358,9 +358,9 @@ class TestPermanentFailureCheckpoint:
         # Checkpoint should exist (cancelled run)
         assert cp.exists()
         data = cp.load()
-        # Row 0 should be checkpointed as a permanent failure
+        # Row 0 should be checkpointed as a successful identity translation
         assert 0 in data
-        assert "no change" in data[0]["status"].lower()
+        assert "translated" in data[0]["status"].lower()
 
     def test_permanent_failure_not_retried_on_resume(self, tmp_path: Path) -> None:
         """A permanently-failed row that was checkpointed is skipped on resume."""
