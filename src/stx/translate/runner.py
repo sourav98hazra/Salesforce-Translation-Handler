@@ -459,9 +459,6 @@ class _Runner:
         # can replay the result onto duplicate rows for free.
         self._dedup: Dict[str, str] = {}
         self._dedup_lock = threading.Lock()
-        
-        # Failed row indices for second-pass recovery
-        self._failed_indices: List[int] = []
         self._completion_lock = threading.Lock()
 
         # Cached fuzzy candidates (loaded once per run to avoid repeated
@@ -499,9 +496,6 @@ class _Runner:
             self._run_serial(translation_jobs)
         else:
             self._run_parallel(translation_jobs)
-
-        # Third pass: recover failed rows using translations from successful rows
-        self._recover_failed_rows()
 
         # ---- Gap-prevention sweep
         # If anything went wrong mid-run (cancellation, executor early-exit,
@@ -779,19 +773,6 @@ class _Runner:
             self._fill_translated(index, cached_dedup, "Translated (dedup)", deduped=True)
             return
 
-        # ---- in-file label match (before TM to respect priority order)
-        if self.infile_translations:
-            stripped_label = entry.label.strip()
-            infile_match = self.infile_translations.get(stripped_label)
-            if infile_match is not None:
-                with self._dedup_lock:
-                    self._dedup[entry.label] = infile_match
-                self._fill_translated(
-                    index, infile_match, "Translated (in-file match)"
-                )
-                self._infile_reuse += 1
-                return
-
         # ---- translation memory
         if self.memory is not None:
             try:
@@ -984,7 +965,6 @@ class _Runner:
                 status=status,
             )
             self._failed += 1
-            self._failed_indices.append(index)  # Track for second-pass recovery
         # Checkpoint permanent failures so they are not retried on resume.
         # Transient errors (network timeouts, rate limits) are left un-checkpointed
         # so they get a fresh attempt on the next run.
@@ -994,55 +974,6 @@ class _Runner:
             except Exception:  # noqa: BLE001
                 LOGGER.debug("Checkpoint save failed for failed index %d", index, exc_info=True)
         self._emit_progress(index, entry.key, sheet, status, entry.label, entry.translation)
-
-    def _recover_failed_rows(self) -> None:
-        """Second-pass recovery for failed rows.
-        
-        After all workers complete, check if any failed row's label was 
-        successfully translated by another row in the same run. This fixes
-        race conditions where duplicate labels fail due to timing but one
-        variant succeeded.
-        """
-        if not self._failed_indices:
-            return
-            
-        recovered_count = 0
-        for index in self._failed_indices[:]:  # Copy list since we'll modify it
-            entry = self.doc.entries[index]
-            
-            # Check if this label was translated in the dedup cache
-            with self._dedup_lock:
-                cached_translation = self._dedup.get(entry.label)
-            
-            if cached_translation:
-                # Recover this failed row
-                self._fill_translated(
-                    index, 
-                    cached_translation, 
-                    "Recovered (second-pass)", 
-                    deduped=True
-                )
-                # Remove from failed indices since it's now recovered
-                self._failed_indices.remove(index)
-                self._failed -= 1  # Decrement failed count
-                recovered_count += 1
-                
-            # Also check in-file translations (stripped label matching)
-            elif self.infile_translations:
-                stripped_label = entry.label.strip()
-                infile_match = self.infile_translations.get(stripped_label)
-                if infile_match:
-                    self._fill_translated(
-                        index,
-                        infile_match,
-                        "Recovered (in-file match)",
-                    )
-                    self._failed_indices.remove(index)
-                    self._failed -= 1
-                    recovered_count += 1
-                    
-        if recovered_count > 0:
-            LOGGER.info(f"Second-pass recovery: recovered {recovered_count} failed rows")
 
     @staticmethod
     def _is_permanent_failure(status: str) -> bool:
