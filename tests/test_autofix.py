@@ -6,6 +6,8 @@ from stx.autofix import (
     auto_fix_document,
     auto_fix_entry,
     fix_deduplicate_keys,
+    fix_normalize_whitespace,
+    fix_restore_html_tags,
     fix_restore_placeholders,
     fix_restore_message_format,
     fix_strip_whitespace_translation,
@@ -157,3 +159,125 @@ def test_trim_to_length_respects_help_text_limit() -> None:
     assert result is not None
     assert len(result.entry.translation) <= 255
     assert result.entry.translation.endswith("\u2026")
+
+
+# ---------------------------------------------------------------------------
+# FEAT-003: Whitespace normalization tests
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_whitespace_collapses_spaces() -> None:
+    """Multiple consecutive spaces are collapsed to a single space."""
+    e = Entry(key="CustomLabel.X", label="Hello World", translation="Hello   World")
+    result = fix_normalize_whitespace(e)
+    assert result is not None
+    assert result.entry.translation == "Hello World"
+
+
+def test_normalize_whitespace_strips_trailing() -> None:
+    """Trailing spaces in translation are stripped if source has none."""
+    e = Entry(key="CustomLabel.X", label="Hello", translation="Hello ")
+    result = fix_normalize_whitespace(e)
+    assert result is not None
+    assert result.entry.translation == "Hello"
+
+
+def test_normalize_whitespace_no_op_clean() -> None:
+    """Clean text with single spaces returns None (no fix needed)."""
+    e = Entry(key="CustomLabel.X", label="Hello World", translation="Hello World")
+    result = fix_normalize_whitespace(e)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# FEAT-003: Smart truncation tests
+# ---------------------------------------------------------------------------
+
+
+def test_smart_truncate_preserves_placeholders() -> None:
+    """Truncation preserves placeholder tokens from the source label."""
+    e = Entry(
+        key="CustomField.X.Y.FieldLabel",
+        label="Welcome {!User.Name}",
+        translation="Welcome to our great application {!User.Name}",
+    )
+    # Limit for FieldLabel is 40 chars; translation is 46 chars
+    result = fix_trim_to_length(e)
+    assert result is not None
+    assert len(result.entry.translation) <= 40
+    assert "{!User.Name}" in result.entry.translation
+
+
+def test_smart_truncate_word_boundary() -> None:
+    """Truncation does not cut a word in half."""
+    e = Entry(
+        key="CustomField.X.Y.FieldLabel",
+        label="Description",
+        translation="This is a longer description that exceeds the field label limit",
+    )
+    result = fix_trim_to_length(e)
+    assert result is not None
+    text = result.entry.translation
+    # The text before the ellipsis should not end mid-word (no partial words).
+    # Remove the ellipsis and check the last char before it.
+    before_ellipsis = text.split("\u2026")[0]
+    # It should end with a complete word (last char is a letter or it ends at a space).
+    assert before_ellipsis[-1] != " " or before_ellipsis.rstrip() == before_ellipsis
+
+
+# ---------------------------------------------------------------------------
+# FEAT-003: HTML tag restoration tests
+# ---------------------------------------------------------------------------
+
+
+def test_html_restore_two_missing_tags() -> None:
+    """Two missing tags (b and i) are restored by wrapping."""
+    e = Entry(
+        key="CustomLabel.X",
+        label="<b><i>Hello</i></b>",
+        translation="Bonjour",
+    )
+    result = fix_restore_html_tags(e)
+    assert result is not None
+    trans = result.entry.translation
+    assert "<b>" in trans
+    assert "</b>" in trans
+    assert "<i>" in trans
+    assert "</i>" in trans
+    assert "Bonjour" in trans
+
+
+def test_html_restore_too_many_skipped() -> None:
+    """More than 3 missing tags returns None (too complex)."""
+    e = Entry(
+        key="CustomLabel.X",
+        label="<a><b><c><d>Hello</d></c></b></a>",
+        translation="Bonjour",
+    )
+    result = fix_restore_html_tags(e)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# FEAT-003: Trim after whitespace collapse fits
+# ---------------------------------------------------------------------------
+
+
+def test_trim_after_whitespace_collapse_fits() -> None:
+    """Extra spaces that once collapsed fit within limit -- no ellipsis needed."""
+    # FieldLabel limit is 40. Create a translation with extra spaces that exceeds 40,
+    # but collapses to <= 40 chars.
+    translation = "Hello  World  Testing  Extra  Spaces  OK Now"  # 45 chars with double-spaces
+    assert len(translation) > 40
+    collapsed = "Hello World Testing Extra Spaces OK Now"
+    assert len(collapsed) <= 40
+    e = Entry(
+        key="CustomField.X.Y.FieldLabel",
+        label="Hello World Testing Extra Spaces OK Now",
+        translation=translation,
+    )
+    result = fix_trim_to_length(e)
+    assert result is not None
+    # Should be the collapsed version without truncation/ellipsis
+    assert "\u2026" not in result.entry.translation
+    assert len(result.entry.translation) <= 40

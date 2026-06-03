@@ -114,6 +114,54 @@ def fix_restore_message_format(entry: Entry) -> Optional[FixResult]:
     )
 
 
+def _smart_truncate(text: str, max_len: int, preserve_tokens: list | None = None) -> str:
+    """Truncate text to max_len, preserving important tokens at the end.
+
+    Steps:
+    1. Collapse multiple spaces to single spaces.
+    2. Reserve space for tokens that must be preserved.
+    3. Truncate at a word boundary when possible.
+    4. Append ellipsis and preserved tokens.
+    """
+    # Step 1: Collapse multiple spaces.
+    text = re.sub(r" {2,}", " ", text).strip()
+
+    if len(text) <= max_len:
+        return text
+
+    # Step 2: Calculate reserved space for tokens.
+    reserved = 0
+    if preserve_tokens:
+        # Space needed: 1 leading space + each token + spaces between them
+        reserved = sum(len(t) for t in preserve_tokens)
+        if preserve_tokens:
+            reserved += len(preserve_tokens)  # 1 space before each token
+
+    # Step 3: Available length = max_len - reserved - 1 (for ellipsis char).
+    available = max_len - reserved - 1
+    if available < 1:
+        # Edge case: tokens alone exceed max_len, hard-truncate.
+        result = text[: max_len - 1] + "\u2026"
+        return result[:max_len]
+
+    # Step 4: Truncate and find word boundary.
+    truncated = text[:available]
+    last_space = truncated.rfind(" ")
+    if last_space > available * 0.5:
+        truncated = truncated[:last_space]
+
+    # Step 5: Build result with ellipsis and tokens.
+    result = truncated.rstrip() + "\u2026"
+    if preserve_tokens:
+        result += " " + " ".join(preserve_tokens)
+
+    # Step 6: If result still exceeds max_len, hard-truncate.
+    if len(result) > max_len:
+        result = result[: max_len - 1] + "\u2026"
+
+    return result
+
+
 def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
     """Truncate the translation to the Salesforce length limit for its component.
 
@@ -125,14 +173,31 @@ def fix_trim_to_length(entry: Entry) -> Optional[FixResult]:
         return None
     if len(entry.translation) <= limit:
         return None
-    # Truncate at a word boundary, leaving room for the ellipsis.
-    target_len = limit - 1  # room for "..."
-    truncated = entry.translation[:target_len]
-    # Find the last space so we don't chop mid-word.
-    last_space = truncated.rfind(" ")
-    if last_space > target_len * 0.6:
-        truncated = truncated[:last_space]
-    truncated = truncated.rstrip() + "\u2026"
+
+    # First try: collapsing whitespace may bring it under the limit.
+    collapsed = re.sub(r" {2,}", " ", entry.translation).strip()
+    if len(collapsed) <= limit:
+        return FixResult(
+            fixed=True,
+            entry=Entry(key=entry.key, label=entry.label, translation=collapsed, approved=entry.approved),
+            description=f"Collapsed whitespace to fit within limit ({len(collapsed)}/{limit} chars).",
+        )
+
+    # Gather placeholders and message format tokens present in the translation.
+    tokens_to_preserve: list[str] = []
+    src_placeholders = _PLACEHOLDER_RE.findall(entry.label)
+    src_msg_tokens = _MESSAGE_FORMAT_RE.findall(entry.label)
+    for tok in src_placeholders:
+        if tok in entry.translation:
+            tokens_to_preserve.append(tok)
+    for tok in src_msg_tokens:
+        if tok in entry.translation:
+            tokens_to_preserve.append(tok)
+
+    truncated = _smart_truncate(
+        entry.translation, limit, preserve_tokens=tokens_to_preserve or None
+    )
+
     return FixResult(
         fixed=True,
         entry=Entry(key=entry.key, label=entry.label, translation=truncated, approved=entry.approved),
@@ -239,6 +304,35 @@ def fix_length_with_retranslation(
         )
 
 
+def fix_normalize_whitespace(entry: Entry) -> Optional[FixResult]:
+    """Collapse runs of spaces and strip leading/trailing whitespace differences."""
+    if not entry.translation:
+        return None
+    text = entry.translation
+    # Collapse runs of spaces (not newlines) to a single space.
+    normalized = re.sub(r" {2,}", " ", text)
+    # Strip leading/trailing whitespace that differs from the source.
+    src_leading = len(entry.label) - len(entry.label.lstrip())
+    src_trailing = len(entry.label) - len(entry.label.rstrip())
+    tgt_leading = len(normalized) - len(normalized.lstrip())
+    tgt_trailing = len(normalized) - len(normalized.rstrip())
+    if tgt_leading > src_leading:
+        normalized = normalized.lstrip()
+        if src_leading:
+            normalized = entry.label[:src_leading] + normalized
+    if tgt_trailing > src_trailing:
+        normalized = normalized.rstrip()
+        if src_trailing:
+            normalized = normalized + entry.label[-src_trailing:]
+    if normalized == entry.translation:
+        return None
+    return FixResult(
+        fixed=True,
+        entry=Entry(key=entry.key, label=entry.label, translation=normalized, approved=entry.approved),
+        description="Normalized whitespace (collapsed multiple spaces or stripped extra leading/trailing).",
+    )
+
+
 def fix_strip_whitespace_translation(entry: Entry) -> Optional[FixResult]:
     """Clear whitespace-only translations so they re-import as untranslated."""
     if entry.translation and not entry.translation.strip():
@@ -251,28 +345,55 @@ def fix_strip_whitespace_translation(entry: Entry) -> Optional[FixResult]:
 
 
 def fix_restore_html_tags(entry: Entry) -> Optional[FixResult]:
-    """If a tag present in the source is missing from the translation, wrap it."""
+    """If tags present in the source are missing from the translation, restore them."""
     if not entry.translation.strip():
         return None
     src_tags = sorted(set(_HTML_TAG_RE.findall(entry.label)))
     tgt_tags = sorted(set(_HTML_TAG_RE.findall(entry.translation)))
     if src_tags == tgt_tags or not src_tags:
         return None
-    missing_tags = set(src_tags) - set(tgt_tags)
+    missing_tags = sorted(set(src_tags) - set(tgt_tags))
     if not missing_tags:
         return None
-    # Simple strategy: wrap the translation in the outermost missing tag pair.
-    # This is a heuristic; complex cases (nested mismatches) should be fixed
-    # manually.  We only wrap if there's exactly one missing tag to keep it safe.
-    if len(missing_tags) == 1:
-        tag = missing_tags.pop()
-        new_translation = f"<{tag}>{entry.translation}</{tag}>"
-        return FixResult(
-            fixed=True,
-            entry=Entry(key=entry.key, label=entry.label, translation=new_translation, approved=entry.approved),
-            description=f"Wrapped translation in <{tag}>...</{tag}> to match source HTML structure.",
+    # Safety limit: more than 3 missing tags is too complex for auto-fix.
+    if len(missing_tags) > 3:
+        return None
+
+    # Detect self-closing tags in the source (e.g., <br/>, <br>, <hr/>).
+    _self_closing_re = re.compile(r"<\s*(" + "|".join(re.escape(t) for t in missing_tags) + r")\s*/?\s*>")
+    self_closing_in_source = set()
+    for m in _self_closing_re.finditer(entry.label):
+        tag_name = m.group(1)
+        # Check if there's no corresponding closing tag in the source.
+        if f"</{tag_name}" not in entry.label:
+            self_closing_in_source.add(tag_name)
+
+    new_translation = entry.translation
+    paired_tags = [t for t in missing_tags if t not in self_closing_in_source]
+    sc_tags = [t for t in missing_tags if t in self_closing_in_source]
+
+    # Wrap in paired tags (outermost first, alphabetical for determinism).
+    for tag in paired_tags:
+        new_translation = f"<{tag}>{new_translation}</{tag}>"
+
+    # Append self-closing tags at the end.
+    for tag in sc_tags:
+        new_translation = f"{new_translation}<{tag}/>"
+
+    desc_parts = []
+    if paired_tags:
+        desc_parts.append(
+            "Wrapped translation in " + ", ".join(f"<{t}>...</{t}>" for t in paired_tags)
         )
-    return None
+    if sc_tags:
+        desc_parts.append("Appended " + ", ".join(f"<{t}/>" for t in sc_tags))
+    description = "; ".join(desc_parts) + " to match source HTML structure."
+
+    return FixResult(
+        fixed=True,
+        entry=Entry(key=entry.key, label=entry.label, translation=new_translation, approved=entry.approved),
+        description=description,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +440,7 @@ def fix_deduplicate_keys(doc: Document) -> AutoFixReport:
 
 # Registry of per-entry fixers in priority order.
 _ENTRY_FIXERS: List[Callable[[Entry], Optional[FixResult]]] = [
+    fix_normalize_whitespace,
     fix_strip_whitespace_translation,
     fix_restore_placeholders,
     fix_restore_message_format,
