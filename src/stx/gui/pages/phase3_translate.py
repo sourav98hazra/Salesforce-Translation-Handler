@@ -377,23 +377,30 @@ class Phase3TranslatePage(PhasePage):
 
         self.add_widget(setup_box)
 
-        # ----- Progress bar + status label on same row (no wasted line)
-        progress_row = QHBoxLayout()
+        # ----- Progress bar (bold percentage) + status label on separate line
         self._progress = QProgressBar()
         self._progress.setRange(0, 100)
         self._progress.setValue(0)
-        self._progress.setMaximumHeight(20)
+        self._progress.setMaximumHeight(22)
         self._progress.setTextVisible(True)
         self._progress.setFormat("%p%")
-        progress_row.addWidget(self._progress, stretch=1)
+        self._progress.setStyleSheet(
+            "QProgressBar { font-weight: bold; font-size: 12px; }"
+        )
 
         self._eta_label = QLabel("")   # blank until translation starts
-        self._eta_label.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700; margin-left: 8px;")
-        self._eta_label.setMinimumWidth(120)
-        progress_row.addWidget(self._eta_label)
+        self._eta_label.setStyleSheet(
+            "color: #064e3b; font-size: 11px; font-weight: 700; "
+            "padding: 4px 8px; border-radius: 4px; background: #d1fae5;"
+        )
+        self._eta_label.setWordWrap(True)
+        self._eta_label.setVisible(False)  # hidden until there's a message
+
         progress_layout = QVBoxLayout()
         progress_layout.setContentsMargins(0, 0, 0, 0)
-        progress_layout.addLayout(progress_row)
+        progress_layout.setSpacing(4)
+        progress_layout.addWidget(self._progress)
+        progress_layout.addWidget(self._eta_label)
         self.add_layout(progress_layout)
 
         # ----- Live feed log (takes all remaining space)
@@ -850,6 +857,7 @@ class Phase3TranslatePage(PhasePage):
 
         self._progress.setValue(0)
         self._eta_label.setText("Starting...")
+        self._eta_label.setVisible(True)
         self._set_running(True)
         self._state.set_phase(2, PhaseStatus.RUNNING)
 
@@ -898,6 +906,10 @@ class Phase3TranslatePage(PhasePage):
             eta_sec = remaining / rate if rate > 0 else 0
             self._eta_label.setText(
                 f"Translating... {percent}% | {rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
+            )
+            self._eta_label.setStyleSheet(
+                "color: #64748b; font-size: 11px; font-weight: 700; "
+                "padding: 4px 8px; border-radius: 4px; background: #f1f5f9;"
             )
         elif percent > 0:
             self._eta_label.setText(f"Translating... {percent}%")
@@ -1043,15 +1055,25 @@ class Phase3TranslatePage(PhasePage):
             infile_note = f" | InFile: {done.infile_reuse_count:,}" if done.infile_reuse_count else ""
             msg = (
                 f"Translation complete - {rows_successful:,} rows processed successfully"
-                f"{failed_note}.  "
-                f"Click 'Save a Copy...' to save.  "
+                f"{failed_note}.  Click 'Save a Copy...' to save.\n"
                 f"[API: {api_count:,} | TM: {done.cached_count:,} | "
                 f"Dedup: {done.deduped_count:,}{infile_note} | "
-                f"Kept: {done.skipped_count:,}] "
-                f"in {elapsed_str}."
+                f"Kept: {done.skipped_count:,}] in {elapsed_str}."
             )
 
         self._eta_label.setText(msg)
+        self._eta_label.setVisible(True)
+        # Style based on success/failure
+        if rows_failed > 0:
+            self._eta_label.setStyleSheet(
+                "color: #991b1b; font-size: 11px; font-weight: 700; "
+                "padding: 4px 8px; border-radius: 4px; background: #fee2e2;"
+            )
+        else:
+            self._eta_label.setStyleSheet(
+                "color: #064e3b; font-size: 11px; font-weight: 700; "
+                "padding: 4px 8px; border-radius: 4px; background: #d1fae5;"
+            )
         self.status_message.emit(msg)
 
         # Mark the phase done so users can navigate forward; the Save
@@ -1077,6 +1099,11 @@ class Phase3TranslatePage(PhasePage):
         # Append the error to the live feed so it's visible even if the dialog is dismissed.
         self._log.appendPlainText(f"\n[ERROR] Translation failed: {safe_msg}")
         self._eta_label.setText(f"Error: {safe_msg[:120]}")
+        self._eta_label.setVisible(True)
+        self._eta_label.setStyleSheet(
+            "color: #991b1b; font-size: 11px; font-weight: 700; "
+            "padding: 4px 8px; border-radius: 4px; background: #fee2e2;"
+        )
 
         # Provide actionable help based on common error types.
         help_text = ""
@@ -1391,6 +1418,7 @@ class Phase3TranslatePage(PhasePage):
         self._log.clear()
         self._progress.setValue(0)
         self._eta_label.setText("")
+        self._eta_label.setVisible(False)
         self._save_copy_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
         self._next_btn.setEnabled(False)
