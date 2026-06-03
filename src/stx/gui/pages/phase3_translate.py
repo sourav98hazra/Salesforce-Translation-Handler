@@ -957,19 +957,6 @@ class Phase3TranslatePage(PhasePage):
         elapsed_str = _format_eta(elapsed)
         rate = rows_successful / elapsed if elapsed > 0 else 0
 
-        sep = "\u2550" * 43
-        self._log.appendPlainText("")
-        if was_cancelled:
-            self._log.appendPlainText(sep)
-            self._log.appendPlainText("  TRANSLATION CANCELLED")
-            self._log.appendPlainText(sep)
-            self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
-        else:
-            self._log.appendPlainText(sep)
-            self._log.appendPlainText("  TRANSLATION COMPLETE")
-            self._log.appendPlainText(sep)
-            self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
-
         # Breakdown of how rows were translated.  translated_count is the
         # TOTAL of all methods, so compute the pure-API portion by subtracting
         # all sub-categories that are already tracked separately.
@@ -978,21 +965,54 @@ class Phase3TranslatePage(PhasePage):
             - done.fuzzy_accepted_count - done.imported_reuse_count
             - done.infile_reuse_count - done.resumed_count
         )
-        self._log.appendPlainText(f"  \u251c\u2500 Via Translation API:        {api_count:>5,}")
-        self._log.appendPlainText(f"  \u251c\u2500 Via cached translation:     {done.cached_count:>5,}")
-        if done.fuzzy_accepted_count:
-            self._log.appendPlainText(f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})")
-        if done.infile_reuse_count:
-            self._log.appendPlainText(f"  \u251c\u2500 Via in-file label match:   {done.infile_reuse_count:>5,}")
-        self._log.appendPlainText(f"  \u251c\u2500 Via repeated label:         {done.deduped_count:>5,}")
-        if done.imported_reuse_count:
-            self._log.appendPlainText(f"  \u251c\u2500 Via imported reference:     {done.imported_reuse_count:>5,}")
-        if done.resumed_count:
-            self._log.appendPlainText(f"  \u251c\u2500 Resumed from checkpoint:   {done.resumed_count:>5,}")
-        self._log.appendPlainText(f"  \u2514\u2500 Pre-existing (unchanged):  {done.skipped_count:>5,}")
 
+        sep = "\u2550" * 43
         self._log.appendPlainText("")
-        self._log.appendPlainText(f"  Rows with errors (fallback): {rows_failed:>5,}")
+        if was_cancelled:
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText("  TRANSLATION CANCELLED")
+            self._log.appendPlainText(sep)
+        else:
+            self._log.appendPlainText(sep)
+            self._log.appendPlainText("  TRANSLATION COMPLETE")
+            self._log.appendPlainText(sep)
+
+        self._log.appendPlainText(f"  Rows processed successfully: {rows_successful:>5,}")
+        self._log.appendPlainText(f"  Rows Process Failed:         {rows_failed:>5,}")
+        self._log.appendPlainText("")
+        self._log.appendPlainText(
+            f"  Successfully Translated:     {done.translated_count:>5,}"
+        )
+        self._log.appendPlainText(
+            f"  \u251c\u2500 Via Translation API:        {api_count:>5,}"
+        )
+        self._log.appendPlainText(
+            f"  \u251c\u2500 Via cached translation:     {done.cached_count:>5,}"
+        )
+        if done.fuzzy_accepted_count:
+            self._log.appendPlainText(
+                f"  \u2502    (via fuzzy match:        {done.fuzzy_accepted_count:>5,})"
+            )
+        if done.infile_reuse_count:
+            self._log.appendPlainText(
+                f"  \u251c\u2500 Via in-file label match:   {done.infile_reuse_count:>5,}"
+            )
+        self._log.appendPlainText(
+            f"  \u251c\u2500 Via repeated label:         {done.deduped_count:>5,}"
+        )
+        if done.imported_reuse_count:
+            self._log.appendPlainText(
+                f"  \u251c\u2500 Via imported reference:     {done.imported_reuse_count:>5,}"
+            )
+        if done.resumed_count:
+            self._log.appendPlainText(
+                f"  \u251c\u2500 Resumed from checkpoint:   {done.resumed_count:>5,}"
+            )
+        self._log.appendPlainText(
+            f"  \u2514\u2500 Pre-existing (unchanged):  {done.skipped_count:>5,}"
+        )
+        self._log.appendPlainText("")
+        self._log.appendPlainText(f"  Failed Translations:         {rows_failed:>5,}")
         self._log.appendPlainText("")
         self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:

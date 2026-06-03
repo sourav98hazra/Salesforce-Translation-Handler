@@ -210,14 +210,17 @@ After translation completes, the live feed displays:
   TRANSLATION COMPLETE
 ═══════════════════════════════════════════
   Rows processed successfully:   800
-  ├─ Translated via API:         500
-  ├─ From Translation Memory:    120
-  │    (of which fuzzy match:     15)
-  ├─ Deduplicated (reused):       80
-  ├─ From imported file:           5
-  └─ Already translated (kept):   95
+  Rows Process Failed:             3
 
-  Rows failed:                      3
+  Successfully Translated:       800
+  ├─ Via Translation API:        500
+  ├─ Via cached translation:     120
+  │    (via fuzzy match:          15)
+  ├─ Via repeated label:          80
+  ├─ Via imported reference:       5
+  └─ Pre-existing (unchanged):   95
+
+  Failed Translations:             3
 
   Elapsed time:             00:05:32
   Rate:                     2.4 rows/s

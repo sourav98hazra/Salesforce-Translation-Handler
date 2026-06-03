@@ -245,16 +245,17 @@ _FAQ: list[tuple[str, str, str]] = [
         "What happens when the API fails for a specific row?",
         "If a row fails all retries, the app applies a 'fallback to original' strategy: the translation "
         "field is filled with the source label text (not left blank). This ensures no rows end up with "
-        "empty translations. The row is counted under 'Rows failed' in the final summary.",
+        "empty translations. The row is counted under 'Failed Translations' in the final summary.",
     ),
     (
         "Phase 3 — Translate",
         "What does the translation summary show when complete?",
         "After translation finishes, the live feed shows a structured summary:\n"
-        "- 'Rows processed successfully' — total rows that have a valid translation, with a tree "
-        "breakdown showing how each was obtained (API, Translation Memory, fuzzy match, dedup, "
-        "imported file, already-translated kept as-is).\n"
-        "- 'Rows failed' — rows where the API failed and fallback was applied.\n"
+        "- 'Rows processed successfully' and 'Rows Process Failed' at the top.\n"
+        "- 'Successfully Translated' with a tree breakdown showing the method "
+        "(API, cached translation, fuzzy match, repeated label, imported reference, "
+        "pre-existing unchanged).\n"
+        "- 'Failed Translations' — rows where the API failed and fallback was applied.\n"
         "- Elapsed time and translation rate (rows/second).",
     ),
     (
