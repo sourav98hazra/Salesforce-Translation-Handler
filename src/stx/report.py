@@ -1,4 +1,4 @@
-"""Export validation reports to CSV, JSON, and HTML formats.
+"""Export validation reports to CSV, JSON, HTML, and XLSX formats.
 
 Each function takes a :class:`~stx.validate.ValidationReport` and writes
 a formatted report to the given path.  An optional ``fixes_applied`` list
@@ -249,3 +249,94 @@ td.info {{ color: #2563eb; font-weight: 600; }}
 </html>
 """
     path.write_text(html, encoding="utf-8")
+
+
+def export_xlsx(
+    report: ValidationReport,
+    path: Path,
+    fixes_applied: Optional[List[dict]] = None,
+) -> None:
+    """Write a two-sheet Excel report: Validation Issues + Fixes Applied.
+
+    Uses the same header styling pattern as :mod:`stx.excel.exporter`:
+    bold white text on a dark-blue fill, frozen header row, auto-sized columns.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+
+    wb = Workbook()
+
+    # --- Sheet 1: Validation Issues ---
+    ws_issues = wb.active
+    ws_issues.title = "Validation Issues"
+    issue_columns = ["Severity", "Category", "Component", "Key", "Message"]
+    ws_issues.append(issue_columns)
+
+    for issue in report.issues:
+        component = issue.component if issue.component else _component_from_key(issue.key)
+        ws_issues.append([
+            issue.severity,
+            issue.category,
+            component,
+            issue.key,
+            issue.message,
+        ])
+
+    _xlsx_style_header(ws_issues, len(issue_columns), header_font, header_fill)
+    _xlsx_autosize(ws_issues, len(issue_columns))
+
+    # --- Sheet 2: Fixes Applied ---
+    ws_fixes = wb.create_sheet("Fixes Applied")
+    fix_columns = [
+        "Key", "Label", "Previous Translation",
+        "Fixed Translation", "Issue Category", "Fix Applied",
+    ]
+    ws_fixes.append(fix_columns)
+
+    if fixes_applied:
+        for fix in fixes_applied:
+            ws_fixes.append([
+                fix.get("key", ""),
+                fix.get("label", ""),
+                fix.get("previous_translation", ""),
+                fix.get("fixed_translation", ""),
+                fix.get("issue_category", ""),
+                fix.get("fix_description", ""),
+            ])
+
+    _xlsx_style_header(ws_fixes, len(fix_columns), header_font, header_fill)
+    _xlsx_autosize(ws_fixes, len(fix_columns))
+
+    wb.save(path)
+
+
+def _xlsx_style_header(ws, col_count: int, font: "Font", fill: "PatternFill") -> None:
+    """Apply header styling and freeze panes at A2."""
+    for col_idx in range(1, col_count + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = font
+        cell.fill = fill
+    ws.freeze_panes = "A2"
+
+
+def _xlsx_autosize(ws, col_count: int, max_width: int = 80) -> None:
+    """Auto-size columns based on content, capped at *max_width*."""
+    from openpyxl.utils import get_column_letter
+
+    widths = [len(str(ws.cell(row=1, column=c).value or "")) for c in range(1, col_count + 1)]
+    for row in ws.iter_rows(min_row=2, max_col=col_count, values_only=True):
+        for idx, value in enumerate(row):
+            if value is None:
+                continue
+            length = len(str(value))
+            if length > widths[idx]:
+                widths[idx] = length
+    for idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, max_width)

@@ -40,6 +40,7 @@ _STAGE_LABELS = {
     "translated": ("Translated", True),
     "reviewed": ("Reviewed", True),
     "validated": ("Validated", True),
+    "validation_report": ("Validation_Report", True),
 }
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

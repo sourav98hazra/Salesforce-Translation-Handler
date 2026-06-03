@@ -603,7 +603,7 @@ def validate(
     source: Path = typer.Argument(..., exists=True),
     language_code: Optional[str] = typer.Option(None, "--code", "-c"),
     export_report: Optional[Path] = typer.Option(
-        None, "--export-report", help="Export validation report to file (.csv/.json/.html)."
+        None, "--export-report", help="Export validation report to file (.xlsx/.csv/.json/.html)."
     ),
 ) -> None:
     """Run pre-export validation (duplicate keys, length limits, token drift, ...)."""
@@ -619,7 +619,7 @@ def validate(
     report = validate_document(doc)
 
     if export_report is not None:
-        from .report import export_csv, export_html, export_json
+        from .report import export_csv, export_html, export_json, export_xlsx
 
         ext = export_report.suffix.lower()
         if ext == ".csv":
@@ -628,9 +628,11 @@ def validate(
             export_json(report, export_report)
         elif ext == ".html":
             export_html(report, export_report)
+        elif ext == ".xlsx":
+            export_xlsx(report, export_report)
         else:
             console.print(
-                f"[red]Unsupported report format '{ext}'. Use .csv, .json, or .html.[/red]"
+                f"[red]Unsupported report format '{ext}'. Use .csv, .json, .html, or .xlsx.[/red]"
             )
             raise typer.Exit(code=2)
         console.print(f"[green]Report exported to[/green] [bold]{export_report}[/bold]")

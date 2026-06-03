@@ -106,7 +106,7 @@ class Phase5ValidatePage(PhasePage):
         self._save_btn.clicked.connect(self._on_save)
         self._download_report_btn = QPushButton("Export Report")
         self._download_report_btn.setToolTip(
-            "Export the validation report as CSV, JSON, or HTML."
+            "Export the validation report as Excel, CSV, JSON, or HTML."
         )
         self._download_report_btn.clicked.connect(self._on_download_report)
 
@@ -736,23 +736,25 @@ class Phase5ValidatePage(PhasePage):
     # ------------------------------------------------------------------ download report
 
     def _on_download_report(self) -> None:
-        """Export the current validation report to CSV, JSON, or HTML."""
+        """Export the current validation report to XLSX, CSV, JSON, or HTML."""
         if self._report is None:
             self.status_message.emit("No validation report available. Run validation first.")
             return
         path = self.pick_save_file(
             "Save validation report",
-            "CSV (*.csv);;JSON (*.json);;HTML (*.html)",
-            "validation_report.csv",
+            "Excel (*.xlsx);;CSV (*.csv);;JSON (*.json);;HTML (*.html)",
+            self.default_save_name("validation_report", suffix=".xlsx"),
         )
         if not path:
             return
 
-        from ...report import export_csv, export_html, export_json
+        from ...report import export_csv, export_html, export_json, export_xlsx
 
         fixes = self._applied_fixes if self._applied_fixes else None
         ext = path.suffix.lower()
-        if ext == ".csv":
+        if ext == ".xlsx":
+            export_xlsx(self._report, path, fixes_applied=fixes)
+        elif ext == ".csv":
             export_csv(self._report, path, fixes_applied=fixes)
         elif ext == ".json":
             export_json(self._report, path, fixes_applied=fixes)
@@ -760,7 +762,7 @@ class Phase5ValidatePage(PhasePage):
             export_html(self._report, path, fixes_applied=fixes)
         else:
             self.status_message.emit(
-                f"Unsupported format '{ext}'. Use .csv, .json, or .html."
+                f"Unsupported format '{ext}'. Use .xlsx, .csv, .json, or .html."
             )
             return
         self.status_message.emit(f"Report exported to {path}")

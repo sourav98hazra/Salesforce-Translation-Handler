@@ -249,3 +249,51 @@ def test_report_grouping_matches_categories(tmp_path: Path) -> None:
     for cat, issues in report_categories.items():
         assert cat in data["issues_by_category"]
         assert len(data["issues_by_category"][cat]) == len(issues)
+
+
+# --- XLSX tests ---
+
+
+def test_export_xlsx(tmp_path):
+    """export_xlsx creates a workbook with two sheets."""
+    from stx.report import export_xlsx
+
+    report = _make_report_with_issues()
+    out = tmp_path / "report.xlsx"
+    export_xlsx(report, out)
+    assert out.exists()
+    from openpyxl import load_workbook
+
+    wb = load_workbook(out)
+    assert "Validation Issues" in wb.sheetnames
+    assert "Fixes Applied" in wb.sheetnames
+    # Check issues sheet has data
+    ws = wb["Validation Issues"]
+    assert ws.cell(1, 1).value == "Severity"
+    assert ws.max_row > 1  # at least one data row
+
+
+def test_export_xlsx_with_fixes(tmp_path):
+    """export_xlsx includes fix data when fixes_applied is provided."""
+    from stx.report import export_xlsx
+
+    report = _make_report_with_issues()
+    fixes = [
+        {
+            "key": "CustomLabel.Msg",
+            "label": "Hello {!User.Name}",
+            "previous_translation": "Bonjour",
+            "fixed_translation": "Bonjour {!User.Name}",
+            "issue_category": "token_drift",
+            "fix_description": "Restored missing placeholder {!User.Name}",
+        }
+    ]
+    out = tmp_path / "report.xlsx"
+    export_xlsx(report, out, fixes_applied=fixes)
+    from openpyxl import load_workbook
+
+    wb = load_workbook(out)
+    ws = wb["Fixes Applied"]
+    assert ws.cell(1, 1).value == "Key"
+    assert ws.max_row == 2  # header + 1 fix row
+    assert ws.cell(2, 1).value == "CustomLabel.Msg"
