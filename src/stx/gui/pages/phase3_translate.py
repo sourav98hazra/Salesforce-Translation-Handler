@@ -1395,6 +1395,12 @@ class Phase3TranslatePage(PhasePage):
             # Suggest a professional default translated output path for Save a Copy...
             self._state.translated_xlsx_path = path.parent / self.default_save_name("translated")
             self._next_btn.setEnabled(True)
+            # Clear previous run state since we're loading a new document
+            self._clear_run_state()
+            # Clear checkpoint for the old file
+            cp = self._build_checkpoint()
+            if cp is not None and cp.exists():
+                cp.clear()
             self.on_enter()
             self.status_message.emit(
                 f"Loaded {len(doc.entries):,} rows from {path.name}.  "
@@ -1425,51 +1431,58 @@ class Phase3TranslatePage(PhasePage):
         )
 
     def _on_reset_checkpoint(self) -> None:
-        """Clear progress: reset Phase 3 to initial state and clear any checkpoint.
-
-        Always resets Phase 3 back to the document-loaded state (as if arriving
-        from Phase 2 fresh). If a checkpoint exists, it is also cleared so the
-        next translation run starts from row 1.
-        """
-        cp = self._build_checkpoint()
-        has_checkpoint = cp is not None and cp.exists()
-
-        if has_checkpoint:
-            msg = (
-                "Clear all translation progress and reset Phase 3?\n\n"
-                "This will:\n"
-                "  • Clear the saved checkpoint (resume data)\n"
-                "  • Clear the live feed and translation results\n"
-                "  • Reload the document from Phase 2\n\n"
-                "The next translation run will start from the beginning."
-            )
-        else:
-            msg = (
-                "Reset Phase 3 to initial state?\n\n"
-                "This will:\n"
-                "  • Clear the live feed and translation results\n"
-                "  • Reload the document from Phase 2\n\n"
-                "You can then start a fresh translation run."
-            )
-
+        """Clear all translation progress. Keeps setup (languages, scope, imports)."""
         reply = QMessageBox.question(
             self,
             "Clear Progress",
-            msg,
+            "Clear all translation progress?\n\n"
+            "This will:\n"
+            "  \u2022 Clear the checkpoint (resume data)\n"
+            "  \u2022 Clear the live feed and results\n"
+            "  \u2022 Reset all counters\n\n"
+            "Your setup (languages, filters, imports) will be kept.\n"
+            "You can then start a fresh translation run.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Clear checkpoint if it exists
-        if has_checkpoint:
+        # Clear checkpoint
+        cp = self._build_checkpoint()
+        if cp is not None and cp.exists():
             cp.clear()
 
-        # Reset Phase 3 UI and reload document from state
-        self.reset_page()
-        self.on_enter()
-        self.status_message.emit("Phase 3 cleared -- document reloaded, ready for fresh translation.")
+        # Clear run state
+        self._clear_run_state()
+
+        # Refresh estimate
+        self._update_estimate()
+        self._start_btn.setEnabled(self._state.document is not None)
+
+        self.status_message.emit("Progress cleared -- ready for a fresh translation run.")
+
+    def _clear_run_state(self) -> None:
+        """Clear translation run state (log, counters, banner, retry). Keeps setup."""
+        self._log.clear()
+        self._progress.setValue(0)
+        self._eta_label.setText("")
+        self._eta_label.setVisible(False)
+        self._save_copy_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(False)
+        self._next_btn.setEnabled(False)
+        self._retry_btn.setVisible(False)
+        self._start_btn.setText("Start translation")
+        self._translated_count = 0
+        self._cached_count = 0
+        self._deduped_count = 0
+        self._skipped_count = 0
+        self._total_rows = 0
+        self._current_row = 0
+        self._start_time = None
+        self._last_run_failed_count = 0
+        self._state.translation_failed_indices = set()
+        self._state.translation_scope_indices = set()
 
     def _get_fuzzy_threshold(self) -> Optional[float]:
         """Read fuzzy threshold from settings; returns None if disabled (0)."""
@@ -1517,8 +1530,11 @@ class Phase3TranslatePage(PhasePage):
         self._start_btn.setEnabled(False)
         self._start_btn.setText("Start translation")
         self._retry_btn.setVisible(False)
-        self._source_combo.setCurrentText("English")
-        self._target_combo.setCurrentText("Japanese")
+        # Preserve auto-detected languages from state (don't hardcode English/Japanese)
+        src_name = getattr(self._state, "source_language_name", "") or "English"
+        tgt_name = getattr(self._state, "target_language_name", "") or "Japanese"
+        self._source_combo.setCurrentText(src_name)
+        self._target_combo.setCurrentText(tgt_name)
         self._selected_components = None
         self._estimate_label.setText("Total Rows Loaded: -- | Rows to Translate: --")
         self._import_trans_label.setText("")
