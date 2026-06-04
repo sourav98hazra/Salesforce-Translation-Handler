@@ -579,7 +579,7 @@ class Phase3TranslatePage(PhasePage):
         self._import_trans_check.setChecked(
             has_imports and self._state.imported_translations_enabled
         )
-        if has_imports:
+        if has_imports and self._state.imported_translations_enabled:
             count = len(self._state.imported_translations)
             self._import_trans_label.setText(f"\u2713 {count:,} translations imported")
             self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
@@ -717,6 +717,13 @@ class Phase3TranslatePage(PhasePage):
             main_win._act_use_imported.blockSignals(True)
             main_win._act_use_imported.setChecked(checked)
             main_win._act_use_imported.blockSignals(False)
+        # Show/hide the imported count label based on checkbox state
+        if checked and self._state.imported_translations:
+            count = len(self._state.imported_translations)
+            self._import_trans_label.setText(f"\u2713 {count:,} translations imported")
+            self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+        else:
+            self._import_trans_label.setText("")
 
     # ------------------------------------------------------------------ output path
 

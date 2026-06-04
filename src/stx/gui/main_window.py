@@ -803,6 +803,13 @@ class MainWindow(QMainWindow):
         # Also keep the io/import_translations_enabled key in sync
         gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1" if checked else "0")
         self._state.imported_translations_enabled = checked
+        # Update the import label visibility to match checkbox state
+        if checked and self._state.imported_translations:
+            count = len(self._state.imported_translations)
+            page._import_trans_label.setText(f"\u2713 {count:,} translations imported")
+            page._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
+        else:
+            page._import_trans_label.setText("")
 
     def _on_toggle_status_log(self, checked: bool) -> None:
         """Toggle the status log dock. When showing, re-dock it to the bottom."""
