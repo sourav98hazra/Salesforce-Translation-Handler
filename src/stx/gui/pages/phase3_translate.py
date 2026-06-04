@@ -1096,10 +1096,20 @@ class Phase3TranslatePage(PhasePage):
         def _line(label: str, value: int, ann: str = "") -> str:
             return f"{label:<{_W}}{value:>9,}{ann}"
 
-        self._log.appendPlainText(_line("  Rows processed successfully:", rows_successful))
-        self._log.appendPlainText(_line("  Rows Process Failed:", rows_failed))
+        # Compute summary values
+        rows_attempted = done.translated_count + done.failed_count
+        rows_translated = done.translated_count
+        total_entries = len(self._state.document.entries) if self._state.document else 0
+        total_with_translation = done.translated_count + done.skipped_count
+
+        # --- Header stats ---
+        self._log.appendPlainText(_line("  Rows attempted:", rows_attempted))
+        self._log.appendPlainText(_line("  Rows translated:", rows_translated))
+        self._log.appendPlainText(_line("  Rows failed:", rows_failed))
         self._log.appendPlainText("")
-        self._log.appendPlainText(_line("  Successfully Translated:", rows_successful))
+
+        # --- Successfully Translated breakdown ---
+        self._log.appendPlainText(_line("  Successfully Translated:", rows_translated))
         self._log.appendPlainText(_line("  \u251c\u2500 Via Translation API:", api_count))
         self._log.appendPlainText(_line("  \u251c\u2500 Via Translation Memory:", done.cached_count))
         if fuzzy_enabled:
@@ -1109,15 +1119,19 @@ class Phase3TranslatePage(PhasePage):
         infile_ann = "   (disabled when retranslate=ON)" if retranslate_on else ""
         self._log.appendPlainText(_line("  \u251c\u2500 Via in-file label match:", done.infile_reuse_count, infile_ann))
         # Imported reference: always show
-        self._log.appendPlainText(_line("  \u251c\u2500 Via imported reference:", done.imported_reuse_count))
+        self._log.appendPlainText(_line("  \u2514\u2500 Via imported reference:", done.imported_reuse_count))
         # Resumed from checkpoint: only show if count > 0
         if done.resumed_count:
-            self._log.appendPlainText(_line("  \u251c\u2500 Resumed from checkpoint:", done.resumed_count))
-        # Pre-existing (unchanged): always show, annotate when retranslate is ON
-        preexist_ann = "   (nothing skipped when retranslate=ON)" if retranslate_on else ""
-        self._log.appendPlainText(_line("  \u2514\u2500 Pre-existing (unchanged):", done.skipped_count, preexist_ann))
+            self._log.appendPlainText(_line("      Resumed from checkpoint:", done.resumed_count))
         self._log.appendPlainText("")
+
+        # --- Pre-existing and Failed ---
+        preexist_ann = "   (nothing skipped when retranslate=ON)" if retranslate_on else ""
+        self._log.appendPlainText(_line("  Pre-existing (kept as-is):", done.skipped_count, preexist_ann))
         self._log.appendPlainText(_line("  Failed Translations:", rows_failed))
+        self._log.appendPlainText(
+            f"  {'Total with translation:':<{_W}}{total_with_translation:>6,} / {total_entries:,}"
+        )
         self._log.appendPlainText("")
         self._log.appendPlainText(f"  Elapsed time:            {elapsed_str:>9}")
         if rate > 0:
