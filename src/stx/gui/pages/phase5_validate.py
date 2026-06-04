@@ -338,9 +338,11 @@ class Phase5ValidatePage(PhasePage):
             )
             self._banner.setVisible(True)
             self._fix_all_btn.setEnabled(False)
+            self._validate_btn.setEnabled(False)
             self._save_btn.setEnabled(False)
             return
         self._fix_all_btn.setEnabled(True)
+        self._validate_btn.setEnabled(True)
         self._save_btn.setEnabled(True)
 
         # Show "data loaded" state before running validation
@@ -946,6 +948,7 @@ class Phase5ValidatePage(PhasePage):
             "padding: 10px; border-radius: 6px; font-weight: 700; "
             "background-color: #f1f5f9; color: #475569;"
         )
+        self._validate_btn.setEnabled(False)
         self._fix_all_btn.setEnabled(False)
         self._fix_selected_btn.setEnabled(False)
         self._save_btn.setEnabled(False)
