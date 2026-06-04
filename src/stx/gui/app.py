@@ -44,6 +44,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     # ignores most background-color rules and renders everything white.
     app.setStyle("Fusion")
 
+    # Set the application-level window icon (appears in taskbar and title bar).
+    from pathlib import Path
+    from PySide6.QtGui import QIcon
+
+    _assets = Path(__file__).parent / "assets"
+    _ico_path = _assets / "logo.ico"
+    _png_path = _assets / "logo.png"
+    _svg_path = _assets / "logo.svg"
+
+    if _ico_path.is_file():
+        app.setWindowIcon(QIcon(str(_ico_path)))
+    elif _png_path.is_file():
+        app.setWindowIcon(QIcon(str(_png_path)))
+    else:
+        try:
+            from PySide6.QtSvg import QSvgRenderer
+            from PySide6.QtGui import QPixmap, QPainter
+            from PySide6.QtCore import QSize
+
+            if _svg_path.is_file():
+                renderer = QSvgRenderer(str(_svg_path))
+                pixmap = QPixmap(QSize(256, 256))
+                pixmap.fill()
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                app.setWindowIcon(QIcon(pixmap))
+        except ImportError:
+            pass  # PySide6-Svg not available; no icon set
+
     # Apply our custom theme (colors, borders, typography) on top of Fusion.
     theme.apply_theme(gui_settings.get_theme())
 

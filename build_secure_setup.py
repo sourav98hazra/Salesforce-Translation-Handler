@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 APP_NAME = "SalesforceTranslationHandler"
 
 

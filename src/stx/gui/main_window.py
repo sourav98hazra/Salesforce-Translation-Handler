@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
@@ -101,6 +101,38 @@ _STATUS_ICONS = {
 }
 
 
+def _load_app_icon() -> QIcon:
+    """Load the application icon with fallback: .ico -> .png -> .svg.
+
+    Returns a QIcon (possibly null/empty if all paths fail).
+    """
+    _assets = Path(__file__).parent / "assets"
+    _ico_path = _assets / "logo.ico"
+    _png_path = _assets / "logo.png"
+    _svg_path = _assets / "logo.svg"
+
+    if _ico_path.is_file():
+        return QIcon(str(_ico_path))
+    if _png_path.is_file():
+        return QIcon(str(_png_path))
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+        from PySide6.QtGui import QPixmap, QPainter
+        from PySide6.QtCore import QSize
+
+        if _svg_path.is_file():
+            renderer = QSvgRenderer(str(_svg_path))
+            pixmap = QPixmap(QSize(256, 256))
+            pixmap.fill()
+            painter = QPainter(pixmap)
+            renderer.render(painter)
+            painter.end()
+            return QIcon(pixmap)
+    except ImportError:
+        pass  # PySide6-Svg not available
+    return QIcon()
+
+
 class MainWindow(QMainWindow):
     """Main application window."""
 
@@ -109,6 +141,7 @@ class MainWindow(QMainWindow):
         # Run one-time settings migration (resets stale defaults from older versions)
         gui_settings.migrate_settings()
         self.setWindowTitle("Salesforce Translation Manager")
+        self.setWindowIcon(_load_app_icon())
         # Reasonable minimum so users on small / windowed displays can
         # actually shrink the window.  Was being held hostage by a fixed
         # 260px sidebar plus large content minimums.
