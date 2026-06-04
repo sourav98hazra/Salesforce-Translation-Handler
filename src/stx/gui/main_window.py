@@ -1542,17 +1542,26 @@ class MainWindow(QMainWindow):
 
         from .. import settings as gui_settings
 
-        memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
-        if memory_path_str:
-            tm_path = Path(memory_path_str)
+        # Determine TM path: use state reference first, then settings, then default
+        tm_path = None
+        if self._state.memory_path is not None and self._state.memory_path.exists():
+            tm_path = self._state.memory_path
         else:
-            try:
-                from ..memory import default_tm_path
-                tm_path = default_tm_path()
-            except (ImportError, AttributeError):
-                tm_path = Path.home() / ".stx" / "translation_memory.db"
+            memory_path_str = gui_settings.get_str(gui_settings.KEYS.memory_path, "").strip()
+            if memory_path_str:
+                tm_path = Path(memory_path_str)
+            else:
+                try:
+                    from ..memory import default_tm_path
+                    tm_path = default_tm_path()
+                except (ImportError, AttributeError):
+                    tm_path = Path.home() / ".cache" / "salesforce-translation-handler" / "tm.sqlite"
 
-        if not tm_path.exists():
+        if tm_path is None or not tm_path.exists():
+            # Even if no file on disk, clear the in-memory reference
+            self._state.memory = None
+            self._state.memory_path = None
+            self._log("Clear TM: no Translation Memory database found on disk.")
             QMessageBox.information(
                 self, "Translation Memory",
                 "No Translation Memory database found.\n"
@@ -1573,18 +1582,21 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Cancel,
         )
         if reply != QMessageBox.StandardButton.Yes:
+            self._log("Clear TM: cancelled by user.")
             return
 
         try:
             tm_path.unlink()
             self._state.memory = None
             self._state.memory_path = None
-            self._log("Translation Memory database cleared.")
+            self._log(f"Translation Memory cleared: {tm_path.name} ({size_kb:.0f} KB deleted).")
             QMessageBox.information(
                 self, "Translation Memory",
-                "Translation Memory has been cleared successfully."
+                "Translation Memory has been cleared successfully.\n"
+                f"Deleted: {tm_path.name}"
             )
         except Exception as exc:
+            self._log(f"Clear TM failed: {exc}")
             QMessageBox.critical(
                 self, "Error",
                 f"Could not delete Translation Memory:\n{exc}"
