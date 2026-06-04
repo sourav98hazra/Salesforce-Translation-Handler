@@ -255,7 +255,7 @@ def test_report_grouping_matches_categories(tmp_path: Path) -> None:
 
 
 def test_export_xlsx(tmp_path):
-    """export_xlsx creates a workbook with two sheets."""
+    """export_xlsx creates a workbook with Summary + per-category sheets."""
     from stx.report import export_xlsx
 
     report = _make_report_with_issues()
@@ -265,12 +265,22 @@ def test_export_xlsx(tmp_path):
     from openpyxl import load_workbook
 
     wb = load_workbook(out)
-    assert "Validation Issues" in wb.sheetnames
-    assert "Fixes Applied" in wb.sheetnames
-    # Check issues sheet has data
-    ws = wb["Validation Issues"]
-    assert ws.cell(1, 1).value == "Severity"
-    assert ws.max_row > 1  # at least one data row
+    # Summary sheet is always present
+    assert "Summary" in wb.sheetnames
+    # Per-category sheets exist for each issue category
+    categories = report.by_category()
+    for cat in categories:
+        assert cat[:31] in wb.sheetnames
+    # Check Summary sheet has header
+    ws = wb["Summary"]
+    assert ws.cell(1, 1).value == "Validation Report"
+    # Check that a category sheet has the right columns
+    first_cat = sorted(categories.keys())[0]
+    ws_cat = wb[first_cat[:31]]
+    assert ws_cat.cell(1, 1).value == "#"
+    assert ws_cat.cell(1, 2).value == "Severity"
+    assert ws_cat.cell(1, 7).value == "Message"
+    assert ws_cat.max_row > 1  # at least one data row
 
 
 def test_export_xlsx_with_fixes(tmp_path):
@@ -293,7 +303,60 @@ def test_export_xlsx_with_fixes(tmp_path):
     from openpyxl import load_workbook
 
     wb = load_workbook(out)
+    assert "Fixes Applied" in wb.sheetnames
     ws = wb["Fixes Applied"]
     assert ws.cell(1, 1).value == "Key"
     assert ws.max_row == 2  # header + 1 fix row
     assert ws.cell(2, 1).value == "CustomLabel.Msg"
+
+
+def test_export_xlsx_summary_with_document_stats(tmp_path):
+    """export_xlsx Summary sheet includes document stats when provided."""
+    from stx.report import export_xlsx
+
+    report = _make_report_with_issues()
+    stats = {"total": 500, "translated": 450, "untranslated": 50}
+    out = tmp_path / "report.xlsx"
+    export_xlsx(report, out, document_stats=stats, document_name="test_file.xlsx")
+    from openpyxl import load_workbook
+
+    wb = load_workbook(out)
+    ws = wb["Summary"]
+    # Find document name and stats in the sheet
+    values = [ws.cell(r, 1).value for r in range(1, ws.max_row + 1)]
+    assert "Document" in values
+    assert "Total Rows" in values
+    # Check the document name value
+    doc_row = values.index("Document") + 1
+    assert ws.cell(doc_row, 2).value == "test_file.xlsx"
+
+
+def test_export_xlsx_category_breakdown(tmp_path):
+    """export_xlsx Summary sheet has category breakdown with totals."""
+    from stx.report import export_xlsx
+
+    report = _make_report_with_issues()
+    out = tmp_path / "report.xlsx"
+    export_xlsx(report, out)
+    from openpyxl import load_workbook
+
+    wb = load_workbook(out)
+    ws = wb["Summary"]
+    # Find the Category header row
+    cat_row = None
+    for r in range(1, ws.max_row + 1):
+        if ws.cell(r, 1).value == "Category":
+            cat_row = r
+            break
+    assert cat_row is not None
+    # The row after the last category should be TOTAL
+    # Find TOTAL row
+    total_row = None
+    for r in range(cat_row + 1, ws.max_row + 1):
+        if ws.cell(r, 1).value == "TOTAL":
+            total_row = r
+            break
+    assert total_row is not None
+    # TOTAL errors + warnings should match report totals
+    assert ws.cell(total_row, 2).value == len(report.errors)
+    assert ws.cell(total_row, 3).value == len(report.warnings)

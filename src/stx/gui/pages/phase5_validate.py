@@ -904,7 +904,21 @@ class Phase5ValidatePage(PhasePage):
         fixes = self._applied_fixes if self._applied_fixes else None
         ext = path.suffix.lower()
         if ext == ".xlsx":
-            export_xlsx(self._report, path, fixes_applied=fixes)
+            # Pass document stats and full issues list for multi-sheet report
+            doc_stats = None
+            doc_name = None
+            if self._state.document is not None:
+                doc_stats = self._state.document.stats()
+            if self._state.reviewed_xlsx_path:
+                doc_name = self._state.reviewed_xlsx_path.name
+            elif self._state.source_stf_path:
+                doc_name = self._state.source_stf_path.name
+            export_xlsx(
+                self._report, path, fixes_applied=fixes,
+                document_stats=doc_stats,
+                document_name=doc_name,
+                all_issues=self._issues if self._issues else None,
+            )
         elif ext == ".csv":
             export_csv(self._report, path, fixes_applied=fixes)
         elif ext == ".json":

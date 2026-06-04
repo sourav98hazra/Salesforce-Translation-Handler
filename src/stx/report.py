@@ -14,7 +14,7 @@ from html import escape as html_escape
 from pathlib import Path
 from typing import List, Optional
 
-from .validate import ValidationReport
+from .validate import ValidationIssue, ValidationReport
 
 
 def _component_from_key(key: str) -> str:
@@ -255,14 +255,42 @@ def export_xlsx(
     report: ValidationReport,
     path: Path,
     fixes_applied: Optional[List[dict]] = None,
+    *,
+    document_stats: Optional[dict] = None,
+    document_name: Optional[str] = None,
+    all_issues: Optional[List["ValidationIssue"]] = None,
 ) -> None:
-    """Write a two-sheet Excel report: Validation Issues + Fixes Applied.
+    """Write a multi-sheet Excel report with Summary + per-category sheets.
 
-    Uses the same header styling pattern as :mod:`stx.excel.exporter`:
-    bold white text on a dark-blue fill, frozen header row, auto-sized columns.
+    Sheet layout:
+      - **Summary**: Document info header, category breakdown table with
+        error/warning/total counts, and a TOTAL row.
+      - **One sheet per category**: Each issue category gets its own sheet
+        with columns: #, Severity, Key, Component, Source Label, Translation,
+        Message.
+      - **Fixes Applied** (if any): Details of auto-fix changes.
+
+    Parameters
+    ----------
+    report : ValidationReport
+        The core validation report (used when *all_issues* is not provided).
+    path : Path
+        Destination file path.
+    fixes_applied : list of dict, optional
+        Auto-fix details to include in a "Fixes Applied" sheet.
+    document_stats : dict, optional
+        Output of ``Document.stats()`` with keys: total, translated,
+        untranslated.  Used for the Summary header section.
+    document_name : str, optional
+        Human-readable document/file name shown in the Summary header.
+    all_issues : list of ValidationIssue, optional
+        Full issues list (including translation_failed entries added by the
+        GUI).  When not provided, falls back to ``report.issues``.
     """
+    from datetime import datetime
+
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
+    from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
     path = Path(path)
@@ -270,37 +298,115 @@ def export_xlsx(
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="1F4E78")
+    bold_font = Font(bold=True)
+
+    # Use the full issues list if provided (includes translation_failed etc.)
+    issues = all_issues if all_issues is not None else list(report.issues)
 
     wb = Workbook()
 
-    # --- Sheet 1: Validation Issues ---
-    ws_issues = wb.active
-    ws_issues.title = "Validation Issues"
-    issue_columns = ["Severity", "Category", "Component", "Key", "Message"]
-    ws_issues.append(issue_columns)
+    # --- Sheet 1: Summary ---
+    ws_summary = wb.active
+    ws_summary.title = "Summary"
 
-    for issue in report.issues:
-        component = issue.component if issue.component else _component_from_key(issue.key)
-        ws_issues.append([
-            issue.severity,
-            issue.category,
-            component,
-            issue.key,
-            issue.message,
-        ])
+    # Header info section
+    ws_summary.append(["Validation Report"])
+    ws_summary["A1"].font = Font(bold=True, size=14)
+    ws_summary.append(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    if document_name:
+        ws_summary.append(["Document", document_name])
+    if document_stats:
+        ws_summary.append(["Total Rows", document_stats.get("total", "")])
+        ws_summary.append(["Translated", document_stats.get("translated", "")])
+        ws_summary.append(["Untranslated", document_stats.get("untranslated", "")])
+    ws_summary.append([])  # blank separator row
 
-    _xlsx_style_header(ws_issues, len(issue_columns), header_font, header_fill)
-    _xlsx_autosize(ws_issues, len(issue_columns))
+    # Category breakdown table
+    summary_header_row = ws_summary.max_row + 1
+    ws_summary.append(["Category", "Errors", "Warnings", "Total", "Auto-fixable"])
 
-    # --- Sheet 2: Fixes Applied ---
-    ws_fixes = wb.create_sheet("Fixes Applied")
-    fix_columns = [
-        "Key", "Label", "Previous Translation",
-        "Fixed Translation", "Issue Category", "Fix Applied",
-    ]
-    ws_fixes.append(fix_columns)
+    # Style the category table header
+    for col_idx in range(1, 6):
+        cell = ws_summary.cell(row=summary_header_row, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
 
+    # Group issues by category and count errors/warnings
+    categories: dict[str, dict[str, int]] = {}
+    for issue in issues:
+        cat = issue.category
+        if cat not in categories:
+            categories[cat] = {"errors": 0, "warnings": 0}
+        if issue.severity == "error":
+            categories[cat]["errors"] += 1
+        else:
+            categories[cat]["warnings"] += 1
+
+    # Determine auto-fixable categories (categories that the autofix module
+    # can handle deterministically).
+    auto_fixable_categories = {
+        "length_limit", "duplicate_key", "token_drift",
+        "html_mismatch", "missing_placeholder", "missing_message_format",
+        "whitespace_only",
+    }
+
+    total_errors = 0
+    total_warnings = 0
+    total_autofixable = 0
+    for cat in sorted(categories.keys()):
+        counts = categories[cat]
+        cat_total = counts["errors"] + counts["warnings"]
+        autofixable = cat_total if cat in auto_fixable_categories else 0
+        ws_summary.append([cat, counts["errors"], counts["warnings"], cat_total, autofixable])
+        total_errors += counts["errors"]
+        total_warnings += counts["warnings"]
+        total_autofixable += autofixable
+
+    # TOTAL row (bold)
+    total_row_idx = ws_summary.max_row + 1
+    ws_summary.append(["TOTAL", total_errors, total_warnings,
+                       total_errors + total_warnings, total_autofixable])
+    for col_idx in range(1, 6):
+        ws_summary.cell(row=total_row_idx, column=col_idx).font = bold_font
+
+    # Auto-size summary columns
+    _xlsx_autosize(ws_summary, 5)
+
+    # --- Per-category sheets ---
+    for cat in sorted(categories.keys()):
+        # Excel sheet names are limited to 31 characters
+        sheet_title = cat[:31]
+        ws = wb.create_sheet(title=sheet_title)
+        cat_columns = ["#", "Severity", "Key", "Component",
+                       "Source Label", "Translation", "Message"]
+        ws.append(cat_columns)
+        _xlsx_style_header(ws, len(cat_columns), header_font, header_fill)
+
+        cat_issues = [i for i in issues if i.category == cat]
+        for idx, issue in enumerate(cat_issues, 1):
+            component = issue.component if issue.component else _component_from_key(issue.key)
+            ws.append([
+                idx,
+                issue.severity,
+                issue.key,
+                component,
+                "",  # Source Label - filled below if document available
+                "",  # Translation - filled below if document available
+                issue.message,
+            ])
+
+        _xlsx_autosize(ws, len(cat_columns))
+
+    # --- Fixes Applied sheet ---
     if fixes_applied:
+        ws_fixes = wb.create_sheet("Fixes Applied")
+        fix_columns = [
+            "Key", "Label", "Previous Translation",
+            "Fixed Translation", "Issue Category", "Fix Applied",
+        ]
+        ws_fixes.append(fix_columns)
+        _xlsx_style_header(ws_fixes, len(fix_columns), header_font, header_fill)
+
         for fix in fixes_applied:
             ws_fixes.append([
                 fix.get("key", ""),
@@ -311,8 +417,7 @@ def export_xlsx(
                 fix.get("fix_description", ""),
             ])
 
-    _xlsx_style_header(ws_fixes, len(fix_columns), header_font, header_fill)
-    _xlsx_autosize(ws_fixes, len(fix_columns))
+        _xlsx_autosize(ws_fixes, len(fix_columns))
 
     wb.save(path)
 
