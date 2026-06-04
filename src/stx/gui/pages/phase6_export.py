@@ -151,7 +151,9 @@ class Phase6ExportPage(PhasePage):
             phase_idx > 0
             and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
         )
-        if self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done:
+        if self._state.document is None or (
+            self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
+        ):
             self._export_btn.setEnabled(False)
             self._validate_btn.setEnabled(False)
             self._load_status.setText(

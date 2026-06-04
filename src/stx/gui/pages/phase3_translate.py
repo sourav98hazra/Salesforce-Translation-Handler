@@ -1020,6 +1020,9 @@ class Phase3TranslatePage(PhasePage):
             )
 
     def _on_translation_done(self, done) -> None:
+        if self._worker is None:
+            return  # Stale signal from force-cancelled worker
+
         # Merge results with existing data (handles retry scenario where only
         # failed rows are re-processed). On first run, existing lists are empty
         # so this is equivalent to a simple assignment.
@@ -1034,7 +1037,7 @@ class Phase3TranslatePage(PhasePage):
                 existing_by_row.values(), key=lambda s: s.row_index
             )
             # Recalculate summaries from merged statuses
-            from ..translate.runner import SheetSummary
+            from ...translate.runner import SheetSummary
             merged_summaries: dict[str, SheetSummary] = {}
             for s in self._state.translation_statuses:
                 summary = merged_summaries.setdefault(
@@ -1257,6 +1260,9 @@ class Phase3TranslatePage(PhasePage):
         )
 
     def _on_translation_failed(self, message: str) -> None:
+        if self._worker is None:
+            return  # Stale signal from force-cancelled worker
+
         self._set_running(False)
         self._state.set_phase(2, PhaseStatus.ERROR)
         safe_msg = gui_secrets.sanitize_error_message(message)

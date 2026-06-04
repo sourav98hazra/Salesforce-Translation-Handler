@@ -315,9 +315,6 @@ class Phase4ReviewPage(PhasePage):
     # ------------------------------------------------------------------ build
 
     def _build(self) -> None:
-        # ---------- Undo stack (shared with model + menu)
-        self._undo_stack = UndoStack(self)
-
         # ---------- Compact toolbar (status pill + counters + actions)
         toolbar = QFrame()
         toolbar.setProperty("role", "card")
