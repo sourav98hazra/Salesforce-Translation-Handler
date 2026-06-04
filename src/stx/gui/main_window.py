@@ -1619,9 +1619,25 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            tm_path.unlink()
+            # Release the in-memory TM reference first so the SQLite connection
+            # is closed before we try to delete the file (prevents "file in use"
+            # errors on Windows).
             self._state.memory = None
             self._state.memory_path = None
+
+            # Force garbage collection to ensure SQLite connection is released
+            import gc
+            gc.collect()
+
+            # Delete main DB file and any WAL/SHM journal files
+            tm_path.unlink(missing_ok=True)
+            wal_path = tm_path.with_suffix(tm_path.suffix + "-wal")
+            shm_path = tm_path.with_suffix(tm_path.suffix + "-shm")
+            if wal_path.exists():
+                wal_path.unlink(missing_ok=True)
+            if shm_path.exists():
+                shm_path.unlink(missing_ok=True)
+
             self._log(f"Translation Memory cleared: {tm_path.name} ({size_kb:.0f} KB deleted).")
             QMessageBox.information(
                 self, "Translation Memory",
