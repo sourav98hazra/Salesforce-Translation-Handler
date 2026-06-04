@@ -331,7 +331,7 @@ class Phase5ValidatePage(PhasePage):
         if self._state.document is None or (
             self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
         ):
-            self._banner.setText("No document loaded.  Complete earlier phases first.")
+            self._banner.setText("No document loaded.")
             self._banner.setStyleSheet(
                 "padding: 10px; border-radius: 6px; font-weight: 700; "
                 "background-color: #f1f5f9; color: #475569;"
@@ -941,7 +941,7 @@ class Phase5ValidatePage(PhasePage):
         self._issues = []
         self._report = None
         self._applied_fixes = []
-        self._banner.setText("No document loaded.  Complete earlier phases first.")
+        self._banner.setText("No document loaded.")
         self._banner.setStyleSheet(
             "padding: 10px; border-radius: 6px; font-weight: 700; "
             "background-color: #f1f5f9; color: #475569;"

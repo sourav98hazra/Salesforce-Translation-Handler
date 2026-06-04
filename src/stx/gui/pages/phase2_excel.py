@@ -41,7 +41,7 @@ class Phase2ExcelPage(PhasePage):
 
     def _build(self) -> None:
         # Status / summary
-        self._summary_label = QLabel("No document loaded yet \u2014 complete Phase 1 first.")
+        self._summary_label = QLabel("No document loaded.")
         self._summary_label.setStyleSheet("color: #4a5568; font-weight: 700;")
         self.add_widget(self._summary_label)
 
@@ -115,10 +115,7 @@ class Phase2ExcelPage(PhasePage):
         if self._state.document is None or (
             self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
         ):
-            self._summary_label.setText(
-                "No document loaded \u2014 complete Phase 1 first, "
-                "or use 'Load existing organised .xlsx...' to jump straight to Phase 3."
-            )
+            self._summary_label.setText("No document loaded.")
             self._convert_btn.setEnabled(False)
             return
         stats = self._state.document.stats()
@@ -147,7 +144,7 @@ class Phase2ExcelPage(PhasePage):
 
     def _on_convert(self) -> None:
         if self._state.document is None:
-            self.warn("Load an STF file in Phase 1 first.")
+            self.warn("No document loaded.")
             return
         # Auto-generate output path: professional dated name in the source folder.
         name = self.default_save_name("organized")
@@ -399,7 +396,7 @@ class Phase2ExcelPage(PhasePage):
 
     def reset_page(self) -> None:
         """Called by Reset Session to clear all displayed widgets back to defaults."""
-        self._summary_label.setText("No document loaded yet \u2014 complete Phase 1 first.")
+        self._summary_label.setText("No document loaded.")
         self._details.setRowCount(0)
         self._save_copy_btn.setEnabled(False)
         self._next_btn.setEnabled(False)

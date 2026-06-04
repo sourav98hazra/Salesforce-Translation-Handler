@@ -69,7 +69,7 @@ class Phase6ExportPage(PhasePage):
         )
         self._load_btn.clicked.connect(self._on_load_excel)
         load_layout.addWidget(self._load_btn)
-        self._load_status = QLabel("No document loaded yet.")
+        self._load_status = QLabel("No document loaded.")
         self._load_status.setStyleSheet("font-weight: 700; color: #4a5568;")
         load_layout.addWidget(self._load_status, stretch=1)
         self.add_widget(load_box)
@@ -155,7 +155,7 @@ class Phase6ExportPage(PhasePage):
             self._export_btn.setEnabled(False)
             self._validate_btn.setEnabled(False)
             self._load_status.setText(
-                "No document loaded.  Click 'Load Excel...' to select a translated workbook."
+                "No document loaded."
             )
             return
 
@@ -176,7 +176,7 @@ class Phase6ExportPage(PhasePage):
             )
         else:
             self._load_status.setText(
-                "No document loaded.  Click 'Load Excel...' to select a translated workbook."
+                "No document loaded."
             )
 
     # ------------------------------------------------------------------ load Excel (direct convert)

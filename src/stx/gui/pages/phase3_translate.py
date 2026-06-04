@@ -619,12 +619,7 @@ class Phase3TranslatePage(PhasePage):
 
     def _on_filter_components(self) -> None:
         if self._state.document is None:
-            self.warn(
-                "No document loaded yet.\n\n"
-                "Either:\n"
-                "  - Complete Phase 1 (Import STF) first, or\n"
-                "  - Click 'Load .xlsx ...' below to load an Excel directly into this phase."
-            )
+            self.warn("No document loaded.")
             return
         dlg = _ComponentFilterDialog(
             self._state.document,
@@ -648,7 +643,7 @@ class Phase3TranslatePage(PhasePage):
 
     def _update_estimate(self) -> None:
         if self._state.document is None:
-            self._estimate_label.setText("Rows to translate: \u2014 (load a document first)")
+            self._estimate_label.setText("Rows to translate: \u2014")
             return
         scope = self._build_scope()
         if scope is None:
@@ -743,11 +738,7 @@ class Phase3TranslatePage(PhasePage):
         self._retry_btn.setVisible(False)
 
         if self._state.document is None:
-            self.warn(
-                "No document loaded yet.\n\n"
-                "Click 'Load Excel...' to load an Excel directly into this phase,\n"
-                "or complete Phase 1 (Import STF) first."
-            )
+            self.warn("No document loaded.")
             return
 
         # Language validation: both must be selected, and must differ.
