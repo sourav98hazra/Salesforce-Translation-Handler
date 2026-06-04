@@ -864,6 +864,10 @@ class MainWindow(QMainWindow):
     def _log(self, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self._status_log.appendPlainText(f"[{timestamp}] {message}")
+        # Ensure the status log scrolls to bottom so new messages are visible
+        scrollbar = self._status_log.verticalScrollBar()
+        if scrollbar:
+            scrollbar.setValue(scrollbar.maximum())
         self.statusBar().showMessage(message, 6000)
 
     # ------------------------------------------------------------------ menu actions
