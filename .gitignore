@@ -3,62 +3,42 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
+dist/
+build/
+.eggs/
 
 # Virtual environments
 .venv/
 venv/
 env/
-ENV/
 
-# Test / coverage
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-
-# Type checkers
-.mypy_cache/
-.ruff_cache/
-.pyright/
-
-# IDE / editors
-.idea/
+# IDE
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Application output (generated artifacts during use)
-output/
-Super_STF_*.stf
-TranslatedOnly_STF_*.stf
-UntranslatedOnly_STF_*.stf
+# Test/coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 
-# PyInstaller output
-build/
-dist/
-SalesforceTranslationHandler.spec
+# Kiro build metadata
+.agents/
+semantic-review/
+
+# PyInstaller
 *.spec
-!build_exe.py
 
-# Logs
-*.log
+# Translation memory and session data
+*.sqlite
+.stxproj
+checkpoints/

@@ -1,8 +1,17 @@
-"""Command line interface for the Salesforce Translation Handler.
+"""Command line interface for the Salesforce Translation Manager.
 
-The CLI exposes every phase of the workflow individually so it can be
-scripted into CI, plus a ``run`` convenience command that performs the
-full pipeline in one invocation.
+The CLI mirrors every GUI phase plus a ``run`` convenience command that
+performs the full pipeline.  Translation-related options (these are the
+default surface for ``translate`` / ``run``):
+
+* ``--backend`` (google / deepl / azure / openai).
+* ``--scope-file`` to apply a saved component / key scope.
+* ``--glossary`` to apply a glossary CSV.
+* ``--memory-db`` to enable the persistent translation memory.
+* ``--workers`` and ``--rate-limit`` for performance tuning.
+* ``--targets`` for multi-language batch runs.
+* ``stx scope`` subcommand to inspect / build scope files.
+* ``stx backends`` to list available translator backends.
 
 Examples
 --------
@@ -11,25 +20,30 @@ Examples
     # Phase 1+2: STF -> organised Excel
     stx stf2xlsx input.stf organized.xlsx
 
-    # Phase 3: translate the Excel
-    stx translate organized.xlsx translated.xlsx --target ja
+    # Phase 3 with all features
+    stx translate organized.xlsx translated.xlsx \\
+        --target ja \\
+        --backend google \\
+        --scope-file input.stxscope.json \\
+        --glossary glossary.csv \\
+        --memory-db tm.sqlite \\
+        --workers 8
 
-    # Phase 5: Excel -> three STF files
-    stx xlsx2stf translated.xlsx ./output --language Japanese
+    # Multi-language batch in one go
+    stx run input.stf ./out --targets ja,fr,de,es
 
-    # Convenience: do everything in one go
-    stx run input.stf ./output --target ja --language Japanese
+    # Pre-export validation
+    stx validate input.stf
 
-    # Launch the desktop GUI
-    stx gui
+    # Build a scope file from a document
+    stx scope new input.stf scope.stxscope.json --components CustomLabel,ButtonOrLink
 """
 
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -40,30 +54,52 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 from rich.table import Table
 
 from . import __version__
+from .checkpoint import CheckpointStore
 from .excel import (
     export_document_to_excel,
     import_document_from_excel,
     write_translation_audit_sheets,
 )
+from .glossary import Glossary
 from .languages import code_for_language, language_for_code, to_google_code
+from .memory import TranslationMemory
+from .model import Entry
+from .scope import Scope, StatusFilter
 from .stf import parse_stf, write_stf_files
 from .translate import (
-    GoogleFreeTranslator,
     TranslationProgress,
+    list_backends,
+    make_backend,
     translate_document,
+    translate_document_multi,
 )
 from .validate import validate_document
 
 app = typer.Typer(
     name="stx",
-    help="Salesforce Translation Handler -- STF <-> Excel <-> Translate pipeline.",
+    help="Salesforce Translation Manager -- STF <-> Excel <-> Translate pipeline.",
     no_args_is_help=True,
     add_completion=False,
 )
+scope_app = typer.Typer(
+    name="scope",
+    help="Inspect / build translation scope files (.stxscope.json).",
+    no_args_is_help=True,
+)
+app.add_typer(scope_app)
+
+session_app = typer.Typer(
+    name="session",
+    help="Manage saved session files (.stxproj).",
+    no_args_is_help=True,
+)
+app.add_typer(session_app)
+
 console = Console()
 
 
@@ -123,17 +159,40 @@ def info(
     table.add_row("Language code", doc.language_code or "(unknown)")
     table.add_row("STF type", doc.stf_type)
     table.add_row("Translation type", doc.translation_type)
-    table.add_row("Total rows", str(stats["total"]))
-    table.add_row("Translated", str(stats["translated"]))
-    table.add_row("Untranslated", str(stats["untranslated"]))
+    table.add_row("Total rows", f"{stats['total']:,}")
+    table.add_row("Translated", f"{stats['translated']:,}")
+    table.add_row("Untranslated", f"{stats['untranslated']:,}")
     table.add_row("Components", str(stats["components"]))
+    console.print(table)
+
+    components = sorted({e.component_type for e in doc.entries})
+    console.print(f"\nComponent types ({len(components)}): " + ", ".join(components))
+
+
+@app.command("backends")
+def list_translator_backends() -> None:
+    """List available translator backends and their auth requirements."""
+    table = Table(title="Translator backends", show_header=True, header_style="bold cyan")
+    table.add_column("Key")
+    table.add_column("Label")
+    table.add_column("API key")
+    table.add_column("Env var")
+    table.add_column("Description")
+    for info in list_backends():
+        table.add_row(
+            info.key,
+            info.label,
+            "yes" if info.requires_api_key else "no",
+            info.env_var or "",
+            info.description,
+        )
     console.print(table)
 
 
 @app.command("stf2xlsx")
 def stf2xlsx(
-    stf_path: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True, help="Input STF file."),
-    xlsx_path: Path = typer.Argument(..., dir_okay=False, help="Output organised .xlsx file."),
+    stf_path: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    xlsx_path: Path = typer.Argument(..., dir_okay=False),
 ) -> None:
     """Phase 1+2: convert an STF file into an organised Excel workbook."""
 
@@ -145,17 +204,64 @@ def stf2xlsx(
     )
 
 
+_SOURCE_SENTINEL = "__auto__"
+
+
 @app.command("translate")
 def translate(
     xlsx_in: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
     xlsx_out: Path = typer.Argument(..., dir_okay=False),
-    source: str = typer.Option("en", "--source", "-s", help="Source language code."),
+    source: str = typer.Option(_SOURCE_SENTINEL, "--source", "-s", show_default="en", help="Source language code (default: en, or auto-detected)."),
     target: str = typer.Option("ja", "--target", "-t", help="Target language code."),
     language_name: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="Human-readable language name (auto-derived from --target if omitted).",
+        None, "--language", "-l", help="Human-readable language name."
+    ),
+    backend: str = typer.Option(
+        "google", "--backend", "-b", help="Translator backend (google/deepl/azure/openai)."
+    ),
+    api_key: Optional[str] = typer.Option(
+        None, "--api-key", help="API key for the backend (overrides env var)."
+    ),
+    scope_file: Optional[Path] = typer.Option(
+        None, "--scope-file", help="Path to a .stxscope.json scope file."
+    ),
+    glossary_path: Optional[Path] = typer.Option(
+        None, "--glossary", help="Path to a CSV glossary."
+    ),
+    memory_db: Optional[Path] = typer.Option(
+        None, "--memory-db", help="Path to a SQLite translation memory."
+    ),
+    import_translations_path: Optional[Path] = typer.Option(
+        None, "--import-translations", help="Path to an existing translated .xlsx to reuse translations from."
+    ),
+    workers: int = typer.Option(
+        4, "--workers", "-w", help="Concurrent translation workers."
+    ),
+    rate_limit: float = typer.Option(
+        8.0, "--rate-limit", help="Initial token-bucket capacity (req/s).  0 = unlimited."
+    ),
+    fuzzy_threshold: float = typer.Option(
+        0, "--fuzzy-threshold", help="Fuzzy TM threshold (0-100). 0 = disabled."
+    ),
+    fuzzy_max_results: int = typer.Option(
+        5, "--fuzzy-max-results", help="Max fuzzy match results to consider."
+    ),
+    fuzzy_auto_accept: float = typer.Option(
+        90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
+    ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="Resume from checkpoint if available."
+    ),
+    reset_checkpoint: bool = typer.Option(
+        False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
+    ),
+    detect_source: bool = typer.Option(
+        True, "--detect-source/--no-detect-source",
+        help="Auto-detect source language from labels (overridden by explicit --source).",
+    ),
+    retranslate_existing: bool = typer.Option(
+        False, "--retranslate-existing",
+        help="Retranslate rows that already have translations instead of skipping them.",
     ),
 ) -> None:
     """Phase 3: translate every untranslated row in an organised Excel workbook."""
@@ -163,19 +269,98 @@ def translate(
     if language_name is None:
         language_name = language_for_code(target) or target
 
+    # Determine whether --source was explicitly provided by checking for sentinel
+    source_explicitly_set = source != _SOURCE_SENTINEL
+    if not source_explicitly_set:
+        source = "en"  # default fallback
+
+    # Auto-detect source language if enabled and --source was not explicitly set
+    doc = None
+    if detect_source and not source_explicitly_set:
+        from .lang_detect import (
+            CONFIDENCE_THRESHOLD,
+            detect_source_language,
+            map_detected_to_salesforce,
+        )
+
+        doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
+        labels = [e.label for e in doc.entries if e.label]
+        detected = detect_source_language(labels)
+        if detected:
+            iso_code, confidence = detected[0]
+            sf_code = map_detected_to_salesforce(iso_code)
+            lang_name = language_for_code(sf_code) if sf_code else iso_code
+            if confidence >= CONFIDENCE_THRESHOLD:
+                console.print(
+                    f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+                )
+                if sf_code:
+                    source = to_google_code(sf_code)
+            else:
+                console.print(
+                    f"[yellow]Low-confidence detection:[/yellow] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%] "
+                    f"-- using default source '{source}'"
+                )
+
     console.print(
         f"Translating [bold]{xlsx_in}[/bold] from [cyan]{source}[/cyan] -> "
-        f"[cyan]{target}[/cyan] ({language_name})"
+        f"[cyan]{target}[/cyan] ({language_name}) via [bold]{backend}[/bold]"
     )
 
-    doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
-    translator = GoogleFreeTranslator()
+    # Reuse the document from detection if available; otherwise parse fresh
+    if doc is None:
+        doc = import_document_from_excel(xlsx_in, language=language_name, language_code=target)
+
+    backend_kwargs: dict = {}
+    if api_key is not None:
+        backend_kwargs["api_key"] = api_key
+    translator = make_backend(backend, **backend_kwargs)
+
+    scope = Scope.load(scope_file) if scope_file else None
+    glossary = Glossary.load_csv(glossary_path) if glossary_path else None
+    memory = TranslationMemory(path=memory_db) if memory_db else None
+
     google_source = to_google_code(source)
     google_target = to_google_code(target)
+    rate = rate_limit if rate_limit > 0 else None
 
-    result = _run_translation_with_progress(doc, translator, google_source, google_target)
+    # Import existing translations if requested
+    imported_trans: Optional[dict] = None
+    if import_translations_path is not None:
+        from .import_translations import parse_translation_file
 
-    # Write output workbook including audit sheets.
+        imported = parse_translation_file(import_translations_path)
+        if imported.count:
+            imported_trans = imported.translations
+            console.print(
+                f"[blue]Imported {imported.count:,} translations from[/blue] "
+                f"[bold]{import_translations_path}[/bold]"
+            )
+
+    # Checkpoint setup
+    checkpoint: Optional[CheckpointStore] = None
+    if resume:
+        checkpoint = CheckpointStore(
+            source_file=str(xlsx_in.resolve()),
+            target_lang=google_target,
+        )
+        if reset_checkpoint:
+            checkpoint.clear()
+
+    result = _run_translation_with_progress(
+        doc, translator, google_source, google_target,
+        scope=scope, memory=memory, glossary=glossary,
+        checkpoint=checkpoint,
+        workers=workers, rate_limit_per_second=rate,
+        fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
+        fuzzy_max_results=fuzzy_max_results,
+        fuzzy_auto_accept_threshold=fuzzy_auto_accept,
+        imported_translations=imported_trans,
+        retranslate_existing=retranslate_existing,
+    )
+
     export_document_to_excel(doc, xlsx_out)
     write_translation_audit_sheets(
         xlsx_out,
@@ -183,9 +368,15 @@ def translate(
         status_rows=[s.as_audit_row() for s in result.statuses],
     )
 
+    resumed_info = f", resumed {result.resumed_count:,}" if result.resumed_count else ""
+    imported_info = f", imported {result.imported_reuse_count:,}" if result.imported_reuse_count else ""
+    retranslated_info = f", retranslated {result.retranslated_count:,}" if result.retranslated_count else ""
     console.print(
-        f"[green]OK[/green] Translated {result.translated_count}, "
-        f"skipped {result.skipped_count}; output: [bold]{xlsx_out}[/bold]"
+        f"[green]OK[/green] Translated {result.translated_count:,} "
+        f"(TM hits {result.cached_count:,}, fuzzy {result.fuzzy_accepted_count:,}, "
+        f"dedup {result.deduped_count:,}{imported_info}{retranslated_info}{resumed_info}); "
+        f"skipped {result.skipped_count:,}; "
+        f"elapsed {result.elapsed_seconds:.1f}s; output: [bold]{xlsx_out}[/bold]"
     )
 
 
@@ -193,18 +384,8 @@ def translate(
 def xlsx2stf(
     xlsx_in: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
     output_dir: Path = typer.Argument(..., file_okay=False),
-    language_name: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="Human-readable language name (e.g. 'Japanese').",
-    ),
-    language_code: Optional[str] = typer.Option(
-        None,
-        "--code",
-        "-c",
-        help="Salesforce language code (e.g. 'ja'). Auto-derived from --language if omitted.",
-    ),
+    language_name: Optional[str] = typer.Option(None, "--language", "-l"),
+    language_code: Optional[str] = typer.Option(None, "--code", "-c"),
 ) -> None:
     """Phase 5: write the three STF files (full / translated / untranslated)."""
 
@@ -214,19 +395,12 @@ def xlsx2stf(
         language_name = language_for_code(language_code) or language_code
 
     if not language_name or not language_code:
-        console.print(
-            "[red]Error:[/red] supply --language and/or --code "
-            "(at least one must be recognised).",
-            highlight=False,
-        )
+        console.print("[red]Error:[/red] supply --language and/or --code (at least one must be recognised).")
         raise typer.Exit(code=2)
 
-    doc = import_document_from_excel(
-        xlsx_in,
-        language=language_name,
-        language_code=language_code,
-    )
-    res = write_stf_files(doc, output_dir, language_name=language_name, language_code=language_code)
+    doc = import_document_from_excel(xlsx_in, language=language_name, language_code=language_code)
+    source_name = xlsx_in.stem
+    res = write_stf_files(doc, output_dir, language_name=language_name, language_code=language_code, source_name=source_name)
 
     table = Table(title="STF files written", show_header=True, header_style="bold cyan")
     table.add_column("File")
@@ -240,35 +414,92 @@ def xlsx2stf(
 def run_pipeline(
     stf_in: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
     output_dir: Path = typer.Argument(..., file_okay=False),
-    target: str = typer.Option("ja", "--target", "-t", help="Target language code."),
-    source: str = typer.Option("en", "--source", "-s", help="Source language code."),
-    language_name: Optional[str] = typer.Option(
+    target: str = typer.Option("ja", "--target", "-t"),
+    targets: Optional[str] = typer.Option(
         None,
-        "--language",
-        "-l",
-        help="Human-readable language name. Auto-derived from --target if omitted.",
+        "--targets",
+        help="Comma-separated additional target codes for multi-language batch.",
     ),
-    skip_translation: bool = typer.Option(
-        False,
-        "--skip-translation",
-        help="Convert STF -> Excel -> STF without invoking the translator (round-trip test).",
+    source: str = typer.Option(_SOURCE_SENTINEL, "--source", "-s", show_default="en"),
+    language_name: Optional[str] = typer.Option(None, "--language", "-l"),
+    backend: str = typer.Option("google", "--backend", "-b"),
+    api_key: Optional[str] = typer.Option(None, "--api-key"),
+    scope_file: Optional[Path] = typer.Option(None, "--scope-file"),
+    glossary_path: Optional[Path] = typer.Option(None, "--glossary"),
+    memory_db: Optional[Path] = typer.Option(None, "--memory-db"),
+    import_translations_path: Optional[Path] = typer.Option(
+        None, "--import-translations", help="Path to an existing translated .xlsx to reuse translations from."
+    ),
+    workers: int = typer.Option(4, "--workers", "-w"),
+    rate_limit: float = typer.Option(8.0, "--rate-limit"),
+    skip_translation: bool = typer.Option(False, "--skip-translation"),
+    fuzzy_threshold: float = typer.Option(
+        0, "--fuzzy-threshold", help="Fuzzy TM threshold (0-100). 0 = disabled."
+    ),
+    fuzzy_max_results: int = typer.Option(
+        5, "--fuzzy-max-results", help="Max fuzzy match results to consider."
+    ),
+    fuzzy_auto_accept: float = typer.Option(
+        90, "--fuzzy-auto-accept", help="Auto-accept fuzzy matches above this score (0-100)."
+    ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="Resume from checkpoint if available."
+    ),
+    reset_checkpoint: bool = typer.Option(
+        False, "--reset-checkpoint", help="Clear any existing checkpoint before starting."
+    ),
+    detect_source: bool = typer.Option(
+        True, "--detect-source/--no-detect-source",
+        help="Auto-detect source language from labels (overridden by explicit --source).",
+    ),
+    retranslate_existing: bool = typer.Option(
+        False, "--retranslate-existing",
+        help="Retranslate rows that already have translations instead of skipping them.",
     ),
 ) -> None:
-    """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF.
-
-    Every phase writes its artifact to ``OUTPUT_DIR`` so you can verify
-    intermediates without relying on the GUI.
-    """
+    """Run the full pipeline: STF -> Excel -> Translate -> Excel -> STF."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     if language_name is None:
         language_name = language_for_code(target) or target
 
+    # Determine whether --source was explicitly provided by checking for sentinel
+    source_explicitly_set = source != _SOURCE_SENTINEL
+    if not source_explicitly_set:
+        source = "en"  # default fallback
+
     organised = output_dir / "01_organized.xlsx"
-    translated = output_dir / "02_translated.xlsx"
 
     console.rule("[bold]Phase 1+2: parse STF and export Excel[/bold]")
     doc = parse_stf(stf_in)
+
+    # Auto-detect source language if enabled and --source was not explicitly set
+    if detect_source and not source_explicitly_set:
+        from .lang_detect import (
+            CONFIDENCE_THRESHOLD,
+            detect_source_language,
+            map_detected_to_salesforce,
+        )
+
+        labels = [e.label for e in doc.entries if e.label]
+        detected = detect_source_language(labels)
+        if detected:
+            iso_code, confidence = detected[0]
+            sf_code = map_detected_to_salesforce(iso_code)
+            lang_name = language_for_code(sf_code) if sf_code else iso_code
+            if confidence >= CONFIDENCE_THRESHOLD:
+                console.print(
+                    f"[blue]Detected source language:[/blue] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%]"
+                )
+                if sf_code:
+                    source = to_google_code(sf_code)
+            else:
+                console.print(
+                    f"[yellow]Low-confidence detection:[/yellow] {lang_name or iso_code} "
+                    f"({iso_code}) [confidence: {confidence * 100:.0f}%] "
+                    f"-- using default source '{source}'"
+                )
     if not doc.language:
         doc.language = language_name
     if not doc.language_code:
@@ -277,41 +508,103 @@ def run_pipeline(
     console.print(f"  [green]written[/green] {organised}")
 
     if not skip_translation:
-        console.rule("[bold]Phase 3: translate[/bold]")
-        translator = GoogleFreeTranslator()
-        result = _run_translation_with_progress(
-            doc,
-            translator,
-            to_google_code(source),
-            to_google_code(target),
-        )
-        export_document_to_excel(doc, translated)
-        write_translation_audit_sheets(
-            translated,
-            summary_rows=[s.as_audit_row() for s in result.summaries],
-            status_rows=[s.as_audit_row() for s in result.statuses],
-        )
-        console.print(
-            f"  [green]written[/green] {translated} "
-            f"(translated={result.translated_count}, skipped={result.skipped_count})"
-        )
+        targets_list = [target]
+        if targets:
+            extra = [t.strip() for t in targets.split(",") if t.strip()]
+            for t in extra:
+                if t not in targets_list:
+                    targets_list.append(t)
+
+        backend_kwargs: dict = {}
+        if api_key is not None:
+            backend_kwargs["api_key"] = api_key
+        translator = make_backend(backend, **backend_kwargs)
+        scope = Scope.load(scope_file) if scope_file else None
+        glossary = Glossary.load_csv(glossary_path) if glossary_path else None
+        memory = TranslationMemory(path=memory_db) if memory_db else None
+        rate = rate_limit if rate_limit > 0 else None
+
+        # Import existing translations if requested
+        imported_trans: Optional[dict] = None
+        if import_translations_path is not None:
+            from .import_translations import parse_translation_file
+
+            imported = parse_translation_file(import_translations_path)
+            if imported.count:
+                imported_trans = imported.translations
+                console.print(
+                    f"[blue]Imported {imported.count:,} translations from[/blue] "
+                    f"[bold]{import_translations_path}[/bold]"
+                )
+
+        for target_code in targets_list:
+            console.rule(f"[bold]Phase 3: translate -> {target_code}[/bold]")
+            per_lang_doc = parse_stf(stf_in)
+            translated_xlsx = output_dir / f"02_translated_{target_code}.xlsx"
+
+            # Checkpoint setup per target language
+            checkpoint: Optional[CheckpointStore] = None
+            if resume:
+                checkpoint = CheckpointStore(
+                    source_file=str(stf_in.resolve()),
+                    target_lang=to_google_code(target_code),
+                )
+                if reset_checkpoint:
+                    checkpoint.clear()
+
+            result = _run_translation_with_progress(
+                per_lang_doc, translator,
+                to_google_code(source), to_google_code(target_code),
+                scope=scope, memory=memory, glossary=glossary,
+                checkpoint=checkpoint,
+                workers=workers, rate_limit_per_second=rate,
+                fuzzy_threshold=fuzzy_threshold if fuzzy_threshold > 0 else None,
+                fuzzy_max_results=fuzzy_max_results,
+                fuzzy_auto_accept_threshold=fuzzy_auto_accept,
+                imported_translations=imported_trans,
+                retranslate_existing=retranslate_existing,
+            )
+            export_document_to_excel(per_lang_doc, translated_xlsx)
+            write_translation_audit_sheets(
+                translated_xlsx,
+                summary_rows=[s.as_audit_row() for s in result.summaries],
+                status_rows=[s.as_audit_row() for s in result.statuses],
+            )
+            console.print(
+                f"  [green]written[/green] {translated_xlsx} "
+                f"(translated={result.translated_count:,}, "
+                f"TM hits={result.cached_count:,}, "
+                f"fuzzy={result.fuzzy_accepted_count:,}, "
+                f"dedup={result.deduped_count:,}, "
+                f"resumed={result.resumed_count:,}, "
+                f"skipped={result.skipped_count:,})"
+            )
+
+            console.rule(f"[bold]Phase 5: STF export -> {target_code}[/bold]")
+            tname = language_name if target_code == target else (language_for_code(target_code) or target_code)
+            stf_out = output_dir / target_code if len(targets_list) > 1 else output_dir
+            stf_out.mkdir(parents=True, exist_ok=True)
+            stf_res = write_stf_files(per_lang_doc, stf_out, language_name=tname, language_code=target_code, source_name=stf_in.stem)
+            for path in stf_res.as_list():
+                console.print(f"  [green]written[/green] {path}")
     else:
         console.print("[yellow]skipping translation as requested[/yellow]")
+        console.rule("[bold]Phase 5: STF export[/bold]")
+        stf_res = write_stf_files(doc, output_dir, language_name=language_name, language_code=target, source_name=stf_in.stem)
+        for path in stf_res.as_list():
+            console.print(f"  [green]written[/green] {path}")
 
-    console.rule("[bold]Phase 5: STF export[/bold]")
-    stf_res = write_stf_files(doc, output_dir, language_name=language_name, language_code=target)
-    for path in stf_res.as_list():
-        console.print(f"  [green]written[/green] {path}")
 
+# ---------------------------------------------------------------------------
+# Validate
+# ---------------------------------------------------------------------------
 
 @app.command("validate")
 def validate(
-    source: Path = typer.Argument(..., exists=True, help="STF or .xlsx file to validate."),
-    language_code: Optional[str] = typer.Option(
-        None,
-        "--code",
-        "-c",
-        help="Salesforce language code (only required for .xlsx input).",
+    source: Path = typer.Argument(..., exists=True),
+    language_code: Optional[str] = typer.Option(None, "--code", "-c"),
+    export_report: Optional[Path] = typer.Option(
+        None, "--export-report", help="Export validation report to file (.xlsx/.csv/.json/.html)."
     ),
 ) -> None:
     """Run pre-export validation (duplicate keys, length limits, token drift, ...)."""
@@ -325,6 +618,26 @@ def validate(
         doc = parse_stf(source)
 
     report = validate_document(doc)
+
+    if export_report is not None:
+        from .report import export_csv, export_html, export_json, export_xlsx
+
+        ext = export_report.suffix.lower()
+        if ext == ".csv":
+            export_csv(report, export_report)
+        elif ext == ".json":
+            export_json(report, export_report)
+        elif ext == ".html":
+            export_html(report, export_report)
+        elif ext == ".xlsx":
+            export_xlsx(report, export_report)
+        else:
+            console.print(
+                f"[red]Unsupported report format '{ext}'. Use .csv, .json, .html, or .xlsx.[/red]"
+            )
+            raise typer.Exit(code=2)
+        console.print(f"[green]Report exported to[/green] [bold]{export_report}[/bold]")
+
     if not report.issues:
         console.print("[green]No validation issues.[/green]")
         return
@@ -351,13 +664,302 @@ def validate(
     if len(report.issues) > 200:
         console.print(f"[yellow]... and {len(report.issues) - 200} more.[/yellow]")
 
+    if report.has_errors:
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# Scope subcommands
+# ---------------------------------------------------------------------------
+
+@scope_app.command("show")
+def scope_show(
+    path: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+) -> None:
+    """Pretty-print the contents of a .stxscope.json file."""
+    scope = Scope.load(path)
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("Name", scope.name)
+    table.add_row(
+        "Components",
+        "ALL" if scope.components is None else ", ".join(sorted(scope.components)),
+    )
+    table.add_row("Status filter", scope.status.value)
+    table.add_row("Include keys", str(len(scope.include_keys)))
+    table.add_row("Include patterns", ", ".join(scope.include_patterns) or "(none)")
+    table.add_row("Exclude keys", str(len(scope.exclude_keys)))
+    table.add_row("Exclude patterns", ", ".join(scope.exclude_patterns) or "(none)")
+    console.print(table)
+
+
+@scope_app.command("new")
+def scope_new(
+    source_path: Path = typer.Argument(..., exists=True),
+    output: Path = typer.Argument(..., dir_okay=False),
+    components: Optional[str] = typer.Option(
+        None, "--components", help="Comma-separated component types to include."
+    ),
+    status: str = typer.Option(
+        "untranslated", "--status",
+        help="Status filter: untranslated / all / translated.",
+    ),
+    include: Optional[str] = typer.Option(
+        None, "--include", help="Comma-separated keys/patterns to allowlist."
+    ),
+    exclude: Optional[str] = typer.Option(
+        None, "--exclude", help="Comma-separated keys/patterns to denylist."
+    ),
+) -> None:
+    """Build a .stxscope.json scope file from a source STF / xlsx."""
+
+    if source_path.suffix.lower() == ".xlsx":
+        doc = import_document_from_excel(source_path)
+    else:
+        doc = parse_stf(source_path)
+
+    if components:
+        comps = {c.strip() for c in components.split(",") if c.strip()}
+    else:
+        comps = {e.component_type for e in doc.entries}
+
+    inc_keys = []
+    inc_patterns = []
+    if include:
+        for token in (t.strip() for t in include.split(",") if t.strip()):
+            (inc_patterns if "*" in token or "?" in token else inc_keys).append(token)
+    exc_keys = []
+    exc_patterns = []
+    if exclude:
+        for token in (t.strip() for t in exclude.split(",") if t.strip()):
+            (exc_patterns if "*" in token or "?" in token else exc_keys).append(token)
+
+    scope = Scope(
+        components=comps,
+        status=StatusFilter(status),
+        include_keys=inc_keys,
+        include_patterns=inc_patterns,
+        exclude_keys=exc_keys,
+        exclude_patterns=exc_patterns,
+        name=output.stem,
+    )
+    scope.save(output)
+    estimate = scope.estimate_count(doc)
+    console.print(
+        f"[green]OK[/green] Scope saved to [bold]{output}[/bold] "
+        f"(matches {estimate:,} of {len(doc.entries):,} rows)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Approve / Unapprove
+# ---------------------------------------------------------------------------
+
+@app.command("approve")
+def approve(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    keys: Optional[str] = typer.Option(None, "--keys", help="Comma-separated list of exact keys to approve."),
+    all_translated: bool = typer.Option(False, "--all-translated", help="Approve all translated entries."),
+) -> None:
+    """Mark entries as approved (by key list or all translated)."""
+
+    if not keys and not all_translated:
+        console.print("[red]Error:[/red] provide --keys or --all-translated.")
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    key_set = {k.strip() for k in keys.split(",") if k.strip()} if keys else set()
+
+    count = 0
+    for i, entry in enumerate(doc.entries):
+        should_approve = False
+        if all_translated and entry.translation.strip():
+            should_approve = True
+        if key_set and entry.key in key_set:
+            should_approve = True
+        if should_approve and not entry.approved:
+            doc.entries[i] = Entry(
+                key=entry.key, label=entry.label, translation=entry.translation, approved=True,
+            )
+            count += 1
+
+    _save_source(doc, source)
+    console.print(f"[green]OK[/green] Approved {count} entry(ies) in [bold]{source}[/bold].")
+
+
+@app.command("unapprove")
+def unapprove(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    keys: Optional[str] = typer.Option(None, "--keys", help="Comma-separated list of exact keys to unapprove."),
+    all_entries: bool = typer.Option(False, "--all", help="Clear approved flag on all entries."),
+) -> None:
+    """Clear the approved flag on entries (by key list or all)."""
+
+    if not keys and not all_entries:
+        console.print("[red]Error:[/red] provide --keys or --all.")
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    key_set = {k.strip() for k in keys.split(",") if k.strip()} if keys else set()
+
+    count = 0
+    for i, entry in enumerate(doc.entries):
+        should_unapprove = False
+        if all_entries:
+            should_unapprove = True
+        if key_set and entry.key in key_set:
+            should_unapprove = True
+        if should_unapprove and entry.approved:
+            doc.entries[i] = Entry(
+                key=entry.key, label=entry.label, translation=entry.translation, approved=False,
+            )
+            count += 1
+
+    _save_source(doc, source)
+    console.print(f"[green]OK[/green] Unapproved {count} entry(ies) in [bold]{source}[/bold].")
+
+
+def _load_source(source: Path) -> Document:
+    """Load a document from STF or Excel based on file extension."""
+    ext = source.suffix.lower()
+    if ext == ".xlsx":
+        return import_document_from_excel(source)
+    return parse_stf(source)
+
+
+def _save_source(doc: Document, source: Path) -> None:
+    """Save a document back to disk in the same format as the source."""
+    ext = source.suffix.lower()
+    if ext == ".xlsx":
+        export_document_to_excel(doc, source)
+    else:
+        from .stf.writer import render_full_stf as _render_full, _write_lf_utf8
+        _write_lf_utf8(source, _render_full(doc))
+
+
+# ---------------------------------------------------------------------------
+# Replace
+# ---------------------------------------------------------------------------
+
+@app.command("replace")
+def replace_cmd(
+    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    find: str = typer.Option(..., "--find", "-f", help="Text (or regex pattern) to search for."),
+    replace: str = typer.Option("", "--replace", "-r", help="Replacement text."),
+    case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Enable case-sensitive matching."),
+    regex: bool = typer.Option(False, "--regex", help="Treat --find as a regular expression."),
+    scope: str = typer.Option(
+        "translation", "--scope", "-s",
+        help="Field scope: translation / label / key / all.",
+    ),
+) -> None:
+    """Find and replace text across entries in an STF or Excel file."""
+    from .find_replace import ReplaceScope, apply_replacements, compute_replacements
+
+    scope_map = {
+        "translation": ReplaceScope.TRANSLATION,
+        "label": ReplaceScope.LABEL,
+        "key": ReplaceScope.KEY,
+        "all": ReplaceScope.ALL,
+    }
+    replace_scope = scope_map.get(scope.lower())
+    if replace_scope is None:
+        console.print(
+            f"[red]Error:[/red] invalid scope '{scope}'. "
+            "Use: translation, label, key, or all."
+        )
+        raise typer.Exit(code=2)
+
+    doc = _load_source(source)
+    replacements = compute_replacements(
+        doc,
+        find,
+        replace,
+        case_sensitive=case_sensitive,
+        use_regex=regex,
+        scope=replace_scope,
+    )
+
+    if not replacements:
+        console.print("[yellow]No matches found.[/yellow]")
+        return
+
+    apply_replacements(doc, replacements)
+    _save_source(doc, source)
+    console.print(
+        f"[green]OK[/green] Replaced {len(replacements)} occurrence(s) "
+        f"in [bold]{source}[/bold]."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Session subcommands
+# ---------------------------------------------------------------------------
+
+@session_app.command("info")
+def session_info(
+    project_file: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+) -> None:
+    """Display metadata from a saved session project file (.stxproj)."""
+    from .session import SessionManager
+
+    mgr = SessionManager()
+    try:
+        data = mgr.load(project_file)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("Version", str(data.get("version", "?")))
+    table.add_row("Source file", data.get("source_file_path", "(unknown)"))
+    table.add_row("File hash", data.get("file_hash", "")[:16] + "...")
+    table.add_row("Target language", f"{data.get('target_language_name', '')} ({data.get('target_language_code', '')})")
+    table.add_row("Source language", data.get("source_language_code", ""))
+    table.add_row("Backend", data.get("backend_key", ""))
+
+    doc = data.get("document")
+    if doc is not None:
+        table.add_row("Document entries", f"{len(doc.entries):,}")
+    else:
+        table.add_row("Document entries", "(no document)")
+
+    table.add_row("Summaries", str(len(data.get("translation_summaries", []))))
+    table.add_row("Statuses", str(len(data.get("translation_statuses", []))))
+    table.add_row("Phase status", str(data.get("phase_status", [])))
+    table.add_row("Created", data.get("created_at", ""))
+    table.add_row("Updated", data.get("updated_at", ""))
+    console.print(table)
+
+
+@session_app.command("reset")
+def session_reset(
+    source_file: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+) -> None:
+    """Clear any auto-saved session for a source file."""
+    from .session import SessionManager
+
+    mgr = SessionManager()
+    if mgr.has_session(source_file):
+        mgr.clear_session(source_file)
+        console.print(f"[green]OK[/green] Session cleared for [bold]{source_file}[/bold].")
+    else:
+        console.print(f"[yellow]No session found for[/yellow] [bold]{source_file}[/bold].")
+
+
+# ---------------------------------------------------------------------------
+# GUI launcher
+# ---------------------------------------------------------------------------
 
 @app.command("gui")
 def launch_gui() -> None:
     """Launch the desktop GUI (requires the ``[gui]`` extra)."""
 
     try:
-        from .gui.app import main  # noqa: WPS433 - intentional lazy import
+        from .gui.app import main  # noqa: WPS433
     except ImportError as exc:  # pragma: no cover
         console.print(
             "[red]The desktop GUI requires PySide6.[/red]\n"
@@ -373,31 +975,50 @@ def launch_gui() -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _run_translation_with_progress(doc, translator, source: str, target: str):
+def _run_translation_with_progress(
+    doc, translator, source: str, target: str,
+    *,
+    scope=None, memory=None, glossary=None,
+    checkpoint=None,
+    workers: int = 4, rate_limit_per_second=8.0,
+    fuzzy_threshold=None, fuzzy_max_results: int = 5,
+    fuzzy_auto_accept_threshold: float = 90.0,
+    imported_translations=None,
+    retranslate_existing: bool = False,
+):
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TaskProgressColumn(),
         TimeElapsedColumn(),
+        TimeRemainingColumn(),
         console=console,
         transient=False,
     ) as progress:
         task_id = progress.add_task("Translating", total=len(doc.entries))
 
         def on_progress(event: TranslationProgress) -> None:
-            progress.update(
-                task_id,
-                completed=event.completed,
-                description=f"Translating {event.sheet}",
-            )
+            extras = []
+            if event.rows_per_second:
+                extras.append(f"{event.rows_per_second:.1f} rows/s")
+            description = f"Translating {event.sheet}"
+            if extras:
+                description += f"  ({', '.join(extras)})"
+            progress.update(task_id, completed=event.completed, description=description)
 
         return translate_document(
-            doc,
-            translator,
-            source_lang=source,
-            target_lang=target,
+            doc, translator,
+            source_lang=source, target_lang=target,
             progress=on_progress,
+            scope=scope, memory=memory, glossary=glossary,
+            checkpoint=checkpoint,
+            workers=workers, rate_limit_per_second=rate_limit_per_second,
+            fuzzy_threshold=fuzzy_threshold,
+            fuzzy_max_results=fuzzy_max_results,
+            fuzzy_auto_accept_threshold=fuzzy_auto_accept_threshold,
+            imported_translations=imported_translations,
+            retranslate_existing=retranslate_existing,
         )
 
 

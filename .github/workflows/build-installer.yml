@@ -1,0 +1,71 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: ["release/**"]
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Sign the installer (requires certificate secrets)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Install project dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[gui]"
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: python build_exe.py
+
+      - name: Prepare dist for installer (onedir)
+        shell: pwsh
+        run: |
+          # If build_exe.py produced a single file, wrap it in a directory
+          $exePath = "dist\SalesforceTranslationHandler.exe"
+          $dirPath = "dist\SalesforceTranslationHandler"
+          if ((Test-Path $exePath) -and -not (Test-Path $dirPath)) {
+            New-Item -ItemType Directory -Path $dirPath -Force
+            Move-Item $exePath "$dirPath\SalesforceTranslationHandler.exe"
+          }
+
+      - name: Compile installer with Inno Setup
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\stx_installer.iss
+
+      - name: Sign installer
+        if: ${{ github.event.inputs.sign == 'true' && env.SIGN_CERT_PATH != '' }}
+        env:
+          SIGN_CERT_PATH: ${{ secrets.SIGN_CERT_PATH }}
+          SIGN_CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+          SIGN_TIMESTAMP_URL: "http://timestamp.digicert.com"
+        shell: pwsh
+        run: |
+          .\installer\sign_executable.ps1 -FilePath "dist\installer\SalesforceTranslationHandler_Setup_*.exe"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/SalesforceTranslationHandler_Setup_*.exe
+          if-no-files-found: error

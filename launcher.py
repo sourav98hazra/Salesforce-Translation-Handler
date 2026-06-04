@@ -20,13 +20,22 @@ def _show_fatal_error(message: str) -> None:
     Tkinter message box (in the standard library) before falling back
     to ``stderr``.
     """
+    # Write crash log as fallback
+    try:
+        import tempfile
+        from pathlib import Path as _P
+        crash_log = _P(tempfile.gettempdir()) / "stx_crash.log"
+        crash_log.write_text(message, encoding="utf-8")
+    except Exception:
+        pass
+    # Try GUI dialog
     try:
         import tkinter as tk
         from tkinter import messagebox
 
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror("Salesforce Translation Handler", message)
+        messagebox.showerror("Salesforce Translation Manager", message)
         root.destroy()
     except Exception:  # noqa: BLE001
         sys.stderr.write(message + "\n")

@@ -1,9 +1,18 @@
 [Desktop Entry]
 Type=Application
-Name=Salesforce Translation Handler
+Name=Salesforce Translation Manager
 Comment=STF -> Excel -> Translate -> Review -> STF workflow
-Exec=bash -c 'cd "$(dirname %k)" && exec ./launch.sh'
-Icon=text-x-generic
+Exec=bash -c 'cd "$(dirname "$1")" && exec ./launch.sh' bash %k
+Icon=src/stx/gui/assets/logo.png
 Terminal=false
 Categories=Utility;Development;
 StartupNotify=true
+
+# --- Installation ---
+# Run the install script from the repo root to generate a desktop entry
+# with correct absolute paths:
+#
+#   bash scripts/install_desktop_entry.sh
+#
+# This creates ~/.local/share/applications/SalesforceTranslationHandler.desktop
+# with absolute Exec and Icon paths. Re-run if you move the repository.
