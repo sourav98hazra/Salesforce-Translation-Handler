@@ -1465,6 +1465,8 @@ class Phase3TranslatePage(PhasePage):
             self._next_btn.setEnabled(True)
             # Clear previous run state since we're loading a new document
             self._clear_run_state()
+            # Mark this phase as active (so on_enter IDLE check doesn't block)
+            self._state.set_phase(1, PhaseStatus.DONE)  # upstream = done (bypassed)
             # Clear checkpoint for the old file
             cp = self._build_checkpoint()
             if cp is not None and cp.exists():

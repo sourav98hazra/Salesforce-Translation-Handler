@@ -347,6 +347,8 @@ class Phase2ExcelPage(PhasePage):
         # Auto-detect source language from labels
         self._detect_source_language(doc)
 
+        # Mark upstream as done so on_enter IDLE check doesn't block
+        self._state.set_phase(0, PhaseStatus.DONE)
         self.on_enter()
 
         # Populate Content Details table from the loaded document

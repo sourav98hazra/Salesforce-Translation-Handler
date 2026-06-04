@@ -1040,6 +1040,8 @@ class Phase4ReviewPage(PhasePage):
             timestamp=time.time(),
         )
         self.set_busy(False)
+        # Mark upstream as done so on_enter IDLE check doesn't block
+        self._state.set_phase(2, PhaseStatus.DONE)
         self.on_enter()
         self.status_message.emit(
             f"Loaded {len(doc.entries):,} rows from {path.name}.  "
