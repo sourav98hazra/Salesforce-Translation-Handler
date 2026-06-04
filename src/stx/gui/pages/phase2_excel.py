@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..workers import ExportExcelWorker, ImportExcelWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
@@ -184,6 +185,17 @@ class Phase2ExcelPage(PhasePage):
             )
         except Exception:  # noqa: BLE001
             pass
+
+        # Take Phase 2 snapshot
+        if self._state.document is not None:
+            self._state.phase_snapshots[1] = PhaseSnapshot(
+                source_path=result.path,
+                artifact_type="organized_excel",
+                row_count=len(self._state.document.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
         total_sheets = len(result.sheets_written)
         # If there is a Content Details sheet, separate the count
         has_content_details = any(
@@ -309,6 +321,18 @@ class Phase2ExcelPage(PhasePage):
             current_phase=1,
             override_existing=False,
             reset_downstream=False,
+        )
+
+        # Clear downstream snapshots and take Phase 2 snapshot
+        for i in range(1, 6):
+            self._state.phase_snapshots[i] = None
+        self._state.phase_snapshots[1] = PhaseSnapshot(
+            source_path=path,
+            artifact_type="organized_excel",
+            row_count=len(doc.entries),
+            target_language_code=self._state.target_language_code,
+            target_language_name=self._state.target_language_name,
+            timestamp=time.time(),
         )
 
         # Auto-detect source language from labels

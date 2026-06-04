@@ -18,6 +18,7 @@ Warnings are surfaced but don't block export.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -49,7 +50,7 @@ from ...validate import (
     get_limit_overrides,
     validate_document,
 )
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..workers import ExportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
 
@@ -424,6 +425,17 @@ class Phase5ValidatePage(PhasePage):
                 current_phase=4,
                 override_existing=False,
                 reset_downstream=False,
+            )
+            # Clear downstream snapshots and take Phase 5 snapshot
+            for i in range(4, 6):
+                self._state.phase_snapshots[i] = None
+            self._state.phase_snapshots[4] = PhaseSnapshot(
+                source_path=path,
+                artifact_type="reviewed_excel",
+                row_count=len(doc.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
             )
             self.set_busy(False)
             self.on_enter()
@@ -836,6 +848,17 @@ class Phase5ValidatePage(PhasePage):
             gui_settings.add_recent_file(path)
         except Exception:  # noqa: BLE001
             pass
+
+        # Take Phase 5 snapshot
+        if self._state.document is not None:
+            self._state.phase_snapshots[4] = PhaseSnapshot(
+                source_path=path,
+                artifact_type="fixed_excel",
+                row_count=len(self._state.document.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
 
     def _on_save_failed(self, message: str) -> None:
         self.set_busy(False)

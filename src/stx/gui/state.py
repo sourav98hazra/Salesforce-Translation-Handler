@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Set
+from typing import TYPE_CHECKING, Any, List, Optional, Set, Tuple
 
 from ..glossary import Glossary
 from ..memory import TranslationMemory
@@ -29,6 +29,22 @@ class PhaseStatus(IntEnum):
     RUNNING = 1
     DONE = 2
     ERROR = 3
+
+
+@dataclass
+class PhaseSnapshot:
+    """Immutable record of the state at the end of a phase.
+
+    Used by Reset Current Phase and Clear Checkpoint to restore the
+    document to the state it was in when a phase last completed.
+    """
+
+    source_path: Path
+    artifact_type: str  # 'stf', 'organized_excel', 'translated_excel', 'reviewed_excel', 'fixed_excel'
+    row_count: int
+    target_language_code: str
+    target_language_name: str
+    timestamp: float
 
 
 @dataclass
@@ -124,6 +140,10 @@ class AppState:
     last_translation_progress: Optional[dict] = None
     last_export_paths: Optional[List[Path]] = None
 
+    phase_snapshots: List[Optional[PhaseSnapshot]] = field(
+        default_factory=lambda: [None] * 6
+    )
+
     def reset_translation_audit(self) -> None:
         self.translation_summaries = []
         self.translation_statuses = []
@@ -207,6 +227,7 @@ class AppState:
         self.last_validation_report = None
         self.last_translation_progress = None
         self.last_export_paths = None
+        self.phase_snapshots = [None] * 6
 
     def mark_phase_completed(self, phase_index: int) -> None:
         """Mark a phase as completed in the workflow context."""

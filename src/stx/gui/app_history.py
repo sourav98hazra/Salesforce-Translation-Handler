@@ -64,6 +64,7 @@ _CONTAINER_FIELDS = (
     "completed_phases",
     "backend_options",
     "last_export_paths",
+    "phase_snapshots",
 )
 
 

@@ -43,7 +43,7 @@ from ...checkpoint import CheckpointStore
 from ...scope import Scope, StatusFilter
 from .. import settings as gui_settings
 from .. import secrets as gui_secrets
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..workers import ExportExcelWorker, TranslationWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, compact_btn, primary
 
@@ -1292,6 +1292,17 @@ class Phase3TranslatePage(PhasePage):
         self._state.set_phase(2, PhaseStatus.DONE)
         self.status_message.emit(f"Translated workbook saved: {path}")
 
+        # Take Phase 3 snapshot
+        if self._state.document is not None:
+            self._state.phase_snapshots[2] = PhaseSnapshot(
+                source_path=path,
+                artifact_type="translated_excel",
+                row_count=len(self._state.document.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
+
     def _on_save_failed(self, message: str) -> None:
         self.set_busy(False)
         self._save_copy_btn.setEnabled(self._state.document is not None)
@@ -1408,6 +1419,17 @@ class Phase3TranslatePage(PhasePage):
                 override_existing=False,
                 reset_downstream=False,
             )
+            # Clear downstream snapshots and take Phase 3 snapshot
+            for i in range(2, 6):
+                self._state.phase_snapshots[i] = None
+            self._state.phase_snapshots[2] = PhaseSnapshot(
+                source_path=path,
+                artifact_type="organized_excel",
+                row_count=len(doc.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
             # Reset component selection so Filter Components picks up the new doc.
             self._selected_components = {e.component_type for e in doc.entries}
             # Suggest a professional default translated output path for Save a Copy...
@@ -1470,6 +1492,19 @@ class Phase3TranslatePage(PhasePage):
         cp = self._build_checkpoint()
         if cp is not None and cp.exists():
             cp.clear()
+
+        # Restore document from Phase 2 snapshot (pre-translation state)
+        snapshot = self._state.phase_snapshots[1]
+        if snapshot is not None and snapshot.source_path.exists():
+            from ...excel import import_document_from_excel
+
+            doc = import_document_from_excel(
+                snapshot.source_path,
+                language=snapshot.target_language_name,
+                language_code=snapshot.target_language_code,
+            )
+            self._state.document = doc
+            self._state.organized_xlsx_path = snapshot.source_path
 
         # Clear run state (log, counters, progress, retry button)
         self._clear_run_state()

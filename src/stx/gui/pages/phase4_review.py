@@ -17,6 +17,7 @@ of editing outside the app.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -51,7 +52,7 @@ from PySide6.QtWidgets import (
 from ...model import Document, Entry
 from ...validate import validate_document
 from ..find_replace_dialog import FindReplaceDialog
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..undo import UndoCommand, UndoStack
 from ..workers import ExportExcelWorker, ImportExcelWorker, WriteAuditSheetsWorker
 from .base import PhasePage, add_popout_to_groupbox, compact_btn, make_action_row, primary
@@ -986,6 +987,17 @@ class Phase4ReviewPage(PhasePage):
             override_existing=False,
             reset_downstream=False,
         )
+        # Clear downstream snapshots and take Phase 4 snapshot
+        for i in range(3, 6):
+            self._state.phase_snapshots[i] = None
+        self._state.phase_snapshots[3] = PhaseSnapshot(
+            source_path=path,
+            artifact_type="reviewed_excel",
+            row_count=len(doc.entries),
+            target_language_code=self._state.target_language_code,
+            target_language_name=self._state.target_language_name,
+            timestamp=time.time(),
+        )
         self.set_busy(False)
         self.on_enter()
         self.status_message.emit(
@@ -1068,6 +1080,17 @@ class Phase4ReviewPage(PhasePage):
         self._state.has_unsaved_changes = False
         self.set_busy(False)
         self.status_message.emit(f"Reviewed workbook saved: {path}")
+
+        # Take Phase 4 snapshot
+        if self._state.document is not None:
+            self._state.phase_snapshots[3] = PhaseSnapshot(
+                source_path=path,
+                artifact_type="reviewed_excel",
+                row_count=len(self._state.document.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
 
     def _on_save_failed(self, message: str) -> None:
         self.set_busy(False)

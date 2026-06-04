@@ -16,6 +16,7 @@ Flow for "direct convert" users:
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -34,7 +35,7 @@ from PySide6.QtWidgets import (
 
 from ...languages import LANGUAGE_NAME_TO_CODE, code_for_language, supported_language_names
 from ...validate import validate_document
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..workers import ImportExcelWorker, WriteStfWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row, primary
 
@@ -205,6 +206,15 @@ class Phase6ExportPage(PhasePage):
             current_phase=5,
             override_existing=False,
             reset_downstream=False,
+        )
+        # Clear Phase 6 snapshot and take a new one
+        self._state.phase_snapshots[5] = PhaseSnapshot(
+            source_path=path,
+            artifact_type="reviewed_excel",
+            row_count=len(doc.entries),
+            target_language_code=self._state.target_language_code,
+            target_language_name=self._state.target_language_name,
+            timestamp=time.time(),
         )
         self.set_busy(False)
         self.on_enter()

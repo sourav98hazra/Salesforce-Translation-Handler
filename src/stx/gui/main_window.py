@@ -27,6 +27,7 @@ Translate / Browse & Review / Validate & Fix / Export STF) with:
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -64,7 +65,7 @@ from .pages.phase3_translate import Phase3TranslatePage
 from .pages.phase4_review import Phase4ReviewPage
 from .pages.phase5_validate import Phase5ValidatePage
 from .pages.phase6_export import Phase6ExportPage
-from .state import AppState, PhaseStatus
+from .state import AppState, PhaseSnapshot, PhaseStatus
 from .app_history import AppHistory, capture_snapshot, restore_snapshot
 from .workers import ImportExcelWorker, ParseStfWorker
 from .dialogs.override_dialog import (
@@ -1130,6 +1131,15 @@ class MainWindow(QMainWindow):
             start_phase=0,
             current_phase=0,
         )
+        # Take Phase 1 snapshot
+        self._state.phase_snapshots[0] = PhaseSnapshot(
+            source_path=path,
+            artifact_type="stf",
+            row_count=len(doc.entries),
+            target_language_code=self._state.target_language_code,
+            target_language_name=self._state.target_language_name,
+            timestamp=time.time(),
+        )
         # Phase 0 (Import STF) is now complete -- jump to Phase 1 (STF -> Excel).
         self._state.set_phase(0, PhaseStatus.DONE)
         self._goto(1)
@@ -1492,6 +1502,9 @@ class MainWindow(QMainWindow):
         # Clear workflow context
         self._state.clear_workflow_context()
 
+        # Clear phase snapshots
+        self._state.phase_snapshots = [None] * 6
+
         # Visually reset all phase pages
         for page in self._pages:
             page.reset_page()
@@ -1614,10 +1627,25 @@ class MainWindow(QMainWindow):
         # via override in the current phase or downstream.
         # Detection: if source_stf_path is set AND current > 0, the document came
         # from Phase 1 and should be preserved for the "go back, click Continue" flow.
-        if current <= 0 or self._state.source_stf_path is None:
+
+        # Try to restore document from upstream snapshot
+        upstream_snapshot = None
+        for i in range(current - 1, -1, -1):
+            snap = self._state.phase_snapshots[i]
+            if snap is not None:
+                upstream_snapshot = snap
+                break
+
+        if upstream_snapshot is not None and upstream_snapshot.source_path.exists():
+            self._restore_from_snapshot(upstream_snapshot)
+        elif current <= 0 or self._state.source_stf_path is None:
             # Resetting Phase 1, or document came from an override (no Phase 1 import)
             self._state.document = None
             self._state.source_stf_path = None
+
+        # Clear snapshots from current phase onwards
+        for i in range(current, 6):
+            self._state.phase_snapshots[i] = None
 
         if current <= 1:
             self._state.organized_xlsx_path = None
@@ -1658,3 +1686,21 @@ class MainWindow(QMainWindow):
         self._update_sidebar_footer()
         self._pages[current].on_enter()
         self._log(f"Reset Phase {current + 1} and all downstream phases.")
+
+    def _restore_from_snapshot(self, snapshot: PhaseSnapshot) -> None:
+        """Reload the document from an upstream phase snapshot."""
+        from ..stf import parse_stf
+        from ..excel import import_document_from_excel
+
+        path = snapshot.source_path
+        if snapshot.artifact_type == "stf":
+            doc = parse_stf(path)
+            self._state.document = doc
+            self._state.source_stf_path = path
+        else:
+            doc = import_document_from_excel(
+                path,
+                language=snapshot.target_language_name,
+                language_code=snapshot.target_language_code,
+            )
+            self._state.document = doc

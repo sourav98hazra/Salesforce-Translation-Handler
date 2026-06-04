@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import (
 
 from ...languages import LANGUAGE_NAME_TO_CODE, code_for_language, supported_language_names
 from ...stf import write_stf_files
-from ..state import AppState, PhaseStatus
+from ..state import AppState, PhaseSnapshot, PhaseStatus
 from ..workers import ParseStfWorker, WriteStfWorker
 from .base import PhasePage, add_popout_to_groupbox, make_action_row
 
@@ -365,6 +366,17 @@ class Phase1ImportPage(PhasePage):
         )
         if self._state.source_stf_path is not None:
             self.action_recorded.emit(f"Load STF ({self._state.source_stf_path.name})")
+
+        # Take Phase 1 snapshot
+        if self._state.document is not None and self._state.source_stf_path is not None:
+            self._state.phase_snapshots[0] = PhaseSnapshot(
+                source_path=self._state.source_stf_path,
+                artifact_type="stf",
+                row_count=len(self._state.document.entries),
+                target_language_code=self._state.target_language_code,
+                target_language_name=self._state.target_language_name,
+                timestamp=time.time(),
+            )
 
     def _detect_source_language(self, doc) -> None:
         """Run language detection on labels and populate the source language dropdown."""
