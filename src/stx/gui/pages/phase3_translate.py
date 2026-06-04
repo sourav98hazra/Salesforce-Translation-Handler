@@ -1185,9 +1185,12 @@ class Phase3TranslatePage(PhasePage):
         # Mark the phase done so users can navigate forward; the Save
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
-        failed_count = len(self._state.translation_failed_indices)
-        if failed_count > 0:
-            self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
+        # Use done.failed_count (actual API failures) for the retry button,
+        # not translation_failed_indices (which includes any in-scope row
+        # with empty translation, e.g. blank labels that were skipped).
+        self._last_run_failed_count = rows_failed
+        if rows_failed > 0:
+            self._retry_btn.setText(f"Retry {rows_failed:,} failed rows")
             self._retry_btn.setVisible(True)
         else:
             self._retry_btn.setVisible(False)
