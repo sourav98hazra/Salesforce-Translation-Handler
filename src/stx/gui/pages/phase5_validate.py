@@ -472,16 +472,21 @@ class Phase5ValidatePage(PhasePage):
                         ))
         self._render_issues()
         self._update_banner()
+        # Count from self._issues which includes translation_failed entries
+        total_errors = sum(1 for i in self._issues if i.severity == "error")
+        total_warnings = sum(1 for i in self._issues if i.severity == "warning")
         self.status_message.emit(
-            f"Validation: {len(self._report.errors)} error(s), "
-            f"{len(self._report.warnings)} warning(s)."
+            f"Validation: {total_errors} error(s), "
+            f"{total_warnings} warning(s)."
         )
 
     def _update_banner(self) -> None:
         if self._report is None:
             return
-        errors = self._report.errors
-        warnings = self._report.warnings
+        # Count from self._issues (includes translation_failed additions)
+        # rather than self._report which only has validator-detected issues.
+        errors = [i for i in self._issues if i.severity == "error"]
+        warnings = [i for i in self._issues if i.severity == "warning"]
 
         # Check if custom overrides are active
         _overrides_suffix = ""
