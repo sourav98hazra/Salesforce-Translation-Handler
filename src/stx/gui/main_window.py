@@ -1574,6 +1574,21 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
 
         from .. import settings as gui_settings
+        from .state import PhaseStatus
+
+        # Prevent clearing TM while translation is running (worker holds a
+        # reference to the TM object and the SQLite file is locked).
+        if (
+            len(self._state.phase_status) > 2
+            and self._state.phase_status[2] == PhaseStatus.RUNNING
+        ):
+            self._log("Clear TM: cannot clear while translation is running.")
+            QMessageBox.warning(
+                self, "Translation Running",
+                "Cannot clear Translation Memory while a translation is in progress.\n\n"
+                "Please wait for translation to complete or cancel it first."
+            )
+            return
 
         # Determine TM path: use state reference first, then settings, then default
         tm_path = None
