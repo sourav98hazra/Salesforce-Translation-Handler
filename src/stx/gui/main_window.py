@@ -1581,8 +1581,8 @@ class MainWindow(QMainWindow):
         self._state.memory = None
         self._state.memory_path = None
 
-        # Reset current phase and downstream to IDLE
-        for i in range(current, len(self._state.phase_status)):
+        # Reset ALL phase statuses to IDLE (document is fully cleared)
+        for i in range(len(self._state.phase_status)):
             self._state.phase_status[i] = PS.IDLE
 
         # Clear any checkpoint for the current document/target language
@@ -1601,44 +1601,39 @@ class MainWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 pass  # best effort
 
-        # Clear phase-specific state for current and downstream
-        if current <= 0:
-            # Resetting from Phase 1: clear everything
-            self._state.document = None
-            self._state.source_stf_path = None
-        if current <= 1:
-            # Clear organized xlsx path so Phase 2 re-converts on re-entry
-            self._state.organized_xlsx_path = None
-            self._state.translated_xlsx_path = None
-        if current <= 2:
-            # Clear translation audit data
-            self._state.translation_summaries = []
-            self._state.translation_statuses = []
-            self._state.translated_xlsx_path = None
+        # Clear ALL document and path state unconditionally.
+        # When a user loads a file via override (Load existing .xlsx / Load Excel)
+        # in ANY phase and then resets, the overridden document must be cleared.
+        # The user expects a full clean slate from the current phase onwards.
+        self._state.document = None
+        self._state.source_stf_path = None
+        self._state.organized_xlsx_path = None
+        self._state.translated_xlsx_path = None
+        self._state.reviewed_xlsx_path = None
+        self._state.output_dir = None
 
-            # Clear translation scope tracking
-            self._state.translation_failed_indices = set()
-            self._state.translation_scope_indices = set()
+        # Clear translation audit data
+        self._state.translation_summaries = []
+        self._state.translation_statuses = []
 
-            # Clear scope and glossary
-            self._state.scope = None
-            self._state.scope_path = None
-            self._state.glossary = None
-            self._state.glossary_path = None
+        # Clear translation scope tracking
+        self._state.translation_failed_indices = set()
+        self._state.translation_scope_indices = set()
 
-            # Clear imported translations
-            self._state.imported_translations = None
-            self._state.imported_translations_path = None
-            self._state.imported_translations_enabled = False
+        # Clear scope and glossary
+        self._state.scope = None
+        self._state.scope_path = None
+        self._state.glossary = None
+        self._state.glossary_path = None
 
-            # Clear retranslate flag
-            self._state.retranslate_existing = False
-        if current <= 3:
-            # Clear review path
-            self._state.reviewed_xlsx_path = None
-        if current <= 4:
-            # Clear validation report
-            self._state.last_validation_report = None
+        # Clear imported translations
+        self._state.imported_translations = None
+        self._state.imported_translations_path = None
+        self._state.imported_translations_enabled = False
+
+        # Clear retranslate flag and other settings
+        self._state.retranslate_existing = False
+        self._state.last_validation_report = None
 
         # Clear unsaved changes flag
         self._state.has_unsaved_changes = False
@@ -1646,11 +1641,10 @@ class MainWindow(QMainWindow):
         # Clear workflow context so subsequent loads don't trigger stale override dialogs
         self._state.clear_workflow_context()
 
-        # Visually reset all pages from current phase onwards.
-        # This ensures downstream phases (e.g. Phase 4 when resetting Phase 2)
-        # also clear their displayed state so stale values never linger.
-        for i in range(current, len(self._pages)):
-            self._pages[i].reset_page()
+        # Visually reset ALL pages -- since document and state are fully cleared,
+        # all phases (including upstream) must show their default empty state.
+        for page in self._pages:
+            page.reset_page()
 
         self._refresh_phase_badges()
         self._update_sidebar_footer()
