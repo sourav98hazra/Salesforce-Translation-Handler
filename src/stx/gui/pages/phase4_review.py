@@ -720,21 +720,15 @@ class Phase4ReviewPage(PhasePage):
         if self._state.document is None:
             return
         stats = self._state.document.stats()
-        # Show Translated breakdown: PreExisting (already had translation) vs
-        # Included (translated in this run = in-scope entries that now have translations)
-        if self._state.translation_scope_indices:
-            # Count how many in-scope rows now have translations (= successfully translated this run)
-            included = sum(
-                1 for idx in self._state.translation_scope_indices
-                if idx < len(self._state.document.entries)
-                and self._state.document.entries[idx].translation.strip()
-            )
-            pre_existing = stats['translated'] - included
-            if pre_existing < 0:
-                pre_existing = 0
+        # Show Translated breakdown: New (translated in this run) vs
+        # Pre-existing (already had translations, kept as-is)
+        if self._state.translation_summaries:
+            # Use the authoritative counts from the translation runner
+            new_count = sum(s.translated_rows for s in self._state.translation_summaries)
+            pre_existing = sum(s.skipped_rows for s in self._state.translation_summaries)
             self._stat_translated["value"].setText(f"{stats['translated']:,}")
             self._stat_translated["subtitle"].setText(
-                f"PreExisting: {pre_existing:,} | Included: {included:,}"
+                f"New: {new_count:,} | Pre-existing: {pre_existing:,}"
             )
             self._stat_translated["subtitle"].setVisible(True)
         else:
