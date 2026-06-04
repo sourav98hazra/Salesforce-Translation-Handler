@@ -412,6 +412,8 @@ class Phase5ValidatePage(PhasePage):
             self._state.document = doc
             self._state.reviewed_xlsx_path = path
             self._state.output_dir = path.parent
+            # Clear source_stf_path: the document no longer comes from Phase 1's STF.
+            self._state.source_stf_path = None
             # Set active workflow context so subsequent loads trigger override dialog.
             self._state.set_active_workflow_context(
                 document=doc,

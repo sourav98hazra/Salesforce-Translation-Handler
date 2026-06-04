@@ -193,6 +193,8 @@ class Phase6ExportPage(PhasePage):
         self._state.document = doc
         self._state.reviewed_xlsx_path = path
         self._state.output_dir = path.parent
+        # Clear source_stf_path: the document no longer comes from Phase 1's STF.
+        self._state.source_stf_path = None
         # Set the active workflow context so future loads trigger the override dialog.
         self._state.set_active_workflow_context(
             document=doc,

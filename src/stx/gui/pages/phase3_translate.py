@@ -1394,6 +1394,8 @@ class Phase3TranslatePage(PhasePage):
             self._state.document = doc
             self._state.organized_xlsx_path = path
             self._state.output_dir = path.parent
+            # Clear source_stf_path: the document no longer comes from Phase 1's STF.
+            self._state.source_stf_path = None
             gui_settings.add_recent_file(path)
             # Set active workflow context so subsequent loads trigger override dialog.
             self._state.set_active_workflow_context(

@@ -1608,14 +1608,20 @@ class MainWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 pass  # best effort
 
-        # --- Clear all state from the current phase onwards ---
-        # This is "Reset Session scoped to this phase and downstream":
-        # the document is always cleared (just like Reset Session does),
-        # all paths from current phase onwards are cleared, and all
-        # auxiliary state (scope, glossary, imports) is wiped.
-        self._state.document = None
-        self._state.source_stf_path = None
-        self._state.organized_xlsx_path = None
+        # --- Clear state from the current phase onwards ---
+        # The document is preserved if it came from an upstream phase (normal flow).
+        # It is cleared if the reset is from Phase 1, or if the document was loaded
+        # via override in the current phase or downstream.
+        # Detection: if source_stf_path is set AND current > 0, the document came
+        # from Phase 1 and should be preserved for the "go back, click Continue" flow.
+        if current <= 0 or self._state.source_stf_path is None:
+            # Resetting Phase 1, or document came from an override (no Phase 1 import)
+            self._state.document = None
+            self._state.source_stf_path = None
+
+        if current <= 1:
+            self._state.organized_xlsx_path = None
+
         self._state.translated_xlsx_path = None
         self._state.reviewed_xlsx_path = None
         self._state.output_dir = None

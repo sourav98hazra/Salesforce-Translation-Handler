@@ -157,6 +157,10 @@ class Phase2ExcelPage(PhasePage):
         worker.start()
 
     def _on_exported(self, result) -> None:
+        # Guard: if the document was cleared (e.g. by Reset Phase) while the
+        # export worker was running, discard this stale callback.
+        if self._state.document is None:
+            return
         self._state.organized_xlsx_path = result.path
         self._state.output_dir = result.path.parent
         self._populate_details(result)
@@ -291,6 +295,9 @@ class Phase2ExcelPage(PhasePage):
         self._state.document = doc
         self._state.organized_xlsx_path = path
         self._state.output_dir = path.parent
+        # Clear source_stf_path: the document no longer comes from Phase 1's STF.
+        # This signals that an override occurred (used by Reset Current Phase).
+        self._state.source_stf_path = None
 
         # Set active workflow context so subsequent loads trigger override dialog.
         self._state.set_active_workflow_context(
