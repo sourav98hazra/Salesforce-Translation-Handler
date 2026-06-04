@@ -451,6 +451,7 @@ class Phase5ValidatePage(PhasePage):
             self.status_message.emit(
                 f"Loaded {len(doc.entries):,} rows from {path.name}; running validation."
             )
+            self.action_recorded.emit(f"Load Excel ({path.name})")
             try:
                 from .. import settings as gui_settings
                 gui_settings.add_recent_file(path)

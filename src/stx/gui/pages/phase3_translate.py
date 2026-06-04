@@ -1474,6 +1474,7 @@ class Phase3TranslatePage(PhasePage):
                 f"Loaded {len(doc.entries):,} rows from {path.name}.  "
                 f"Click 'Filter Components...' to select which to translate, then Start."
             )
+            self.action_recorded.emit(f"Load Excel ({path.name})")
 
         worker.finished_ok.connect(_loaded)
         worker.failed.connect(lambda msg: self.error(msg, "Load failed"))

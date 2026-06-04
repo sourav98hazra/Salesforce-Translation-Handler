@@ -1045,6 +1045,7 @@ class Phase4ReviewPage(PhasePage):
             f"Loaded {len(doc.entries):,} rows from {path.name}.  "
             "This is now the latest version."
         )
+        self.action_recorded.emit(f"Load Excel ({path.name})")
         try:
             from .. import settings as gui_settings
             gui_settings.add_recent_file(path)

@@ -237,6 +237,7 @@ class Phase6ExportPage(PhasePage):
             f"Loaded {len(doc.entries):,} rows from {path.name}.  "
             f"Ready for direct STF export."
         )
+        self.action_recorded.emit(f"Load Excel ({path.name})")
         try:
             from .. import settings as gui_settings
             gui_settings.add_recent_file(path)
