@@ -879,7 +879,7 @@ class Phase3TranslatePage(PhasePage):
         self._skipped_count = 0
         self._current_row = 0
         scope_count = scope.estimate_count(self._state.document) if scope else len(self._state.document.entries)
-        self._total_rows = scope_count
+        self._total_rows = len(self._state.document.entries)
         self._start_time = time.time()
         self._log.clear()
 
@@ -887,7 +887,7 @@ class Phase3TranslatePage(PhasePage):
         src_code = code_for_language(self._source_combo.currentText()) or "en"
         self._log.appendPlainText(
             f"\u2500\u2500  {src_code.upper()} \u2192 {self._state.target_language_code.upper()}  "
-            f"\u2500\u2500  rows to translate: {self._total_rows:,}  |  workers: {workers}"
+            f"\u2500\u2500  rows to process: {self._total_rows:,} (in scope: {scope_count:,})  |  workers: {workers}"
         )
         self._log.appendPlainText(
             "  Legend: Translated = via API  |  Memory = via Translation Memory  "

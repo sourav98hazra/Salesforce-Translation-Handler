@@ -244,7 +244,7 @@ class TranslationWorker(QThread):
                 event.percent,
                 f"[{event.completed}/{event.total}] {event.sheet} :: {event.key} -> {event.status}",
             )
-            if event.status.startswith("Translated") or event.status.startswith("Skipped"):
+            if not event.status.startswith("Not processed"):
                 self.row_translated.emit(
                     event.source_text or "",
                     event.translation_text or "",
