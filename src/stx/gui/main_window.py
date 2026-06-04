@@ -1678,15 +1678,14 @@ class MainWindow(QMainWindow):
         self._state.phase_snapshots[:current] = upstream_snaps
 
         # Visually reset pages from current phase onwards.
-        # Upstream pages keep their displayed state (cosmetic only --
-        # the underlying data is cleared, so navigating back will
-        # show them as empty via their on_enter()).
+        # Do NOT call on_enter() -- it would auto-convert/repopulate from
+        # upstream data.  The user should manually navigate back to Phase N-1
+        # and click "Continue" to re-forward data (like first time).
         for i in range(current, len(self._pages)):
             self._pages[i].reset_page()
 
         self._refresh_phase_badges()
         self._update_sidebar_footer()
-        self._pages[current].on_enter()
         self._log(f"Reset Phase {current + 1} and all downstream phases.")
 
     def _restore_from_snapshot(self, snapshot: PhaseSnapshot) -> None:
