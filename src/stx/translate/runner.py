@@ -102,6 +102,7 @@ class SheetSummary:
     total_rows: int = 0
     translated_rows: int = 0
     skipped_rows: int = 0
+    failed_rows: int = 0
     cached_rows: int = 0  # how many came from the translation memory
     deduped_rows: int = 0  # how many came from in-run dedup
 
@@ -111,6 +112,7 @@ class SheetSummary:
             "Total Rows": self.total_rows,
             "Translated Rows": self.translated_rows,
             "Skipped Rows": self.skipped_rows,
+            "Failed Rows": self.failed_rows,
             "TM Hits": self.cached_rows,
             "Dedup Hits": self.deduped_rows,
         }
@@ -963,6 +965,7 @@ class _Runner:
                 status=status,
             )
             self._failed += 1
+            summary.failed_rows += 1
         # Checkpoint permanent failures so they are not retried on resume.
         # Transient errors (network timeouts, rate limits) are left un-checkpointed
         # so they get a fresh attempt on the next run.

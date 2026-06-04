@@ -1070,6 +1070,8 @@ class Phase3TranslatePage(PhasePage):
                         summary.deduped_rows += 1
                 elif s.status.startswith("Skipped"):
                     summary.skipped_rows += 1
+                elif s.status.startswith("Translation failed"):
+                    summary.failed_rows += 1
             self._state.translation_summaries = list(merged_summaries.values())
         else:
             # First run - simple assignment

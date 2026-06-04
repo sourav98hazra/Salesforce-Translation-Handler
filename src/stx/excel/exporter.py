@@ -144,7 +144,7 @@ def write_translation_audit_sheets(
 
     summary_columns = [
         "Sheet Name", "Total Rows", "Translated Rows", "Skipped Rows",
-        "TM Hits", "Dedup Hits",
+        "Failed Rows", "TM Hits", "Dedup Hits",
     ]
     status_columns = ["Sheet Name", "Row Index", "Key", "Label", "Translation", "Status"]
 
