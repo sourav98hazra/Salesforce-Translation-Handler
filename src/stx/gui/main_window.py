@@ -1622,11 +1622,11 @@ class MainWindow(QMainWindow):
             # Even if no file on disk, clear the in-memory reference
             self._state.memory = None
             self._state.memory_path = None
-            self._log("Clear TM: no Translation Memory database found on disk.")
+            self._log(f"Clear TM: no database found at {tm_path}")
             QMessageBox.information(
                 self, "Translation Memory",
-                "No Translation Memory database found.\n"
-                f"Expected at: {tm_path}"
+                "No Translation Memory cache exists yet.\n"
+                "Translations will be cached after your first translation run."
             )
             return
 
@@ -1635,10 +1635,10 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.warning(
             self,
             "Clear Translation Memory",
-            f"Delete the Translation Memory database?\n\n"
-            f"File: {tm_path.name} ({size_kb:.0f} KB)\n\n"
-            f"All cached translations from previous runs will be permanently lost.\n"
-            f"This cannot be undone.",
+            "Delete all cached translations?\n\n"
+            f"This will clear {size_kb:.0f} KB of cached translation data.\n\n"
+            "All cached translations from previous runs will be permanently lost.\n"
+            "This cannot be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -1670,7 +1670,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, "Translation Memory",
                 "Translation Memory has been cleared successfully.\n"
-                f"Deleted: {tm_path.name}"
+                "All cached translations from previous runs have been removed."
             )
         except Exception as exc:
             self._log(f"Clear TM failed: {exc}")
