@@ -246,31 +246,55 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Phase 3 — Translate",
         "What happens when the API fails for a specific row?",
-        "If a row fails all retries, it stays untranslated (the translation field remains empty). "
-        "You can retry failed rows in Phase 3 using the Retry button, or manually translate them "
-        "in Phase 4. The retry button count matches the 'Rows failed' number from the summary "
-        "(it uses done.failed_count). Phase 4 shows failed rows in the 'Untranslated' count with a "
-        "'(Failed: N)' breakdown so you can easily see how many need attention.",
+        "If a row fails all retries (network error, rate limit, invalid response), it stays "
+        "untranslated (the translation field remains empty). The app handles failures as follows:\n"
+        "1. The row is marked with status 'Translation failed (<reason>)'\n"
+        "2. It appears in the summary under 'Rows failed' and 'Failed Translations'\n"
+        "3. The Retry button appears showing the exact failed count (e.g. 'Retry 5 failed rows'). "
+        "This count comes from done.failed_count and matches the summary's 'Rows failed' exactly.\n"
+        "4. In Phase 4, failed rows show in the 'Untranslated' counter with a subtitle "
+        "'Failed: N | Excluded: Y' when scope information is available\n"
+        "5. In Phase 5, failed rows appear as translation_failed warnings\n\n"
+        "To retry: click the Retry button in Phase 3 (only untranslated rows are re-attempted), "
+        "or manually translate them in Phase 4's inline editor.",
     ),
     (
         "Phase 3 — Translate",
         "What does the translation summary show when complete?",
-        "After translation finishes, the live feed shows a structured summary:\n"
-        "- 'Rows attempted', 'Rows translated', and 'Rows failed' at the top.\n"
-        "- 'Successfully Translated' with a tree breakdown showing the method "
-        "(API, Translation Memory, fuzzy match, deduplication, in-file label match, "
-        "imported reference).\n"
-        "- 'Pre-existing (kept as-is)' for rows that already had a translation.\n"
-        "- 'Failed Translations' for rows where the API failed.\n"
-        "- 'Total with translation: X / Y' showing the overall count.\n"
-        "- Elapsed time and translation rate (rows/second).",
+        "After translation finishes, the live feed shows a structured summary block:\n\n"
+        "Header section:\n"
+        "  - Rows attempted: total rows the runner processed (translated + failed)\n"
+        "  - Rows translated: rows that received a translation (by any method)\n"
+        "  - Rows failed: rows where translation could not be completed\n\n"
+        "Successfully Translated breakdown (tree view):\n"
+        "  - Via Translation API: rows translated by calling the backend (Google/DeepL/Azure/OpenAI)\n"
+        "  - Via Translation Memory: rows found in the TM cache from previous runs\n"
+        "    - (via fuzzy match: N) shown when fuzzy matching is enabled\n"
+        "  - Via deduplication: rows whose label appeared earlier in this run\n"
+        "  - Via in-file label match: rows reusing a translation already in the same file\n"
+        "  - Via imported reference: rows matched from an imported Excel\n\n"
+        "Footer section:\n"
+        "  - Pre-existing (kept as-is): rows that already had translations and were skipped\n"
+        "  - Failed Translations: same as 'Rows failed' above\n"
+        "  - Total with translation: X / Y (translated + pre-existing out of total entries)\n"
+        "  - Elapsed time and Rate (rows/second)\n\n"
+        "When 'Retranslate all' is on, annotations appear next to relevant lines "
+        "(e.g. 'nothing skipped when retranslate=ON' next to Pre-existing).",
     ),
     (
         "Phase 3 — Translate",
         "What happens to rows with blank labels?",
-        "Rows with blank (empty) labels cannot be translated. They are marked as "
-        "'Translation failed (blank label)' and appear in Phase 5 as translation_failed "
-        "warnings for review. They are counted in the 'Rows failed' total in the summary.",
+        "Rows with blank (empty) labels cannot be sent to a translation API because there is "
+        "no text to translate. The app handles them as follows:\n"
+        "1. During translation, they are marked with status 'Translation failed (blank label)'\n"
+        "2. They are counted in the 'Rows failed' total in the summary\n"
+        "3. In Phase 5 (Validate & Fix), they appear as 'translation_failed' warnings with the "
+        "message 'Translation failed - needs manual input or retry in Phase 3'\n"
+        "4. They remain visible in Phase 5's issues table so you can review them\n"
+        "5. The Retry button in Phase 3 will attempt them again, but they will still fail "
+        "if the label is still blank\n\n"
+        "To fix: either provide a translation manually in Phase 4's editor, or check whether "
+        "the blank label is intentional in the source STF file.",
     ),
     (
         "Phase 3 — Translate",
@@ -402,26 +426,49 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Settings",
         "How do I reset only the current phase?",
-        "File -> Reset Current Phase resets the current phase and all downstream phases to IDLE. "
-        "The document is reloaded from the upstream phase's snapshot (the saved state from when "
-        "that phase last completed). Downstream pages show empty until you re-enter them via "
-        "the 'Continue to Phase N' button from the upstream phase. This prevents stale data "
-        "from being shown.",
+        "File -> Reset Current Phase resets the current phase and all downstream phases. "
+        "Here is exactly what happens:\n\n"
+        "1. A confirmation dialog asks 'Reset Phase N and all downstream phases?'\n"
+        "2. All phases from the current one onwards are set to IDLE status\n"
+        "3. The document is reloaded from the upstream phase's snapshot. Each phase saves a "
+        "lightweight snapshot (file path + metadata like row count, language code, timestamp) "
+        "when it completes. The app looks backward from the current phase to find the most "
+        "recent upstream snapshot and re-parses that file.\n"
+        "4. Downstream pages are visually reset (reset_page() is called) but on_enter() is "
+        "NOT called -- they show a clean empty state\n"
+        "5. All action buttons in downstream phases are disabled (Re-validate, Auto-fix, "
+        "Save, Export, etc.)\n"
+        "6. Snapshots for the current phase onwards are cleared\n"
+        "7. Translation Memory on disk is always preserved (never deleted by reset)\n"
+        "8. Imported translations, scope, glossary, and checkpoint are cleared\n\n"
+        "To continue working after a reset: complete the reset phase and click "
+        "'Continue to Phase N' to flow data to the next phase (just like the first time).",
     ),
     (
         "Settings",
         "Why do downstream phases show empty after I reset?",
-        "After Reset Current Phase, downstream phases are set to IDLE and show empty. "
-        "This is by design: it prevents stale data from a previous run from being shown. "
-        "To continue working, complete the reset phase and click 'Continue to Phase N' "
-        "to re-enter downstream phases with fresh data.",
+        "After Reset Current Phase, downstream phases are set to IDLE and show 'No document "
+        "loaded.' with all action buttons disabled. This is by design.\n\n"
+        "The logic is: a phase shows empty when phase_status == IDLE AND the upstream phase "
+        "is not marked DONE. This prevents stale data from a previous run from appearing.\n\n"
+        "To re-populate downstream phases:\n"
+        "1. Complete the reset phase (e.g. re-run translation in Phase 3)\n"
+        "2. Click 'Continue to Phase N' at the bottom\n"
+        "3. The downstream phase's on_enter() is called, loading fresh data\n\n"
+        "Alternatively, use 'Load Excel' in any downstream phase to bring in a file "
+        "directly -- this marks the upstream phase as DONE and re-enables the page.",
     ),
     (
         "Settings",
         "Why did the imported translations count disappear?",
-        "The imported translations counter and the sidebar 'imports active' text hide "
-        "when the 'Use imports' checkbox is unchecked. Re-check the checkbox (Translation "
-        "menu -> Use imported translations) to see the count again.",
+        "The imported translations counter (e.g. '1,205 translations imported') and the "
+        "sidebar footer 'imports active' text are visibility-linked to the 'Use imports' "
+        "checkbox state. When you uncheck 'Use imports' (in the Translation menu or the "
+        "Phase 3 checkbox), both indicators hide immediately.\n\n"
+        "The imported translations file is still loaded in memory -- it is not deleted. "
+        "Re-check 'Use imports' (Translation menu -> Use imported translations) and the "
+        "count and sidebar text will reappear. The translations will be applied on the "
+        "next translation run.",
     ),
     # -- Glossary --
     (
