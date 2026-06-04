@@ -1577,7 +1577,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Release in-memory TM reference
+        # Release in-memory TM reference (TM database on disk is kept)
         self._state.memory = None
         self._state.memory_path = None
 
@@ -1585,7 +1585,27 @@ class MainWindow(QMainWindow):
         for i in range(current, len(self._state.phase_status)):
             self._state.phase_status[i] = PS.IDLE
 
+        # Clear any checkpoint for the current document/target language
+        # (must happen before paths are cleared below)
+        from ..checkpoint import CheckpointStore
+        source_path = self._state.organized_xlsx_path or self._state.source_stf_path
+        if source_path is not None:
+            target_code = self._state.target_language_code or "ja"
+            try:
+                cp = CheckpointStore(
+                    source_file=str(Path(source_path).resolve()),
+                    target_lang=target_code,
+                )
+                if cp.exists():
+                    cp.clear()
+            except Exception:  # noqa: BLE001
+                pass  # best effort
+
         # Clear phase-specific state for current and downstream
+        if current <= 0:
+            # Resetting from Phase 1: clear everything
+            self._state.document = None
+            self._state.source_stf_path = None
         if current <= 1:
             # Clear organized xlsx path so Phase 2 re-converts on re-entry
             self._state.organized_xlsx_path = None
@@ -1600,26 +1620,31 @@ class MainWindow(QMainWindow):
             self._state.translation_failed_indices = set()
             self._state.translation_scope_indices = set()
 
-            # Clear Phase 3 checkpoint when resetting Phase 3 or upstream
-            from ..checkpoint import CheckpointStore
-            source_path = self._state.organized_xlsx_path or self._state.source_stf_path
-            if source_path is not None:
-                target_code = self._state.target_language_code or "ja"
-                try:
-                    cp = CheckpointStore(
-                        source_file=str(Path(source_path).resolve()),
-                        target_lang=target_code,
-                    )
-                    if cp.exists():
-                        cp.clear()
-                except Exception:  # noqa: BLE001
-                    pass  # best effort
+            # Clear scope and glossary
+            self._state.scope = None
+            self._state.scope_path = None
+            self._state.glossary = None
+            self._state.glossary_path = None
+
+            # Clear imported translations
+            self._state.imported_translations = None
+            self._state.imported_translations_path = None
+            self._state.imported_translations_enabled = False
+
+            # Clear retranslate flag
+            self._state.retranslate_existing = False
         if current <= 3:
             # Clear review path
             self._state.reviewed_xlsx_path = None
         if current <= 4:
             # Clear validation report
             self._state.last_validation_report = None
+
+        # Clear unsaved changes flag
+        self._state.has_unsaved_changes = False
+
+        # Clear workflow context so subsequent loads don't trigger stale override dialogs
+        self._state.clear_workflow_context()
 
         # Visually reset all pages from current phase onwards.
         # This ensures downstream phases (e.g. Phase 4 when resetting Phase 2)
