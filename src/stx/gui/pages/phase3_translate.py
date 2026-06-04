@@ -493,6 +493,20 @@ class Phase3TranslatePage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
+        # If this phase was reset (IDLE) and upstream hasn't sent us here
+        # via "Continue" (upstream not DONE), show empty state.
+        phase_idx = 2  # Phase 3 = index 2
+        upstream_done = (
+            phase_idx > 0
+            and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
+        )
+        if self._state.document is None or (
+            self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
+        ):
+            self._start_btn.setEnabled(False)
+            self._estimate_label.setText("Total Rows Loaded: -- | Rows to Translate: --")
+            return
+
         # Sync source language combo from state.
         src_name = getattr(self._state, "source_language_name", "English") or "English"
         if src_name in LANGUAGE_NAME_TO_CODE:

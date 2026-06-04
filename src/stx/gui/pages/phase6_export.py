@@ -144,6 +144,21 @@ class Phase6ExportPage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
+        # If this phase was reset (IDLE) and upstream hasn't sent us here
+        # via "Continue" (upstream not DONE), show empty state.
+        phase_idx = 5  # Phase 6 = index 5
+        upstream_done = (
+            phase_idx > 0
+            and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
+        )
+        if self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done:
+            self._export_btn.setEnabled(False)
+            self._validate_btn.setEnabled(False)
+            self._load_status.setText(
+                "No document loaded.  Click 'Load Excel...' to select a translated workbook."
+            )
+            return
+
         if self._state.target_language_name in LANGUAGE_NAME_TO_CODE:
             self._lang_combo.setCurrentText(self._state.target_language_name)
         if self._state.target_language_code:

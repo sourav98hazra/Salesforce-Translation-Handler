@@ -644,7 +644,16 @@ class Phase4ReviewPage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
-        if self._state.document is None:
+        # If this phase was reset (IDLE) and upstream hasn't sent us here
+        # via "Continue" (upstream not DONE), show empty state.
+        phase_idx = 3  # Phase 4 = index 3
+        upstream_done = (
+            phase_idx > 0
+            and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
+        )
+        if self._state.document is None or (
+            self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
+        ):
             self._status_pill.setText("\u2022  No document loaded")
             self._status_pill.setStyleSheet(
                 "padding: 4px 10px; border-radius: 12px; "

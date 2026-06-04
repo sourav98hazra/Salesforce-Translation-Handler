@@ -105,7 +105,16 @@ class Phase2ExcelPage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
-        if self._state.document is None:
+        # If this phase was reset (IDLE) and upstream hasn't sent us here
+        # via "Continue" (upstream not DONE), show empty state.
+        phase_idx = 1  # Phase 2 = index 1
+        upstream_done = (
+            phase_idx > 0
+            and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
+        )
+        if self._state.document is None or (
+            self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
+        ):
             self._summary_label.setText(
                 "No document loaded \u2014 complete Phase 1 first, "
                 "or use 'Load existing organised .xlsx...' to jump straight to Phase 3."

@@ -321,7 +321,16 @@ class Phase5ValidatePage(PhasePage):
     # ------------------------------------------------------------------ lifecycle
 
     def on_enter(self) -> None:
-        if self._state.document is None:
+        # If this phase was reset (IDLE) and upstream hasn't sent us here
+        # via "Continue" (upstream not DONE), show empty state.
+        phase_idx = 4  # Phase 5 = index 4
+        upstream_done = (
+            phase_idx > 0
+            and self._state.phase_status[phase_idx - 1] == PhaseStatus.DONE
+        )
+        if self._state.document is None or (
+            self._state.phase_status[phase_idx] == PhaseStatus.IDLE and not upstream_done
+        ):
             self._banner.setText("No document loaded.  Complete earlier phases first.")
             self._banner.setStyleSheet(
                 "padding: 10px; border-radius: 6px; font-weight: 700; "
