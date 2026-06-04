@@ -1586,7 +1586,7 @@ class MainWindow(QMainWindow):
         """Implementation of Clear TM (wrapped by _action_clear_tm for safety)."""
         from PySide6.QtWidgets import QMessageBox
 
-        from .. import settings as gui_settings
+        from . import settings as gui_settings
         from .state import PhaseStatus
 
         # Prevent clearing TM while translation is running (worker holds a
