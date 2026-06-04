@@ -1020,8 +1020,40 @@ class Phase3TranslatePage(PhasePage):
             )
 
     def _on_translation_done(self, done) -> None:
-        self._state.translation_summaries = done.summaries
-        self._state.translation_statuses = done.statuses
+        # Merge results with existing data (handles retry scenario where only
+        # failed rows are re-processed). On first run, existing lists are empty
+        # so this is equivalent to a simple assignment.
+        if self._state.translation_statuses:
+            # Build a lookup of existing statuses by row_index for fast merge
+            existing_by_row = {s.row_index: s for s in self._state.translation_statuses}
+            # Overwrite with new results (retry updates previously failed rows)
+            for s in done.statuses:
+                existing_by_row[s.row_index] = s
+            # Rebuild the merged list sorted by row_index
+            self._state.translation_statuses = sorted(
+                existing_by_row.values(), key=lambda s: s.row_index
+            )
+            # Recalculate summaries from merged statuses
+            from ..translate.runner import SheetSummary
+            merged_summaries: dict[str, SheetSummary] = {}
+            for s in self._state.translation_statuses:
+                summary = merged_summaries.setdefault(
+                    s.sheet_name, SheetSummary(sheet_name=s.sheet_name)
+                )
+                summary.total_rows += 1
+                if s.status.startswith("Translated") or s.status.startswith("Reused") or s.status.startswith("Resumed"):
+                    summary.translated_rows += 1
+                    if "TM hit" in s.status:
+                        summary.cached_rows += 1
+                    elif "dedup" in s.status:
+                        summary.deduped_rows += 1
+                elif s.status.startswith("Skipped"):
+                    summary.skipped_rows += 1
+            self._state.translation_summaries = list(merged_summaries.values())
+        else:
+            # First run - simple assignment
+            self._state.translation_summaries = done.summaries
+            self._state.translation_statuses = done.statuses
 
         # Compute scope and failed indices for downstream phases.
         # Use the runner's status entries to identify ONLY rows that genuinely
