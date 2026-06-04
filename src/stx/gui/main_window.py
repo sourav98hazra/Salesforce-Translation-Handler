@@ -1581,8 +1581,8 @@ class MainWindow(QMainWindow):
         self._state.memory = None
         self._state.memory_path = None
 
-        # Reset ALL phase statuses to IDLE (document is fully cleared)
-        for i in range(len(self._state.phase_status)):
+        # Reset current phase and downstream to IDLE; upstream stays as-is
+        for i in range(current, len(self._state.phase_status)):
             self._state.phase_status[i] = PS.IDLE
 
         # Clear any checkpoint for the current document/target language
@@ -1601,39 +1601,76 @@ class MainWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 pass  # best effort
 
-        # Clear ALL document and path state unconditionally.
-        # When a user loads a file via override (Load existing .xlsx / Load Excel)
-        # in ANY phase and then resets, the overridden document must be cleared.
-        # The user expects a full clean slate from the current phase onwards.
-        self._state.document = None
-        self._state.source_stf_path = None
-        self._state.organized_xlsx_path = None
-        self._state.translated_xlsx_path = None
-        self._state.reviewed_xlsx_path = None
-        self._state.output_dir = None
+        # --- Phase-cascaded state clearing ---
+        # Each block clears state owned by that phase and downstream.
+        # The document is cleared if the current phase is where it was
+        # created/loaded (Phase 1) OR if an override loaded it into a later phase.
+        if current <= 0:
+            # Phase 1 owns the STF document and source path
+            self._state.document = None
+            self._state.source_stf_path = None
 
-        # Clear translation audit data
-        self._state.translation_summaries = []
-        self._state.translation_statuses = []
+        if current <= 1:
+            # Phase 2 owns the organized xlsx
+            # If the document was loaded via override in Phase 2+ (not from Phase 1),
+            # we must also clear it since there's no upstream phase that "owns" it.
+            if self._state.source_stf_path is None:
+                # No STF was imported via Phase 1 -- document came from an override
+                self._state.document = None
+            self._state.organized_xlsx_path = None
+            self._state.translated_xlsx_path = None
 
-        # Clear translation scope tracking
-        self._state.translation_failed_indices = set()
-        self._state.translation_scope_indices = set()
+        if current <= 2:
+            # Phase 3 owns translation results
+            # If the document was loaded via override in Phase 3+ (skipping Phase 1 & 2),
+            # we must also clear it.
+            if self._state.source_stf_path is None and self._state.organized_xlsx_path is None:
+                self._state.document = None
+            self._state.translation_summaries = []
+            self._state.translation_statuses = []
+            self._state.translated_xlsx_path = None
 
-        # Clear scope and glossary
-        self._state.scope = None
-        self._state.scope_path = None
-        self._state.glossary = None
-        self._state.glossary_path = None
+            # Clear translation scope tracking
+            self._state.translation_failed_indices = set()
+            self._state.translation_scope_indices = set()
 
-        # Clear imported translations
-        self._state.imported_translations = None
-        self._state.imported_translations_path = None
-        self._state.imported_translations_enabled = False
+            # Clear scope and glossary
+            self._state.scope = None
+            self._state.scope_path = None
+            self._state.glossary = None
+            self._state.glossary_path = None
 
-        # Clear retranslate flag and other settings
-        self._state.retranslate_existing = False
-        self._state.last_validation_report = None
+            # Clear imported translations
+            self._state.imported_translations = None
+            self._state.imported_translations_path = None
+            self._state.imported_translations_enabled = False
+
+            # Clear retranslate flag
+            self._state.retranslate_existing = False
+
+        if current <= 3:
+            # Phase 4 owns the reviewed xlsx
+            # If the document was loaded via override in Phase 4+ (skipping earlier phases),
+            # we must also clear it.
+            if (
+                self._state.source_stf_path is None
+                and self._state.organized_xlsx_path is None
+                and self._state.translated_xlsx_path is None
+            ):
+                self._state.document = None
+            self._state.reviewed_xlsx_path = None
+
+        if current <= 4:
+            # Phase 5 owns the validation report
+            # If the document was loaded via override in Phase 5+, clear it.
+            if (
+                self._state.source_stf_path is None
+                and self._state.organized_xlsx_path is None
+                and self._state.translated_xlsx_path is None
+                and self._state.reviewed_xlsx_path is None
+            ):
+                self._state.document = None
+            self._state.last_validation_report = None
 
         # Clear unsaved changes flag
         self._state.has_unsaved_changes = False
@@ -1641,10 +1678,10 @@ class MainWindow(QMainWindow):
         # Clear workflow context so subsequent loads don't trigger stale override dialogs
         self._state.clear_workflow_context()
 
-        # Visually reset ALL pages -- since document and state are fully cleared,
-        # all phases (including upstream) must show their default empty state.
-        for page in self._pages:
-            page.reset_page()
+        # Visually reset pages from current phase onwards.
+        # Upstream pages keep their displayed state since their data is preserved.
+        for i in range(current, len(self._pages)):
+            self._pages[i].reset_page()
 
         self._refresh_phase_badges()
         self._update_sidebar_footer()
