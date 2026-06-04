@@ -279,6 +279,8 @@ class AboutDialog(QDialog):
             "the same output -- great for diffs and code review.\n"
             "\u2022 Each phase works on its own input or as part of the "
             "end-to-end flow -- both modes are first-class.\n"
+            "\u2022 Phase reset reloads from the upstream snapshot, ensuring "
+            "clean state without data loss.\n"
             "\u2022 Five themes (light, dark, ocean, forest, sunset) plus "
             "auto, with soft borders and rounded panels for a calm, modern "
             "look.\n"
@@ -338,12 +340,14 @@ class AboutDialog(QDialog):
             "HTML tags & attributes -- walked tag-by-tag, never altered",
             "URLs and email addresses -- preserved verbatim",
             "Escape sequences (\\n, \\t) -- preserved",
+            "Blank-label detection with clear failure marking",
         ]))
 
         layout.addWidget(_heading("Workflow"))
         layout.addWidget(_bullets([
             "Each phase works independently or as part of the end-to-end "
             "pipeline",
+            "Phase Snapshot system for reliable reset behavior",
             "Validation with auto-fix (length trimming, placeholder "
             "restoration, deduplication)",
             "Pop-out any panel into a separate window for side-by-side "

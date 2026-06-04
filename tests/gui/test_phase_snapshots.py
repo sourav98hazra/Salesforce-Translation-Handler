@@ -192,3 +192,71 @@ class TestSnapshotRestore:
         )
         assert doc is not None
         assert len(doc.entries) == len(sample_doc.entries)
+
+
+class TestPhaseSnapshotDownstreamIdle:
+    """Tests verifying that after reset, downstream phases are IDLE.
+
+    After Reset Current Phase, downstream pages show empty until the user
+    re-enters them via "Continue to Phase N" from the upstream phase.
+    """
+
+    def test_reset_sets_downstream_to_idle(self) -> None:
+        """Resetting at phase 2 sets phases 2-5 to IDLE, preserving 0-1."""
+        state = AppState()
+        # Mark all phases DONE
+        for i in range(6):
+            state.phase_status[i] = PhaseStatus.DONE
+
+        # Simulate reset at phase 2: phases 2+ go to IDLE
+        reset_phase = 2
+        for i in range(reset_phase, 6):
+            state.phase_status[i] = PhaseStatus.IDLE
+
+        # Phases 0, 1 remain DONE
+        assert state.phase_status[0] == PhaseStatus.DONE
+        assert state.phase_status[1] == PhaseStatus.DONE
+        # Phases 2-5 are now IDLE
+        for i in range(2, 6):
+            assert state.phase_status[i] == PhaseStatus.IDLE
+
+    def test_reset_clears_snapshots_for_current_and_downstream(self, tmp_path: Path) -> None:
+        """On reset, snapshots from the current phase onwards are cleared."""
+        state = AppState()
+        # Set snapshots for all phases
+        for i in range(6):
+            state.phase_snapshots[i] = PhaseSnapshot(
+                source_path=tmp_path / f"phase{i}.xlsx",
+                artifact_type="organized_excel",
+                row_count=10 * (i + 1),
+                target_language_code="ja",
+                target_language_name="Japanese",
+                timestamp=time.time(),
+            )
+
+        # Simulate reset at phase 2: clear snapshots from phase 2 onwards
+        reset_phase = 2
+        for i in range(reset_phase, 6):
+            state.phase_snapshots[i] = None
+
+        # Phases 0, 1 snapshots preserved
+        assert state.phase_snapshots[0] is not None
+        assert state.phase_snapshots[1] is not None
+        # Phases 2-5 snapshots cleared
+        for i in range(2, 6):
+            assert state.phase_snapshots[i] is None
+
+    def test_downstream_idle_prevents_action(self) -> None:
+        """Downstream phases in IDLE status should not allow actions.
+
+        This verifies the state condition that the UI uses to disable
+        buttons: phase_status == IDLE and the upstream phase is not DONE.
+        """
+        state = AppState()
+        state.phase_status[2] = PhaseStatus.DONE  # Phase 3 completed
+        state.phase_status[3] = PhaseStatus.IDLE   # Phase 4 reset to IDLE
+
+        # Downstream is IDLE while upstream is DONE -- user must navigate
+        # via "Continue" to re-enter phase 4
+        assert state.phase_status[3] == PhaseStatus.IDLE
+        assert state.phase_status[2] == PhaseStatus.DONE

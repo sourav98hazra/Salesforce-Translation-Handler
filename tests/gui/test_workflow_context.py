@@ -557,7 +557,12 @@ def test_integration_current_phase_advances(qtbot):
 
 
 def test_reset_phase_clears_downstream_pages(qtbot):
-    """_action_reset_current_phase resets ALL downstream phase statuses to IDLE."""
+    """_action_reset_current_phase resets ALL downstream phase statuses to IDLE.
+
+    Note: reset_page() is called on each downstream page, but on_enter() is NOT
+    called after reset. Pages show a clean empty state until the user re-enters
+    them via "Continue to Phase N" from the upstream phase.
+    """
     from stx.gui.main_window import MainWindow
     from stx.gui.state import PhaseStatus
 
@@ -579,3 +584,54 @@ def test_reset_phase_clears_downstream_pages(qtbot):
         )
 
     win.close()
+
+
+# ============================================================
+# Issue 6b: test_reset_preserves_upstream_snapshots
+# ============================================================
+
+
+def test_reset_preserves_upstream_snapshots():
+    """Reset at phase 2 preserves snapshots for phases 0 and 1 while clearing 2+."""
+    import time
+    from pathlib import Path
+
+    from stx.gui.state import AppState, PhaseSnapshot, PhaseStatus
+
+    state = AppState()
+
+    # Set snapshots for phases 0, 1, 2, 3
+    for i in range(4):
+        state.phase_snapshots[i] = PhaseSnapshot(
+            source_path=Path(f"/fake/phase{i}.xlsx"),
+            artifact_type="organized_excel",
+            row_count=100 * (i + 1),
+            target_language_code="ja",
+            target_language_name="Japanese",
+            timestamp=time.time(),
+        )
+        state.phase_status[i] = PhaseStatus.DONE
+
+    # Simulate reset at phase 2: clear snapshots and status from phase 2 onwards
+    reset_phase = 2
+    for i in range(reset_phase, 6):
+        state.phase_snapshots[i] = None
+        state.phase_status[i] = PhaseStatus.IDLE
+
+    # Upstream snapshots (phases 0, 1) are preserved
+    assert state.phase_snapshots[0] is not None
+    assert state.phase_snapshots[0].row_count == 100
+    assert state.phase_snapshots[1] is not None
+    assert state.phase_snapshots[1].row_count == 200
+
+    # Downstream snapshots (phases 2+) are cleared
+    for i in range(2, 6):
+        assert state.phase_snapshots[i] is None
+
+    # Upstream statuses preserved
+    assert state.phase_status[0] == PhaseStatus.DONE
+    assert state.phase_status[1] == PhaseStatus.DONE
+
+    # Downstream statuses are IDLE
+    for i in range(2, 6):
+        assert state.phase_status[i] == PhaseStatus.IDLE

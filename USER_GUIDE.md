@@ -40,7 +40,7 @@ The sidebar on the left shows:
 - The six phase buttons with status badges (`✓` done, `▶` running, `⚠` error).
 - Below the phases: **document stats** (total / translated / untranslated rows), the **target language**, and a **mini progress bar** (visible during translation).
 
-The **Status log** at the bottom of the window can be hidden or shown via `View -> Show Status Log` (`Ctrl+L`).
+The **Status log** at the bottom of the window can be hidden or shown via `View -> Show Status Log` (`Ctrl+L`). When toggled, it re-docks to the bottom position.
 
 The sidebar is **resizable** (drag its right edge to taste, between roughly 220 and 280 pixels) and the whole window has a sensible minimum (900×600) -- the app starts within your screen size, never wider, even on small laptops or secondary monitors.
 
@@ -129,9 +129,17 @@ The Preview panel in Phase 1 has a **"Pop out"** button that detaches the previe
    [Reused from file] EN: Save -> JA: 保存
    ```
    No API call is made for these — the existing translation is reused directly.
-7. When translation completes, a **final summary block** is printed in the live feed.
-8. The translated document is held **in memory** — click **"Save a Copy..."** to write it to disk with a professional dated filename.
-9. Click **"Continue to Phase 4 →"** when done.
+7. When translation completes, a **final summary block** is printed in the live feed showing:
+   - Rows attempted / Rows translated / Rows failed
+   - Successfully Translated breakdown (Via API, Translation Memory, fuzzy match, deduplication, in-file label match, imported reference)
+   - Pre-existing (kept as-is) count
+   - Failed Translations count
+   - Total with translation: X / Y
+   - Elapsed time and rate (rows/second)
+8. Rows with **blank labels** are marked as "Translation failed (blank label)" and appear in Phase 5 as translation_failed warnings.
+9. The translated document is held **in memory** -- click **"Save a Copy..."** to write it to disk with a professional dated filename.
+10. Click **"Continue to Phase 4 ->"** when done.
+11. The **import translations label** and sidebar footer "imports active" text hide when "Use imports" is unchecked.
 
 #### Translation menu
 
@@ -183,8 +191,8 @@ The live feed panel has a **"Pop out"** button that detaches it into an independ
 **How to use:**
 
 1. The **status pill** at the top tells you whether the document is clean (green), has warnings (amber), or has errors (red).
-2. The **counters** show translated / untranslated / issue counts.
-3. **Filter** the table by component, status, or substring search — see [Filters (Phase 4)](#filters-phase-4--browse--review) below for details.
+2. The **counters** show translated / untranslated / issue counts. The Translated counter shows a plain count (no split breakdown). The Untranslated counter shows a "Failed: X | Excluded: Y" subtitle when scope info is available. Stat widgets use a vertical layout (label on top).
+3. **Filter** the table by component, status, or substring search -- see [Filters (Phase 4)](#filters-phase-4--browse--review) below for details.
 4. Click any row to populate the **side-by-side editor** at the bottom (source on the left, translation on the right).  Edit the translation and click **Apply** to save the change.  Click **Reset to source** to revert.  Drag the slim handle between the table and the editor to resize them; the text areas grow vertically with the editor pane.
 5. **"Save reviewed workbook (.xlsx)"** writes the current state to disk.
 6. Click **"Continue to Phase 5 (Validate & Fix) →"**.
@@ -212,7 +220,7 @@ The table updates immediately as you type or change dropdowns.  Click the **"Cle
 **How to use:**
 
 1. Validation runs automatically on entry.
-2. The banner shows total errors / warnings.
+2. The banner shows total errors / warnings (includes translation_failed entries in the count).
 3. Click **"Auto-fix all"** to let the deterministic fixers resolve what they can:
    * Restore missing placeholders / `{0}` MessageFormat tokens
    * Trim translations that exceed Salesforce length limits (truncated at word boundary)
@@ -221,7 +229,7 @@ The table updates immediately as you type or change dropdowns.  Click the **"Cle
    * Restore missing HTML tag pairs
 4. Or click **"Auto-fix selected"** / **"Auto-fix this row"** for finer control.
 5. Use the **inline editor** below the table to manually correct rows the auto-fixer can't handle.
-6. Click **"Re-validate"** to confirm everything is now clean.
+6. Click **"Re-validate"** to confirm everything is now clean. (The Re-validate button is disabled when the phase is in IDLE status, e.g. after a reset.)
 7. Click **"Save fixed workbook (.xlsx)"** at any point.
 8. Click **"Download Report..."** to export the validation results as CSV, JSON, or HTML. A save dialog lets you choose the format; the report includes severity, category, component, key, and message for every issue.
 9. Click **"Continue to Phase 6 (Export STF) →"**.
@@ -784,6 +792,7 @@ A: On Windows, run `python build_secure_setup.py --exe` for a standalone .exe, o
 | Exported STF looks wrong | Double-check that the target language code (e.g. `ja`, `de`, `fr`) matches your Salesforce Translation Workbench setup exactly. |
 | Window opens off-screen | The app saves window geometry. Delete the QSettings file and restart. On Windows: delete registry key under `HKCU\Software\SalesforceTranslationHandler`. On macOS/Linux: delete `~/.config/SalesforceTranslationHandler/`. |
 | Undo not working as expected | Phase 4 Ctrl+Z only works for translation cell edits. For undoing major actions (load file, translate, auto-fix), use Ctrl+Shift+Z (Edit → Undo last major action). |
-| Reset Session clears everything? | Yes, that is by design. "Reset Session" = full clear. Use "Reset Current Phase" (File menu) to only reset the active phase and downstream. |
+| Reset Session clears everything? | Yes, that is by design. "Reset Session" = full clear. Use "Reset Current Phase" (File menu) to only reset the active phase and downstream. Reset Current Phase reloads the document from the upstream phase snapshot, sets the current and all downstream phases to IDLE, and downstream pages show empty until you re-enter them via "Continue to Phase N". All action buttons in downstream phases are disabled after reset. |
+| Pages show "No document loaded" | All "No document loaded" messages simply display "No document loaded." without additional suffix text. Load a document in the appropriate phase to continue. |
 | Standalone .exe crashes immediately | Check `%TEMP%\stx_crash.log` (Windows) or `/tmp/stx_crash.log` (Mac/Linux) for the error message. Common cause: missing hidden imports -- ensure build_exe.py includes all required modules. |
 | "No module named stx" when running .exe | Rebuild with `python build_exe.py` after installing `pip install -e ".[gui]" pyinstaller`. |

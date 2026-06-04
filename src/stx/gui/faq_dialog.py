@@ -248,19 +248,29 @@ _FAQ: list[tuple[str, str, str]] = [
         "What happens when the API fails for a specific row?",
         "If a row fails all retries, it stays untranslated (the translation field remains empty). "
         "You can retry failed rows in Phase 3 using the Retry button, or manually translate them "
-        "in Phase 4. Phase 4 shows failed rows in the 'Untranslated' count with a "
+        "in Phase 4. The retry button count matches the 'Rows failed' number from the summary "
+        "(it uses done.failed_count). Phase 4 shows failed rows in the 'Untranslated' count with a "
         "'(Failed: N)' breakdown so you can easily see how many need attention.",
     ),
     (
         "Phase 3 — Translate",
         "What does the translation summary show when complete?",
         "After translation finishes, the live feed shows a structured summary:\n"
-        "- 'Rows processed successfully' and 'Rows Process Failed' at the top.\n"
+        "- 'Rows attempted', 'Rows translated', and 'Rows failed' at the top.\n"
         "- 'Successfully Translated' with a tree breakdown showing the method "
-        "(API, Translation Memory, fuzzy match, deduplication, imported reference, "
-        "pre-existing unchanged).\n"
-        "- 'Failed Translations' — rows where the API failed and the row was left untranslated.\n"
+        "(API, Translation Memory, fuzzy match, deduplication, in-file label match, "
+        "imported reference).\n"
+        "- 'Pre-existing (kept as-is)' for rows that already had a translation.\n"
+        "- 'Failed Translations' for rows where the API failed.\n"
+        "- 'Total with translation: X / Y' showing the overall count.\n"
         "- Elapsed time and translation rate (rows/second).",
+    ),
+    (
+        "Phase 3 — Translate",
+        "What happens to rows with blank labels?",
+        "Rows with blank (empty) labels cannot be translated. They are marked as "
+        "'Translation failed (blank label)' and appear in Phase 5 as translation_failed "
+        "warnings for review. They are counted in the 'Rows failed' total in the summary.",
     ),
     (
         "Phase 3 — Translate",
@@ -392,8 +402,26 @@ _FAQ: list[tuple[str, str, str]] = [
     (
         "Settings",
         "How do I reset only the current phase?",
-        "File → Reset Current Phase resets the current phase and all downstream phases, "
-        "without clearing Phase 1-2 data.",
+        "File -> Reset Current Phase resets the current phase and all downstream phases to IDLE. "
+        "The document is reloaded from the upstream phase's snapshot (the saved state from when "
+        "that phase last completed). Downstream pages show empty until you re-enter them via "
+        "the 'Continue to Phase N' button from the upstream phase. This prevents stale data "
+        "from being shown.",
+    ),
+    (
+        "Settings",
+        "Why do downstream phases show empty after I reset?",
+        "After Reset Current Phase, downstream phases are set to IDLE and show empty. "
+        "This is by design: it prevents stale data from a previous run from being shown. "
+        "To continue working, complete the reset phase and click 'Continue to Phase N' "
+        "to re-enter downstream phases with fresh data.",
+    ),
+    (
+        "Settings",
+        "Why did the imported translations count disappear?",
+        "The imported translations counter and the sidebar 'imports active' text hide "
+        "when the 'Use imports' checkbox is unchecked. Re-check the checkbox (Translation "
+        "menu -> Use imported translations) to see the count again.",
     ),
     # -- Glossary --
     (

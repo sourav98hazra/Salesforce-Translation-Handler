@@ -747,19 +747,21 @@ The previous layout (counter boxes + inline component list + QSplitter) was repl
   ═══════════════════════════════════════════
     TRANSLATION COMPLETE
   ═══════════════════════════════════════════
-    Rows processed successfully:   800
-    Rows Process Failed:             3
+    Rows attempted:                 803
+    Rows translated:                800
+    Rows failed:                      3
 
-    Successfully Translated:       800
-    ├─ Via Translation API:        500
-    ├─ Via Translation Memory:     120
-    │    (via fuzzy match:          15)
-    ├─ Via deduplication:           80
-    ├─ Via in-file label match:      0
-    ├─ Via imported reference:       5
-    └─ Pre-existing (unchanged):    95
+    Successfully Translated:        800
+    ├─ Via Translation API:         500
+    ├─ Via Translation Memory:      120
+    │    (via fuzzy match:           15)
+    ├─ Via deduplication:            80
+    ├─ Via in-file label match:      10
+    └─ Via imported reference:        5
 
-    Failed Translations:             3
+    Pre-existing (kept as-is):       95
+    Failed Translations:              3
+    Total with translation:     895 / 998
 
     Elapsed time:             00:05:32
     Rate:                     2.4 rows/s
@@ -1129,3 +1131,12 @@ and **Auto** (follows the OS). The choice is remembered across sessions.
 | `Ctrl+L` | Toggle the Status Log dock |
 | `F1` / `Ctrl+F1` | User Guide / FAQ & Troubleshooting |
 | `Ctrl+Q` | Quit |
+
+---
+
+# v2.0.1 -- Phase Snapshots and reset improvements
+
+- **Phase Snapshot system**: each phase saves a lightweight snapshot (file path + metadata) on completion for reliable reset behavior.
+- **Reset Current Phase** reloads the document from the upstream phase snapshot, setting downstream phases to IDLE.
+- **Downstream pages show empty** after reset until the user re-enters via "Continue to Phase N" from the upstream phase.
+- **Blank-label rows** are now marked as "Translation failed (blank label)" and surfaced in Phase 5 as warnings.

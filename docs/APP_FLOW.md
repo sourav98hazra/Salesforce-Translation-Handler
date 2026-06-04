@@ -102,7 +102,18 @@ User loads new file
 | Action | Scope | What it clears |
 |--------|-------|----------------|
 | Reset Session | Everything | Document, paths, phases, undo, filters, imports, scope, glossary, batch, all visual state |
-| Reset Phase | Current + downstream | Phase status, downstream artifacts (e.g. validation report, reviewed path) |
+| Reset Phase | Current + downstream | Phase status, downstream artifacts (e.g. validation report, reviewed path); reloads document from upstream phase snapshot |
+
+## Phase Snapshot / Reset Current Phase
+
+Each phase saves a lightweight **PhaseSnapshot** (source file path, artifact type, row count, target language code/name, and timestamp) when it completes. This enables reliable reset behavior:
+
+- On **Reset Current Phase**, the document is reloaded from the upstream phase's snapshot file via `_restore_from_snapshot()`.
+- The current phase and all downstream phases are set to IDLE.
+- Downstream pages show empty until the user re-enters them via "Continue to Phase N" from the upstream phase.
+- All action buttons in downstream phases are disabled after reset.
+- No `on_enter()` is called for downstream pages after reset; the page shows a clean empty state.
+- Loading an Excel via "Load" in any phase marks the upstream phase as DONE (satisfies the IDLE check for downstream navigation).
 
 ## Settings Layout
 
@@ -209,18 +220,21 @@ After translation completes, the live feed displays:
 ═══════════════════════════════════════════
   TRANSLATION COMPLETE
 ═══════════════════════════════════════════
-  Rows processed successfully:   800
-  Rows Process Failed:             3
+  Rows attempted:                 803
+  Rows translated:                800
+  Rows failed:                      3
 
-  Successfully Translated:       800
-  ├─ Via Translation API:        500
-  ├─ Via Translation Memory:     120
-  │    (via fuzzy match:          15)
-  ├─ Via deduplication:          80
-  ├─ Via imported reference:       5
-  └─ Pre-existing (unchanged):   95
+  Successfully Translated:        800
+  ├─ Via Translation API:         500
+  ├─ Via Translation Memory:      120
+  │    (via fuzzy match:           15)
+  ├─ Via deduplication:            80
+  ├─ Via in-file label match:      10
+  └─ Via imported reference:        5
 
-  Failed Translations:             3
+  Pre-existing (kept as-is):       95
+  Failed Translations:              3
+  Total with translation:     895 / 998
 
   Elapsed time:             00:05:32
   Rate:                     2.4 rows/s
