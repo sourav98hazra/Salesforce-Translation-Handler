@@ -710,7 +710,23 @@ class Phase4ReviewPage(PhasePage):
         if self._state.document is None:
             return
         stats = self._state.document.stats()
-        self._stat_translated["value"].setText(f"{stats['translated']:,}")
+        # Show Translated breakdown: PreExisting (already had translation) vs
+        # Included (translated in this run = in-scope entries that now have translations)
+        if self._state.translation_scope_indices:
+            # Count how many in-scope rows now have translations (= successfully translated this run)
+            included = sum(
+                1 for idx in self._state.translation_scope_indices
+                if idx < len(self._state.document.entries)
+                and self._state.document.entries[idx].translation.strip()
+            )
+            pre_existing = stats['translated'] - included
+            if pre_existing < 0:
+                pre_existing = 0
+            self._stat_translated["value"].setText(
+                f"{stats['translated']:,} (PreExisting: {pre_existing:,} | Included: {included:,})"
+            )
+        else:
+            self._stat_translated["value"].setText(f"{stats['translated']:,}")
         # Show Failed/Excluded breakdown when translation scope info is available
         if self._state.translation_scope_indices:
             # Re-derive live failed count: only count indices where translation
