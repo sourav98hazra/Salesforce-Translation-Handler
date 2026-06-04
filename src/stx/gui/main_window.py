@@ -123,7 +123,7 @@ def _load_app_icon() -> QIcon:
         if _svg_path.is_file():
             renderer = QSvgRenderer(str(_svg_path))
             pixmap = QPixmap(QSize(256, 256))
-            pixmap.fill()
+            pixmap.fill(Qt.GlobalColor.transparent)
             painter = QPainter(pixmap)
             renderer.render(painter)
             painter.end()
