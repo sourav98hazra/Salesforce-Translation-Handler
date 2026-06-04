@@ -1673,7 +1673,9 @@ class MainWindow(QMainWindow):
 
         # Clear flags and workflow context
         self._state.has_unsaved_changes = False
+        upstream_snaps = self._state.phase_snapshots[:current]
         self._state.clear_workflow_context()
+        self._state.phase_snapshots[:current] = upstream_snaps
 
         # Visually reset pages from current phase onwards.
         # Upstream pages keep their displayed state (cosmetic only --
@@ -1693,14 +1695,18 @@ class MainWindow(QMainWindow):
         from ..excel import import_document_from_excel
 
         path = snapshot.source_path
-        if snapshot.artifact_type == "stf":
-            doc = parse_stf(path)
-            self._state.document = doc
-            self._state.source_stf_path = path
-        else:
-            doc = import_document_from_excel(
-                path,
-                language=snapshot.target_language_name,
-                language_code=snapshot.target_language_code,
-            )
-            self._state.document = doc
+        try:
+            if snapshot.artifact_type == "stf":
+                doc = parse_stf(path)
+                self._state.document = doc
+                self._state.source_stf_path = path
+            else:
+                doc = import_document_from_excel(
+                    path,
+                    language=snapshot.target_language_name,
+                    language_code=snapshot.target_language_code,
+                )
+                self._state.document = doc
+        except Exception:  # noqa: BLE001
+            self._state.document = None
+            self._state.source_stf_path = None

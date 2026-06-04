@@ -1498,13 +1498,16 @@ class Phase3TranslatePage(PhasePage):
         if snapshot is not None and snapshot.source_path.exists():
             from ...excel import import_document_from_excel
 
-            doc = import_document_from_excel(
-                snapshot.source_path,
-                language=snapshot.target_language_name,
-                language_code=snapshot.target_language_code,
-            )
-            self._state.document = doc
-            self._state.organized_xlsx_path = snapshot.source_path
+            try:
+                doc = import_document_from_excel(
+                    snapshot.source_path,
+                    language=snapshot.target_language_name,
+                    language_code=snapshot.target_language_code,
+                )
+                self._state.document = doc
+                self._state.organized_xlsx_path = snapshot.source_path
+            except Exception:  # noqa: BLE001
+                pass  # Leave document as-is on failure
 
         # Clear run state (log, counters, progress, retry button)
         self._clear_run_state()
