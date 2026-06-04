@@ -1024,10 +1024,10 @@ class Phase3TranslatePage(PhasePage):
         self._state.translation_statuses = done.statuses
 
         # Compute scope and failed indices for downstream phases.
-        # We replicate the component + include/exclude key/pattern filters
-        # from the Scope, but NOT the status filter (since successfully
-        # translated rows now have non-empty translations and would be
-        # excluded by the UNTRANSLATED status check).
+        # Use the runner's status entries to identify ONLY rows that genuinely
+        # failed translation (status starts with "Translation failed"), not
+        # just any row with an empty translation (which could be blank-label
+        # rows that were correctly skipped).
         if self._state.document is not None and self._state.scope is not None:
             import fnmatch as _fnmatch
 
@@ -1056,8 +1056,15 @@ class Phase3TranslatePage(PhasePage):
                     if not in_include:
                         continue
                 scope_indices.add(idx)
-                if not entry.translation.strip():
-                    failed_indices.add(idx)
+
+            # Identify genuinely failed rows from the runner's status entries
+            for status_entry in done.statuses:
+                if status_entry.status.startswith("Translation failed"):
+                    # status_entry.row_index is 1-based Excel row; convert to 0-based
+                    idx = status_entry.row_index - 2
+                    if idx in scope_indices:
+                        failed_indices.add(idx)
+
             self._state.translation_scope_indices = scope_indices
             self._state.translation_failed_indices = failed_indices
 
