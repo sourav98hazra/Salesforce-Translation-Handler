@@ -1023,15 +1023,33 @@ class Phase3TranslatePage(PhasePage):
         if self._worker is None:
             return  # Stale signal from force-cancelled worker
 
-        # Merge results with existing data (handles retry scenario where only
-        # failed rows are re-processed). On first run, existing lists are empty
-        # so this is equivalent to a simple assignment.
+        # Merge results with existing data (handles retry scenario).
+        # On first run, existing lists are empty so this is a simple assignment.
+        # On retry: the runner processes ALL rows again, marking previously-
+        # translated rows as "Skipped (already translated)". We must preserve
+        # the ORIGINAL translation method (e.g., "Translated", "Translated (TM hit)")
+        # and only update rows that actually improved (failed -> succeeded).
         if self._state.translation_statuses:
-            # Build a lookup of existing statuses by row_index for fast merge
+            # Build a lookup of existing statuses by row_index
             existing_by_row = {s.row_index: s for s in self._state.translation_statuses}
-            # Overwrite with new results (retry updates previously failed rows)
+
+            # Smart merge: only overwrite if the new status is an improvement
             for s in done.statuses:
-                existing_by_row[s.row_index] = s
+                old = existing_by_row.get(s.row_index)
+                if old is None:
+                    # New row not in previous run - always add
+                    existing_by_row[s.row_index] = s
+                elif old.status.startswith("Translation failed"):
+                    # Previously failed - always take the new result (success or new failure)
+                    existing_by_row[s.row_index] = s
+                elif s.status.startswith("Skipped (already translated)"):
+                    # Retry sees this row as "already translated" - keep original method
+                    pass
+                elif s.status.startswith("Translated") or s.status.startswith("Reused"):
+                    # New successful translation - overwrite (handles edge cases)
+                    existing_by_row[s.row_index] = s
+                # else: keep the existing status (preserves original method)
+
             # Rebuild the merged list sorted by row_index
             self._state.translation_statuses = sorted(
                 existing_by_row.values(), key=lambda s: s.row_index
