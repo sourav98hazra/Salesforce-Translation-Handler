@@ -575,18 +575,28 @@ class Phase4ReviewPage(PhasePage):
             "QFrame { background: transparent; border: none; "
             "padding: 2px 6px; }"
         )
-        layout = QHBoxLayout(frame)
+        layout = QVBoxLayout(frame)
         layout.setContentsMargins(6, 2, 6, 2)
-        layout.setSpacing(4)
+        layout.setSpacing(0)
+        # Top row: label + main value
+        top = QHBoxLayout()
+        top.setSpacing(4)
         title = QLabel(label.upper())
         title.setStyleSheet(
             "color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: 0.6px;"
         )
         val = QLabel(value)
         val.setStyleSheet(f"color: {accent}; font-size: 15px; font-weight: 700;")
-        layout.addWidget(title)
-        layout.addWidget(val)
-        return {"frame": frame, "value": val}
+        top.addWidget(title)
+        top.addWidget(val)
+        top.addStretch(1)
+        layout.addLayout(top)
+        # Bottom row: subtitle for breakdown (hidden by default)
+        subtitle = QLabel("")
+        subtitle.setStyleSheet(f"color: {accent}; font-size: 10px; font-weight: 600;")
+        subtitle.setVisible(False)
+        layout.addWidget(subtitle)
+        return {"frame": frame, "value": val, "subtitle": subtitle}
 
     # ------------------------------------------------------------------ undo / redo UI
 
@@ -722,11 +732,14 @@ class Phase4ReviewPage(PhasePage):
             pre_existing = stats['translated'] - included
             if pre_existing < 0:
                 pre_existing = 0
-            self._stat_translated["value"].setText(
-                f"{stats['translated']:,} (PreExisting: {pre_existing:,} | Included: {included:,})"
+            self._stat_translated["value"].setText(f"{stats['translated']:,}")
+            self._stat_translated["subtitle"].setText(
+                f"PreExisting: {pre_existing:,} | Included: {included:,}"
             )
+            self._stat_translated["subtitle"].setVisible(True)
         else:
             self._stat_translated["value"].setText(f"{stats['translated']:,}")
+            self._stat_translated["subtitle"].setVisible(False)
         # Show Failed/Excluded breakdown when translation scope info is available
         if self._state.translation_scope_indices:
             # Re-derive live failed count: only count indices where translation
@@ -748,11 +761,14 @@ class Phase4ReviewPage(PhasePage):
                 self.status_message.emit(
                     "Note: Untranslated count may be imprecise — document was modified after translation."
                 )
-            self._stat_untranslated["value"].setText(
-                f"{stats['untranslated']:,} (Failed: {failed:,} | Excluded: {excluded:,})"
+            self._stat_untranslated["value"].setText(f"{stats['untranslated']:,}")
+            self._stat_untranslated["subtitle"].setText(
+                f"Failed: {failed:,} | Excluded: {excluded:,}"
             )
+            self._stat_untranslated["subtitle"].setVisible(True)
         else:
             self._stat_untranslated["value"].setText(f"{stats['untranslated']:,}")
+            self._stat_untranslated["subtitle"].setVisible(False)
 
     def _run_auto_validation(self) -> None:
         if self._state.document is None:
