@@ -643,9 +643,7 @@ class _Runner:
             return "done"
 
         if not entry.label.strip():
-            self._fill(index, entry, sheet, "Skipped (blank label)", summary)
-            summary.skipped_rows += 1
-            self._skipped += 1
+            self._mark_failed(index, "Translation failed (blank label)")
             return "done"
 
         if entry.translation.strip():
