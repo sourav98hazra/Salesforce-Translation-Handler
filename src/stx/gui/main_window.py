@@ -1584,17 +1584,6 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Determine if the document was loaded at or after the current phase
-        # (i.e., via an override like "Load existing .xlsx" / "Load Excel").
-        # If so, the document must be cleared since no upstream phase owns it.
-        # workflow_started_from_phase tracks where the document was loaded:
-        #   - None or 0 = normal Phase 1 import
-        #   - 1 = loaded in Phase 2 via "Load existing .xlsx"
-        #   - 2 = loaded in Phase 3 via "Load Excel..."
-        #   - etc.
-        doc_loaded_at = self._state.workflow_started_from_phase or 0
-        clear_document = (doc_loaded_at >= current)
-
         # Release in-memory TM reference (TM database on disk is kept)
         self._state.memory = None
         self._state.memory_path = None
@@ -1619,52 +1608,43 @@ class MainWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 pass  # best effort
 
-        # --- Clear document if it was loaded in this phase or downstream ---
-        if clear_document:
-            self._state.document = None
-            self._state.source_stf_path = None
-            self._state.output_dir = None
+        # --- Clear all state from the current phase onwards ---
+        # This is "Reset Session scoped to this phase and downstream":
+        # the document is always cleared (just like Reset Session does),
+        # all paths from current phase onwards are cleared, and all
+        # auxiliary state (scope, glossary, imports) is wiped.
+        self._state.document = None
+        self._state.source_stf_path = None
+        self._state.organized_xlsx_path = None
+        self._state.translated_xlsx_path = None
+        self._state.reviewed_xlsx_path = None
+        self._state.output_dir = None
 
-        # --- Phase-cascaded state clearing (like Reset Session, scoped) ---
-        if current <= 0:
-            self._state.document = None
-            self._state.source_stf_path = None
+        self._state.translation_summaries = []
+        self._state.translation_statuses = []
+        self._state.translation_failed_indices = set()
+        self._state.translation_scope_indices = set()
 
-        if current <= 1:
-            self._state.organized_xlsx_path = None
-            self._state.translated_xlsx_path = None
+        self._state.scope = None
+        self._state.scope_path = None
+        self._state.glossary = None
+        self._state.glossary_path = None
 
-        if current <= 2:
-            self._state.translation_summaries = []
-            self._state.translation_statuses = []
-            self._state.translated_xlsx_path = None
+        self._state.imported_translations = None
+        self._state.imported_translations_path = None
+        self._state.imported_translations_enabled = False
 
-            self._state.translation_failed_indices = set()
-            self._state.translation_scope_indices = set()
-
-            self._state.scope = None
-            self._state.scope_path = None
-            self._state.glossary = None
-            self._state.glossary_path = None
-
-            self._state.imported_translations = None
-            self._state.imported_translations_path = None
-            self._state.imported_translations_enabled = False
-
-            self._state.retranslate_existing = False
-
-        if current <= 3:
-            self._state.reviewed_xlsx_path = None
-
-        if current <= 4:
-            self._state.last_validation_report = None
+        self._state.retranslate_existing = False
+        self._state.last_validation_report = None
 
         # Clear flags and workflow context
         self._state.has_unsaved_changes = False
         self._state.clear_workflow_context()
 
         # Visually reset pages from current phase onwards.
-        # Upstream pages keep their displayed state since their data is preserved.
+        # Upstream pages keep their displayed state (cosmetic only --
+        # the underlying data is cleared, so navigating back will
+        # show them as empty via their on_enter()).
         for i in range(current, len(self._pages)):
             self._pages[i].reset_page()
 
