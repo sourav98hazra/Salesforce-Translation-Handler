@@ -1575,6 +1575,15 @@ class MainWindow(QMainWindow):
 
     def _action_clear_tm(self) -> None:
         """Clear the Translation Memory database file after confirmation."""
+        try:
+            self._action_clear_tm_impl()
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"Clear TM error: {exc}")
+            import traceback
+            traceback.print_exc()
+
+    def _action_clear_tm_impl(self) -> None:
+        """Implementation of Clear TM (wrapped by _action_clear_tm for safety)."""
         from PySide6.QtWidgets import QMessageBox
 
         from .. import settings as gui_settings
