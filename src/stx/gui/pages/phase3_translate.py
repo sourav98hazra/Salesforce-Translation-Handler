@@ -444,7 +444,7 @@ class Phase3TranslatePage(PhasePage):
             "Only untranslated rows will be sent to the API."
         )
         self._retry_btn.setVisible(False)  # hidden until failures occur
-        self._retry_btn.clicked.connect(self._on_start)  # reuses the same start logic
+        self._retry_btn.clicked.connect(self._on_retry_or_retranslate)  # handles both retry and retranslate
         self._retry_btn.setStyleSheet(
             "QPushButton { background: #f59e0b; color: white; padding: 6px 14px; "
             "border-radius: 6px; font-weight: bold; }"
@@ -574,19 +574,18 @@ class Phase3TranslatePage(PhasePage):
         self._start_btn.setEnabled(self._state.document is not None and not self.is_busy)
 
         # Show retry button if there are known failed rows from the last translation run
+        # Show retranslate button if there are translated rows that can be retranslated
         if self._state.document is not None:
             failed_count = len(self._state.translation_failed_indices)
+            translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+            
             if failed_count > 0:
+                # Retry failed rows
                 self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
                 self._retry_btn.setVisible(True)
-            else:
-                self._retry_btn.setVisible(False)
-
-        # Show retry button if there are known failed rows from the last translation run
-        if self._state.document is not None:
-            failed_count = len(self._state.translation_failed_indices)
-            if failed_count > 0:
-                self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
+            elif translated_count > 0:
+                # Retranslate existing translated rows
+                self._retry_btn.setText(f"Retranslate {translated_count:,} rows")
                 self._retry_btn.setVisible(True)
             else:
                 self._retry_btn.setVisible(False)
@@ -939,6 +938,29 @@ class Phase3TranslatePage(PhasePage):
         self._worker.failed.connect(self._on_translation_failed)
         self._worker.start()
 
+    def _on_retry_or_retranslate(self) -> None:
+        """Handle both retry failed rows and retranslate existing rows."""
+        if self._state.document is None:
+            return
+            
+        failed_count = len(self._state.translation_failed_indices)
+        
+        if failed_count > 0:
+            # This is a retry operation - keep current settings
+            self._on_start()
+        else:
+            # This is a retranslate operation - temporarily enable retranslate_existing
+            from . import gui_settings
+            original_retranslate = gui_settings.get_retranslate_existing()
+            
+            try:
+                # Enable retranslate for this run
+                gui_settings.set_retranslate_existing(True)
+                self._on_start()
+            finally:
+                # Restore original setting
+                gui_settings.set_retranslate_existing(original_retranslate)
+
     def _on_progress(self, percent: int, message: str) -> None:
         if self._worker is None:
             return  # Ignore queued signals after force stop
@@ -966,19 +988,22 @@ class Phase3TranslatePage(PhasePage):
             
             remaining = self._total_rows - self._current_row
             
-            # Simple, reliable ETA calculation
+            # Debug: Add remaining info to ETA display
             if recent_rate > 0 and remaining > 0:
                 eta_sec = remaining / recent_rate
                 # Cap unreasonable ETAs
                 eta_sec = min(eta_sec, 24 * 3600)  # Max 24 hours
                 eta_sec = max(eta_sec, 0)          # Don't show negative time
                 
-                # Clean, simple display format
+                # Clean display with debug info
                 self._eta_label.setText(
-                    f"Translating... {percent}% | {recent_rate:.1f} rows/s | ETA: {_format_eta(eta_sec)}"
+                    f"Translating... {percent}% | {recent_rate:.1f} rows/s | {remaining} left | ETA: {_format_eta(eta_sec)}"
                 )
             else:
-                self._eta_label.setText(f"Translating... {percent}% | Calculating ETA...")
+                # Show debug info when ETA can't be calculated
+                self._eta_label.setText(
+                    f"Translating... {percent}% | Rate: {recent_rate:.1f} | Remaining: {remaining} | ETA: N/A"
+                )
                 
             self._eta_label.setStyleSheet(
                 "color: #64748b; font-size: 11px; font-weight: 700; "
@@ -1209,8 +1234,15 @@ class Phase3TranslatePage(PhasePage):
         # a Copy... button is now available for explicit file save.
         self._set_running(False)
         failed_count = len(self._state.translation_failed_indices)
+        translated_count = sum(1 for e in self._state.document.entries if e.translation.strip())
+        
         if failed_count > 0:
+            # Retry failed rows
             self._retry_btn.setText(f"Retry {failed_count:,} failed rows")
+            self._retry_btn.setVisible(True)
+        elif translated_count > 0:
+            # Retranslate existing translated rows
+            self._retry_btn.setText(f"Retranslate {translated_count:,} rows")
             self._retry_btn.setVisible(True)
         else:
             self._retry_btn.setVisible(False)
