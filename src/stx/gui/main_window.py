@@ -810,6 +810,8 @@ class MainWindow(QMainWindow):
             page._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
         else:
             page._import_trans_label.setText("")
+        # Refresh sidebar footer to show/hide "imports active" text
+        self._update_sidebar_footer()
 
     def _on_toggle_status_log(self, checked: bool) -> None:
         """Toggle the status log dock. When showing, re-dock it to the bottom."""

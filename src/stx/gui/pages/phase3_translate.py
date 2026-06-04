@@ -724,6 +724,10 @@ class Phase3TranslatePage(PhasePage):
             self._import_trans_label.setStyleSheet("color: #16a34a; font-size: 11px; font-weight: 600;")
         else:
             self._import_trans_label.setText("")
+        # Refresh sidebar footer to show/hide "imports active" text
+        main_win = self.window()
+        if hasattr(main_win, '_update_sidebar_footer'):
+            main_win._update_sidebar_footer()
 
     # ------------------------------------------------------------------ output path
 
