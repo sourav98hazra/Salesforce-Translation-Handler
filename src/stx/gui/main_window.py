@@ -530,7 +530,7 @@ class MainWindow(QMainWindow):
         self._toggle_log_action.setShortcut("Ctrl+L")
         self._toggle_log_action.setCheckable(True)
         self._toggle_log_action.setChecked(True)
-        self._toggle_log_action.triggered.connect(lambda checked: self._status_dock.setVisible(checked))
+        self._toggle_log_action.triggered.connect(self._on_toggle_status_log)
         view_menu.addAction(self._toggle_log_action)
         self._status_dock.visibilityChanged.connect(self._toggle_log_action.setChecked)
 
@@ -803,6 +803,16 @@ class MainWindow(QMainWindow):
         # Also keep the io/import_translations_enabled key in sync
         gui_settings.set_str(gui_settings.KEYS.import_translations_enabled, "1" if checked else "0")
         self._state.imported_translations_enabled = checked
+
+    def _on_toggle_status_log(self, checked: bool) -> None:
+        """Toggle the status log dock. When showing, re-dock it to the bottom."""
+        if checked:
+            # Always re-dock to bottom when showing (in case it was floating)
+            self._status_dock.setFloating(False)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._status_dock)
+            self._status_dock.setVisible(True)
+        else:
+            self._status_dock.setVisible(False)
 
     def _action_previous_phase(self) -> None:
         """Navigate to the previous phase (app-wide back)."""
