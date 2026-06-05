@@ -53,8 +53,12 @@ _DATA_SEP = ";" if sys.platform == "win32" else ":"
 # ``--windowed`` hides the console on Windows / produces a Mac .app bundle.
 # Built dynamically so we can use absolute paths and only add --icon when the
 # icon actually exists on disk.
+# Use --onedir when building for the installer (env var set by installer/build_installer.py)
+import os as _os
+_ONEDIR = _os.environ.get("STX_PYINSTALLER_ONEDIR", "") == "1"
+
 EXTRA_FLAGS: list[str] = [
-    "--onefile",
+    "--onedir" if _ONEDIR else "--onefile",
     "--windowed",
     "--noconfirm",
     "--clean",
