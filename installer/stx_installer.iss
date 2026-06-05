@@ -47,11 +47,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Include all files from the PyInstaller --onedir output
-Source: "..\dist\SalesforceTranslationHandler\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Fallback: if --onefile mode was used, include the single exe
-; (Only one of the above Source lines should match; the other will be skipped
-;  if the path does not exist during compilation.)
+; Include all files from the PyInstaller --onedir output.
+; Run 'python installer/build_installer.py' first to produce dist/SalesforceTranslationHandler/
+Source: "..\dist\SalesforceTranslationHandler\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\SalesforceTranslationHandler\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -62,10 +61,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandirs; Name: "{app}\__pycache__"
-Type: filesandirs; Name: "{app}\*.pyc"
+Type: files; Name: "{app}\__pycache__\*"
+Type: dirifempty; Name: "{app}\__pycache__"
+Type: files; Name: "{app}\*.pyc"
 Type: dirifempty; Name: "{app}"
-Type: filesandirs; Name: "{localappdata}\SalesforceTranslationHandler\cache"
+Type: files; Name: "{localappdata}\SalesforceTranslationHandler\cache\*"
+Type: dirifempty; Name: "{localappdata}\SalesforceTranslationHandler\cache"
 Type: dirifempty; Name: "{localappdata}\SalesforceTranslationHandler"
 
 [Code]

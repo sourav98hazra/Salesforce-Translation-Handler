@@ -1,5 +1,8 @@
 # Salesforce Translation Manager
 
+[![Download Latest Release](https://img.shields.io/github/v/release/sourav98hazra/Salesforce-Translation-Handler?label=Download&style=for-the-badge)](https://github.com/sourav98hazra/Salesforce-Translation-Handler/releases/latest)
+[![GitHub Pages](https://img.shields.io/badge/Website-Live-green?style=for-the-badge)](https://sourav98hazra.github.io/Salesforce-Translation-Handler)
+
 A professional cross-platform desktop application for the Salesforce
 Translation Workbench (STF) workflow:
 
