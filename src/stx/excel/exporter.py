@@ -33,7 +33,7 @@ _MAX_SHEET_NAME = 31
 # Truncation budget that leaves room for a "_NN" disambiguation suffix.
 _BASE_SHEET_NAME_BUDGET = 28
 
-ENTRY_COLUMNS = ["Key", "Label", "Translation"]
+ENTRY_COLUMNS = ["Key", "Label", "Translation", "Approved"]
 CONTENT_DETAILS_COLUMNS = [
     "SheetName",
     "SavedAs",
@@ -142,8 +142,11 @@ def write_translation_audit_sheets(
     target = Path(workbook_path)
     wb = load_workbook(target)
 
-    summary_columns = ["Sheet Name", "Total Rows", "Translated Rows", "Skipped Rows"]
-    status_columns = ["Sheet Name", "Row Index", "Key", "Label", "Status"]
+    summary_columns = [
+        "Sheet Name", "Total Rows", "Translated Rows", "Skipped Rows",
+        "Failed Rows", "TM Hits", "Dedup Hits",
+    ]
+    status_columns = ["Sheet Name", "Row Index", "Key", "Label", "Translation", "Status"]
 
     _replace_sheet_with_dict_rows(wb, "Translation_Summary", summary_columns, summary_rows)
     _replace_sheet_with_dict_rows(wb, "Translation_Status_Log", status_columns, status_rows)
@@ -205,6 +208,7 @@ def _write_entry_sheet(ws: Worksheet, entries: List[Entry]) -> None:
             _safe_excel_text(entry.key),
             _safe_excel_text(entry.label),
             _safe_excel_text(entry.translation),
+            "Yes" if entry.approved else "",
         ])
     _force_string_columns(ws, len(ENTRY_COLUMNS))
     _style_header(ws, len(ENTRY_COLUMNS))

@@ -23,7 +23,9 @@ from ..excel import (
 from ..languages import to_google_code
 from ..model import Document
 from ..stf import parse_stf, write_stf_files
-from ..translate import GoogleFreeTranslator, TranslationProgress, translate_document
+from ..translate import TranslationProgress, make_backend, translate_document
+
+from ..checkpoint import CheckpointStore
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ class WriteStfWorker(_CallableWorker):
         language_name: str,
         language_code: str,
         parent: Optional[QObject] = None,
+        source_name: str | None = None,
     ) -> None:
         super().__init__(
             lambda: write_stf_files(
@@ -108,6 +111,7 @@ class WriteStfWorker(_CallableWorker):
                 output_dir,
                 language_name=language_name,
                 language_code=language_code,
+                source_name=source_name,
             ),
             parent,
         )
@@ -125,6 +129,14 @@ class TranslationDone:
     statuses: list
     translated_count: int
     skipped_count: int
+    cached_count: int = 0
+    deduped_count: int = 0
+    fuzzy_accepted_count: int = 0
+    resumed_count: int = 0
+    imported_reuse_count: int = 0
+    infile_reuse_count: int = 0
+    failed_count: int = 0
+    elapsed_seconds: float = 0.0
 
 
 class TranslationWorker(QThread):
@@ -140,37 +152,105 @@ class TranslationWorker(QThread):
         original text -- the audit sheets still capture that detail).
     failed(str)
         On unexpected error.
+    row_translated(str source, str translation, str status, bool from_fuzzy)
+        Live "EN -> JA" feed for the GUI status panel.
+
+    Multi-click safety:
+        - ``start()`` is idempotent: a second call while running logs a
+          warning (Qt's own QThread.start() check) and is a no-op.
+        - ``cancel()`` is idempotent: setting ``_cancel`` to True repeatedly
+          has no extra effect.
+        - The worker itself is one-shot; pages must construct a fresh
+          worker per translation run (Qt requirement anyway).
     """
 
     progress = Signal(int, str)
     finished_ok = Signal(object)
     failed = Signal(str)
+    row_translated = Signal(str, str, str, bool)  # source, translation, status, from_fuzzy
 
     def __init__(
         self,
         doc: Document,
         source_code: str,
         target_code: str,
+        *,
+        scope=None,
+        memory=None,
+        glossary=None,
+        checkpoint: Optional[CheckpointStore] = None,
+        workers: int = 4,
+        rate_limit_per_second=8.0,
+        prevent_system_sleep: bool = True,
+        backend_name: str = "google",
+        api_key: Optional[str] = None,
+        fuzzy_threshold: Optional[float] = None,
+        fuzzy_max_results: int = 5,
+        fuzzy_auto_accept_threshold: float = 90.0,
+        imported_translations: Optional[dict] = None,
+        infile_translations: Optional[dict] = None,
+        retranslate_existing: bool = False,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._doc = doc
         self._source = to_google_code(source_code)
         self._target = to_google_code(target_code)
+        self._scope = scope
+        self._memory = memory
+        self._glossary = glossary
+        self._checkpoint = checkpoint
+        self._workers = workers
+        self._rate_limit = rate_limit_per_second
+        self._prevent_sleep = prevent_system_sleep
+        self._backend_name = backend_name
+        self._api_key = api_key
+        self._fuzzy_threshold = fuzzy_threshold
+        self._fuzzy_max_results = fuzzy_max_results
+        self._fuzzy_auto_accept_threshold = fuzzy_auto_accept_threshold
+        self._imported_translations = imported_translations
+        self._infile_translations = infile_translations
+        self._retranslate_existing = retranslate_existing
         self._cancel = False
+        self._cancel_lock = QObject()  # used only for sender identity
+        self._already_finished = False
 
     def cancel(self) -> None:
-        """Request a graceful early-stop after the current row."""
+        """Request a graceful early-stop after the current row.
+
+        Idempotent -- calling repeatedly has no extra effect.  The
+        running translation finishes its in-flight row and then the
+        runner gracefully fills remaining slots with ``Cancelled``.
+        """
         self._cancel = True
 
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancel
+
     def run(self) -> None:  # noqa: D401
-        translator = GoogleFreeTranslator()
+        if self._already_finished:
+            # Defensive: should never happen because Qt threads are one-shot,
+            # but avoids any chance of double-emit if someone re-invokes run().
+            return
+
+        translator_kwargs = {}
+        if self._api_key:
+            translator_kwargs["api_key"] = self._api_key
+        translator = make_backend(self._backend_name, **translator_kwargs)
 
         def on_progress(event: TranslationProgress) -> None:
             self.progress.emit(
                 event.percent,
                 f"[{event.completed}/{event.total}] {event.sheet} :: {event.key} -> {event.status}",
             )
+            if not event.status.startswith("Not processed"):
+                self.row_translated.emit(
+                    event.source_text or "",
+                    event.translation_text or "",
+                    event.status,
+                    event.from_fuzzy,
+                )
 
         try:
             result = translate_document(
@@ -180,17 +260,40 @@ class TranslationWorker(QThread):
                 target_lang=self._target,
                 progress=on_progress,
                 cancel=lambda: self._cancel,
+                scope=self._scope,
+                memory=self._memory,
+                glossary=self._glossary,
+                checkpoint=self._checkpoint,
+                workers=self._workers,
+                rate_limit_per_second=self._rate_limit,
+                prevent_system_sleep=self._prevent_sleep,
+                fuzzy_threshold=self._fuzzy_threshold,
+                fuzzy_max_results=self._fuzzy_max_results,
+                fuzzy_auto_accept_threshold=self._fuzzy_auto_accept_threshold,
+                imported_translations=self._imported_translations,
+                infile_translations=self._infile_translations,
+                retranslate_existing=self._retranslate_existing,
             )
         except Exception as exc:  # noqa: BLE001
+            self._already_finished = True
             self.failed.emit(f"{type(exc).__name__}: {exc}")
             return
 
+        self._already_finished = True
         self.finished_ok.emit(
             TranslationDone(
                 summaries=result.summaries,
                 statuses=result.statuses,
                 translated_count=result.translated_count,
                 skipped_count=result.skipped_count,
+                cached_count=result.cached_count,
+                deduped_count=result.deduped_count,
+                fuzzy_accepted_count=result.fuzzy_accepted_count,
+                resumed_count=result.resumed_count,
+                imported_reuse_count=result.imported_reuse_count,
+                infile_reuse_count=result.infile_reuse_count,
+                failed_count=result.failed_count,
+                elapsed_seconds=result.elapsed_seconds,
             )
         )
 

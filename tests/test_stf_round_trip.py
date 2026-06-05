@@ -8,7 +8,7 @@ import pytest
 
 from stx.excel import export_document_to_excel, import_document_from_excel
 from stx.model import Document, Entry
-from stx.stf import parse_stf_text, render_full_stf, render_translated_only_stf, render_untranslated_only_stf, write_stf_files
+from stx.stf import parse_stf, parse_stf_text, render_full_stf, render_translated_only_stf, render_untranslated_only_stf, write_stf_files
 
 
 SAMPLE_STF = """\
@@ -140,3 +140,41 @@ def test_sheet_name_collision_handling() -> None:
     a = _allocate_sheet_name(f"{long_a}_Untranslated", used); used.add(a)
     b = _allocate_sheet_name(f"{long_b}_Untranslated", used); used.add(b)
     assert a != b
+
+
+# ---------------------------------------------------------------------------
+# BOM and CRLF handling tests
+# ---------------------------------------------------------------------------
+
+def test_parse_stf_with_bom(tmp_path: Path) -> None:
+    """STF file with UTF-8 BOM parses correctly."""
+    content = "# Language: Japanese\nLanguage code: ja\nType: Bilingual\nTranslation type: Metadata\nCustomLabel.X\tHello\tKonnichiwa\t-"
+    bom_content = "\ufeff" + content
+    stf_file = tmp_path / "bom_test.stf"
+    stf_file.write_bytes(bom_content.encode("utf-8-sig"))
+
+    doc = parse_stf(stf_file)
+    assert doc.language == "Japanese"
+    assert doc.language_code == "ja"
+    assert len(doc.entries) == 1
+    assert doc.entries[0].key == "CustomLabel.X"
+
+
+def test_parse_stf_text_with_bom() -> None:
+    """parse_stf_text handles BOM in string input."""
+    text = "\ufeff# Language: Japanese\nLanguage code: ja\nCustomLabel.X\tHello"
+    doc = parse_stf_text(text)
+    assert doc.language == "Japanese"
+    assert len(doc.entries) == 1
+
+
+def test_parse_stf_with_crlf(tmp_path: Path) -> None:
+    """STF file with CRLF line endings parses correctly."""
+    content = "# Language: Japanese\r\nLanguage code: ja\r\nCustomLabel.X\tHello\tKonnichiwa\t-\r\n"
+    stf_file = tmp_path / "crlf_test.stf"
+    stf_file.write_bytes(content.encode("utf-8"))
+
+    doc = parse_stf(stf_file)
+    assert doc.language == "Japanese"
+    assert len(doc.entries) == 1
+    assert doc.entries[0].translation == "Konnichiwa"  # no trailing \r
