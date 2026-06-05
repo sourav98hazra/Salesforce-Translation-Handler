@@ -61,10 +61,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandirs; Name: "{app}\__pycache__"
-Type: filesandirs; Name: "{app}\*.pyc"
+Type: files; Name: "{app}\__pycache__\*"
+Type: dirifempty; Name: "{app}\__pycache__"
+Type: files; Name: "{app}\*.pyc"
 Type: dirifempty; Name: "{app}"
-Type: filesandirs; Name: "{localappdata}\SalesforceTranslationHandler\cache"
+Type: files; Name: "{localappdata}\SalesforceTranslationHandler\cache\*"
+Type: dirifempty; Name: "{localappdata}\SalesforceTranslationHandler\cache"
 Type: dirifempty; Name: "{localappdata}\SalesforceTranslationHandler"
 
 [Code]
